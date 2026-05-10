@@ -231,9 +231,7 @@ export default function Home() {
             {!sidebarCollapsed && 'Import'}
             <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
           </label>
-          <div className={`${sidebarCollapsed ? 'flex justify-center py-1' : 'px-3 py-1'}`}>
-            <ThemeToggle />
-          </div>
+          <ThemeToggle sidebar collapsed={sidebarCollapsed} />
         </div>
       </aside>
 
