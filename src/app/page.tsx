@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
-  FileText, Search, Download, Upload, ChevronLeft,
+  FileText, Search, Download, Upload, ChevronLeft, Inbox,
 } from 'lucide-react'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { GraphView } from '@/components/graph/GraphView'
@@ -17,16 +17,17 @@ import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { SearchBar } from '@/components/search/SearchBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
-type Tab = 'today' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes'
+type Tab = 'today' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'proposals'
 
 const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'today',  label: 'Today',   Icon: House },
-  { id: 'graph',  label: 'Graph',   Icon: Share2 },
-  { id: 'habits', label: 'Habits',  Icon: Activity },
-  { id: 'tasks',  label: 'Tasks',   Icon: CheckSquare },
-  { id: 'events', label: 'Events',  Icon: Calendar },
-  { id: 'school', label: 'School',  Icon: BookOpen },
-  { id: 'notes',  label: 'Notes',   Icon: FileText },
+  { id: 'today',     label: 'Today',     Icon: House },
+  { id: 'graph',     label: 'Graph',     Icon: Share2 },
+  { id: 'habits',    label: 'Habits',    Icon: Activity },
+  { id: 'tasks',     label: 'Tasks',     Icon: CheckSquare },
+  { id: 'events',    label: 'Events',    Icon: Calendar },
+  { id: 'school',    label: 'School',    Icon: BookOpen },
+  { id: 'notes',     label: 'Notes',     Icon: FileText },
+  { id: 'proposals', label: 'Proposals', Icon: Inbox },
 ]
 
 // Placeholder logo mark — two lines converging into a node (the "A + node" concept)
@@ -44,7 +45,6 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>('today')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatWidth, setChatWidth] = useState(420)
-  const [queueOpen, setQueueOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [graphRefreshKey, setGraphRefreshKey] = useState(0)
@@ -102,7 +102,7 @@ export default function Home() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); window.open('/api/export', '_blank'); return }
       if (inInput) return
       if (e.key === '/') { e.preventDefault(); chatInputRef.current?.focus() }
-      if (e.key === 'p') setQueueOpen(true)
+      if (e.key === 'p') setTab('proposals')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -161,7 +161,7 @@ export default function Home() {
               title={sidebarCollapsed ? t.label : undefined}
               style={{ fontFamily: 'var(--font-montserrat)' }}
               className={`
-                flex items-center rounded-lg text-[13px] font-medium transition-colors
+                relative flex items-center rounded-lg text-[13px] font-medium transition-colors
                 ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'gap-3 px-3 py-2 w-full text-left'}
                 ${tab === t.id
                   ? 'bg-muted/80 text-foreground'
@@ -171,6 +171,14 @@ export default function Home() {
             >
               <t.Icon className={`shrink-0 ${tab === t.id ? 'opacity-100' : 'opacity-55'} ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
               {!sidebarCollapsed && t.label}
+              {!sidebarCollapsed && t.id === 'proposals' && pendingCount > 0 && (
+                <span className="ml-auto text-[9px] font-semibold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                  {pendingCount}
+                </span>
+              )}
+              {sidebarCollapsed && t.id === 'proposals' && pendingCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
             </button>
           ))}
         </nav>
@@ -238,48 +246,30 @@ export default function Home() {
       {/* ── Main panel ─────────────────────────────────── */}
       <div className="hidden md:flex flex-col flex-1 overflow-hidden relative">
         {/* Slim top bar */}
-        <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
+        <header className="flex items-center px-5 h-[52px] border-b border-border/60 shrink-0">
           <p className="text-[15px] font-semibold text-foreground" style={{ fontFamily: 'var(--font-montserrat)' }}>
             {tab === 'today'
               ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
               : activeTab?.label}
           </p>
-          <button
-            onClick={() => setQueueOpen(true)}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
-              pendingCount > 0
-                ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60'
-            }`}
-          >
-            {pendingCount > 0 ? (
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                {pendingCount} pending
-              </span>
-            ) : 'proposals'}
-          </button>
         </header>
 
         {/* Panel content */}
         <div className="flex-1 overflow-hidden">
-          {tab === 'today'  && <TodayView onNavigate={(t) => setTab(t as Tab)} />}
-          {tab === 'graph'  && <GraphView refreshKey={graphRefreshKey} />}
-          {tab === 'habits' && <HabitsPanel />}
-          {tab === 'tasks'  && <TasksPanel />}
-          {tab === 'events' && <EventsPanel />}
-          {tab === 'school' && <SchoolPanel />}
-          {tab === 'notes'  && <NotesPanel />}
+          {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} />}
+          {tab === 'graph'     && <GraphView refreshKey={graphRefreshKey} />}
+          {tab === 'habits'    && <HabitsPanel />}
+          {tab === 'tasks'     && <TasksPanel />}
+          {tab === 'events'    && <EventsPanel />}
+          {tab === 'school'    && <SchoolPanel />}
+          {tab === 'notes'     && <NotesPanel />}
+          {tab === 'proposals' && (
+            <ProposalQueue
+              onCountChange={(n) => setPendingCount(n)}
+              onApproved={() => setGraphRefreshKey((k) => k + 1)}
+            />
+          )}
         </div>
-
-        {/* Proposals — overlays just the main panel, aligned with the rest */}
-        {queueOpen && (
-          <ProposalQueue
-            onClose={() => setQueueOpen(false)}
-            onCountChange={(n) => setPendingCount(n)}
-            onApproved={() => setGraphRefreshKey((k) => k + 1)}
-          />
-        )}
       </div>
 
       {searchOpen && <SearchBar onClose={() => setSearchOpen(false)} />}

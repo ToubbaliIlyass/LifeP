@@ -148,12 +148,11 @@ function ProposalCard({ proposal, onResolved, onApproved }: ProposalCardProps) {
 // --- Full proposal queue panel ---
 
 interface ProposalQueueProps {
-  onClose: () => void
   onCountChange: (n: number) => void
   onApproved: () => void
 }
 
-export function ProposalQueue({ onClose, onCountChange, onApproved }: ProposalQueueProps) {
+export function ProposalQueue({ onCountChange, onApproved }: ProposalQueueProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
 
   const load = useCallback(() => {
@@ -168,22 +167,18 @@ export function ProposalQueue({ onClose, onCountChange, onApproved }: ProposalQu
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="absolute inset-0 bg-background z-50 flex flex-col">
-      <div className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
-        <span className="text-[15px] font-semibold" style={{ fontFamily: 'var(--font-montserrat)' }}>Proposals</span>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted/60 transition-colors text-lg leading-none">×</button>
-      </div>
-      <ScrollArea className="flex-1 p-3">
-        {proposals.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center pt-8">No pending proposals</p>
-        ) : (
-          <div className="space-y-3">
-            {proposals.map((p) => (
-              <ProposalCard key={p.id} proposal={p} onResolved={load} onApproved={onApproved} />
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-    </div>
+    <ScrollArea className="h-full">
+      {proposals.length === 0 ? (
+        <p className="text-[13px] text-muted-foreground/50 text-center pt-12 font-serif italic">
+          No pending proposals
+        </p>
+      ) : (
+        <div className="p-5 space-y-3 max-w-2xl">
+          {proposals.map((p) => (
+            <ProposalCard key={p.id} proposal={p} onResolved={load} onApproved={onApproved} />
+          ))}
+        </div>
+      )}
+    </ScrollArea>
   )
 }
