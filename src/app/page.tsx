@@ -236,11 +236,13 @@ export default function Home() {
       </div>
 
       {/* ── Main panel ─────────────────────────────────── */}
-      <div className="hidden md:flex flex-col flex-1 overflow-hidden">
+      <div className="hidden md:flex flex-col flex-1 overflow-hidden relative">
         {/* Slim top bar */}
         <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
           <p className="text-[15px] font-semibold text-foreground" style={{ fontFamily: 'var(--font-montserrat)' }}>
-            {activeTab?.label}
+            {tab === 'today'
+              ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : activeTab?.label}
           </p>
           <button
             onClick={() => setQueueOpen(true)}
@@ -269,17 +271,18 @@ export default function Home() {
           {tab === 'school' && <SchoolPanel />}
           {tab === 'notes'  && <NotesPanel />}
         </div>
+
+        {/* Proposals — overlays just the main panel, aligned with the rest */}
+        {queueOpen && (
+          <ProposalQueue
+            onClose={() => setQueueOpen(false)}
+            onCountChange={(n) => setPendingCount(n)}
+            onApproved={() => setGraphRefreshKey((k) => k + 1)}
+          />
+        )}
       </div>
 
       {searchOpen && <SearchBar onClose={() => setSearchOpen(false)} />}
-
-      {queueOpen && (
-        <ProposalQueue
-          onClose={() => setQueueOpen(false)}
-          onCountChange={(n) => setPendingCount(n)}
-          onApproved={() => setGraphRefreshKey((k) => k + 1)}
-        />
-      )}
     </main>
   )
 }

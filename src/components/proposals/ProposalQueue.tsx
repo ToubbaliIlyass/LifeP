@@ -168,10 +168,10 @@ export function ProposalQueue({ onClose, onCountChange, onApproved }: ProposalQu
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 bg-background border-l shadow-xl z-50 flex flex-col">
-      <div className="flex items-center justify-between px-4 h-12 border-b shrink-0">
-        <span className="text-sm font-semibold">Proposals</span>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg leading-none">×</button>
+    <div className="absolute inset-0 bg-background z-50 flex flex-col">
+      <div className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
+        <span className="text-[15px] font-semibold" style={{ fontFamily: 'var(--font-montserrat)' }}>Proposals</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted/60 transition-colors text-lg leading-none">×</button>
       </div>
       <ScrollArea className="flex-1 p-3">
         {proposals.length === 0 ? (

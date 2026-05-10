@@ -110,16 +110,6 @@ export function TodayView({ onNavigate }: TodayViewProps) {
     <ScrollArea className="h-full">
       <div className="px-8 py-8 max-w-2xl">
 
-        {/* Date heading */}
-        <div className="mb-8">
-          <p className="text-[11px] font-mono text-muted-foreground/40 uppercase tracking-widest mb-1">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
-          </p>
-          <h1 className="text-3xl font-bold text-foreground font-serif leading-tight">
-            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-          </h1>
-        </div>
-
         {isEmpty && (
           <div className="py-10 text-center">
             <p className="text-[13px] text-muted-foreground/60 font-serif italic">
