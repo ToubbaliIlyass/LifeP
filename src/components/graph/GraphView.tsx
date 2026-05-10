@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
-  Panel,
   useNodesState,
   useEdgesState,
   type NodeTypes,
@@ -15,9 +14,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import { toFlowEdges, toFlowNodes } from '@/lib/graph/layout'
-import type { NodeData } from '@/lib/graph/layout'
-import { FilterBar } from './FilterBar'
+import { toFlowGraph } from '@/lib/graph/layout'
 import { GoalNode } from './nodes/GoalNode'
 import { HabitNode } from './nodes/HabitNode'
 import { TaskNode } from './nodes/TaskNode'
@@ -28,9 +25,13 @@ import { AssignmentNode } from './nodes/AssignmentNode'
 import { ExamNode } from './nodes/ExamNode'
 import { NoteNode } from './nodes/NoteNode'
 import { GenericNode } from './nodes/GenericNode'
+import { RootNode } from './nodes/RootNode'
+import { CategoryNode } from './nodes/CategoryNode'
 import type { Node as DbNode, Edge as DbEdge } from '@/lib/db/schema'
 
 const BASE_NODE_TYPES: NodeTypes = {
+  root: RootNode,
+  category: CategoryNode,
   goal: GoalNode,
   habit: HabitNode,
   task: TaskNode,
@@ -74,34 +75,25 @@ function useDarkMode() {
 }
 
 export function GraphView({ refreshKey = 0 }: GraphViewProps) {
-  const [filter, setFilter] = useState('')
   const dark = useDarkMode()
   const [viewState, setViewState] = useState<ViewState>({ status: 'loading' })
-  const [resolvedNodeTypes, setResolvedNodeTypes] = useState<NodeTypes>(BASE_NODE_TYPES)
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode<NodeData>>([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
 
   useEffect(() => {
-    const url = filter ? `/api/graph?filter=${encodeURIComponent(filter)}` : '/api/graph'
-    // refreshKey changes when a proposal is approved — forces a re-fetch
-    void refreshKey
     let cancelled = false
 
-    fetch(url)
+    fetch('/api/graph')
       .then((r) => {
         if (!r.ok) throw new Error(`Graph fetch failed: ${r.status}`)
         return r.json() as Promise<GraphData>
       })
       .then((data) => {
         if (cancelled) return
-        const extra: NodeTypes = {}
-        for (const n of data.nodes) {
-          const key = n.type.toLowerCase()
-          if (!BASE_NODE_TYPES[key]) extra[key] = GenericNode
-        }
-        setResolvedNodeTypes({ ...BASE_NODE_TYPES, ...extra })
-        setNodes(toFlowNodes(data.nodes))
-        setEdges(toFlowEdges(data.edges))
+        const { nodes: fn, edges: fe } = toFlowGraph(data.nodes, data.edges)
+        setNodes(fn)
+        setEdges(fe)
         setViewState({ status: 'ready', data })
       })
       .catch((e: unknown) => {
@@ -112,10 +104,73 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
     return () => {
       cancelled = true
     }
-  }, [filter, refreshKey, setNodes, setEdges])
+  }, [refreshKey, setNodes, setEdges])
 
-  const isEmpty =
-    viewState.status === 'ready' && viewState.data.nodes.length === 0
+  // Compute highlighted node ids for the current hover
+  const highlightedIds = useMemo<Set<string>>(() => {
+    if (!hoveredId) return new Set()
+
+    const ids = new Set<string>([hoveredId])
+
+    // Direct neighbors (1 level)
+    for (const edge of edges) {
+      if (edge.source === hoveredId) ids.add(edge.target)
+      if (edge.target === hoveredId) ids.add(edge.source)
+    }
+
+    // For category nodes: also include their children's neighbors (2nd level)
+    if (hoveredId.startsWith('__cat__:') || hoveredId === '__root__') {
+      const firstLevel = new Set(ids)
+      for (const edge of edges) {
+        if (firstLevel.has(edge.source)) ids.add(edge.target)
+        if (firstLevel.has(edge.target)) ids.add(edge.source)
+      }
+    }
+
+    return ids
+  }, [hoveredId, edges])
+
+  const displayNodes = useMemo(
+    () =>
+      nodes.map((n) => ({
+        ...n,
+        style: {
+          ...n.style,
+          opacity: hoveredId === null || highlightedIds.has(n.id) ? 1 : 0.12,
+          transition: 'opacity 0.15s ease',
+        },
+      })),
+    [nodes, hoveredId, highlightedIds],
+  )
+
+  const displayEdges = useMemo(
+    () =>
+      edges.map((e) => {
+        const highlighted =
+          hoveredId === null ||
+          (highlightedIds.has(e.source) && highlightedIds.has(e.target))
+        return {
+          ...e,
+          style: {
+            ...e.style,
+            opacity: highlighted ? 1 : 0.05,
+            transition: 'opacity 0.15s ease',
+          },
+        }
+      }),
+    [edges, hoveredId, highlightedIds],
+  )
+
+  const isEmpty = viewState.status === 'ready' && viewState.data.nodes.length === 0
+
+  // Build node types: BASE_NODE_TYPES + GenericNode fallback for any unknown types
+  const nodeTypes = useMemo<NodeTypes>(() => {
+    const extra: NodeTypes = {}
+    for (const n of nodes) {
+      if (n.type && !BASE_NODE_TYPES[n.type]) extra[n.type] = GenericNode
+    }
+    return { ...BASE_NODE_TYPES, ...extra }
+  }, [nodes])
 
   return (
     <div className="flex flex-col h-full">
@@ -138,18 +193,17 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           </div>
         )}
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={displayNodes}
+          edges={displayEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          nodeTypes={resolvedNodeTypes}
+          nodeTypes={nodeTypes}
+          onNodeMouseEnter={(_, n) => setHoveredId(n.id)}
+          onNodeMouseLeave={() => setHoveredId(null)}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
         >
-          <Panel position="top-left">
-            <FilterBar active={filter} onChange={setFilter} />
-          </Panel>
           <Background
             color={dark ? 'oklch(1 0 0 / 5%)' : 'oklch(0 0 0 / 8%)'}
             gap={24}
