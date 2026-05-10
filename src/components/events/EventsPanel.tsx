@@ -58,10 +58,6 @@ export function EventsPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-sm font-semibold">Upcoming Events</p>
-        <p className="text-xs text-muted-foreground mt-0.5">Next 30 days</p>
-      </div>
       <ScrollArea className="flex-1">
         {loading && <p className="text-sm text-muted-foreground text-center pt-8">Loading…</p>}
         {!loading && grouped.size === 0 && (

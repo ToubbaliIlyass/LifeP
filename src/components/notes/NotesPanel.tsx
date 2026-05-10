@@ -38,12 +38,6 @@ export function NotesPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-lg font-bold font-serif">Notes & Journal</p>
-        {notes.length > 0 && (
-          <p className="text-xs text-muted-foreground mt-0.5">{notes.length} entr{notes.length !== 1 ? 'ies' : 'y'}</p>
-        )}
-      </div>
       <ScrollArea className="flex-1">
         {loading && <p className="text-sm text-muted-foreground text-center pt-8">Loading…</p>}
         {!loading && notes.length === 0 && (

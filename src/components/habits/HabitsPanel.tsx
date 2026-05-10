@@ -53,13 +53,12 @@ export function HabitsPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-border/60 shrink-0">
-        <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest mb-1">
-          {data ? formatDate(data.date) : '—'}
-        </p>
-        <div className="flex items-baseline justify-between">
-          <p className="text-lg font-bold text-foreground font-serif">Habits</p>
+      {/* Header — date + progress only, no title (shown in top bar) */}
+      <div className="px-5 py-3 border-b border-border/60 shrink-0">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest">
+            {data ? formatDate(data.date) : '—'}
+          </p>
           {total > 0 && (
             <span className="text-[11px] font-mono text-muted-foreground/50">
               {completed}/{total}
@@ -67,7 +66,7 @@ export function HabitsPanel() {
           )}
         </div>
         {total > 0 && (
-          <div className="mt-2.5 h-px bg-border/60 overflow-hidden rounded-full">
+          <div className="mt-2 h-px bg-border/60 overflow-hidden rounded-full">
             <div
               className="h-full bg-primary/70 rounded-full transition-all duration-500"
               style={{ width: `${(completed / total) * 100}%` }}

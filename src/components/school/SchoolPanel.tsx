@@ -67,12 +67,6 @@ export function SchoolPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-sm font-semibold">School</p>
-        {courses.length > 0 && (
-          <p className="text-xs text-muted-foreground mt-0.5">{courses.length} course{courses.length !== 1 ? 's' : ''}</p>
-        )}
-      </div>
       <ScrollArea className="flex-1">
         {loading && <p className="text-sm text-muted-foreground text-center pt-8">Loading…</p>}
         {!loading && courses.length === 0 && (

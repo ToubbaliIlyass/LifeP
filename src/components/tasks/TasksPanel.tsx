@@ -69,16 +69,6 @@ export function TasksPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-5 py-4 border-b border-border/60 shrink-0">
-        <div className="flex items-baseline justify-between">
-          <p className="text-lg font-bold text-foreground font-serif">Tasks</p>
-          {tasks.length > 0 && (
-            <span className="text-[11px] font-mono text-muted-foreground/50">
-              {active} remaining
-            </span>
-          )}
-        </div>
-      </div>
 
       <ScrollArea className="flex-1">
         {loading && <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>}

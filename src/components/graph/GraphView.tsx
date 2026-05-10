@@ -115,9 +115,14 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
       })
       .then((data) => {
         if (cancelled) return
-        const { nodes: fn, edges: fe } = toFlowGraph(data.nodes, data.edges)
-        setNodes(fn)
-        setEdges(fe)
+        if (data.nodes.length > 0) {
+          const { nodes: fn, edges: fe } = toFlowGraph(data.nodes, data.edges)
+          setNodes(fn)
+          setEdges(fe)
+        } else {
+          setNodes([])
+          setEdges([])
+        }
         setViewState({ status: 'ready', data })
       })
       .catch((e: unknown) => {
