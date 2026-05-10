@@ -276,10 +276,7 @@ export default function Home() {
       {queueOpen && (
         <ProposalQueue
           onClose={() => setQueueOpen(false)}
-          onCountChange={(n) => {
-            setPendingCount(n)
-            if (n === 0) setQueueOpen(false)
-          }}
+          onCountChange={(n) => setPendingCount(n)}
           onApproved={() => setGraphRefreshKey((k) => k + 1)}
         />
       )}
