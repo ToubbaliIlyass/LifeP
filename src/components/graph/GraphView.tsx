@@ -6,6 +6,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
   type NodeTypes,
@@ -118,7 +119,6 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <FilterBar active={filter} onChange={setFilter} />
       <div className="flex-1 relative">
         {viewState.status === 'loading' && (
           <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/50">
@@ -147,6 +147,9 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
         >
+          <Panel position="top-left">
+            <FilterBar active={filter} onChange={setFilter} />
+          </Panel>
           <Background
             color={dark ? 'oklch(1 0 0 / 5%)' : 'oklch(0 0 0 / 8%)'}
             gap={24}

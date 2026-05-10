@@ -34,21 +34,18 @@ export function FilterBar({ active, onChange }: FilterBarProps) {
   ]
 
   return (
-    <div className="flex items-end gap-0 px-4 border-b border-border/60 shrink-0 overflow-x-auto">
+    <div className="flex items-center gap-0.5 bg-background/80 dark:bg-[oklch(0.125_0.004_255/90%)] backdrop-blur-md border border-border/50 rounded-xl px-1.5 py-1.5 shadow-[0_2px_12px_oklch(0_0_0/0.15)]">
       {filters.map((f) => (
         <button
           key={f.value}
           onClick={() => onChange(f.value)}
-          className={`relative px-3 py-2.5 text-[11px] font-medium tracking-wide transition-colors whitespace-nowrap shrink-0 ${
+          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all whitespace-nowrap ${
             active === f.value
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground/70'
+              ? 'bg-foreground text-background shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           {f.label}
-          {active === f.value && (
-            <span className="absolute bottom-0 left-3 right-3 h-px bg-primary rounded-full" />
-          )}
         </button>
       ))}
     </div>
