@@ -8,6 +8,20 @@ interface ChatPanelProps {
   inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
+const SUGGESTIONS = [
+  { label: 'Set a goal', prompt: 'I want to set a new goal: ' },
+  { label: 'Log a habit', prompt: 'I completed my habit today — ' },
+  { label: 'Add a task', prompt: 'I need to add a task: ' },
+  { label: "Plan my day", prompt: 'Help me plan my day' },
+]
+
+function getGreeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export function ChatPanel({ inputRef }: ChatPanelProps) {
   const { messages, sendMessage, status, error } = useChat()
   const [input, setInput] = useState('')
@@ -15,36 +29,94 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
   const localInputRef = useRef<HTMLInputElement>(null)
   const resolvedRef = inputRef ?? localInputRef
   const busy = status === 'submitted' || status === 'streaming'
+  const empty = messages.length === 0
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const text = input.trim()
-    if (!text || busy) return
+  function submit(text?: string) {
+    const t = (text ?? input).trim()
+    if (!t || busy) return
     setInput('')
-    sendMessage({ text })
+    sendMessage({ text: t })
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    submit()
+  }
+
+  // ── Empty state — Claude.ai inspired ──────────────────
+  if (empty) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
+          {/* Greeting */}
+          <p className="text-3xl font-extrabold text-foreground mb-1 tracking-tight">
+            {getGreeting()}, Ilyass
+          </p>
+          <p className="text-sm text-muted-foreground mb-8">
+            What do you want to track today?
+          </p>
+
+          {/* Floating input card */}
+          <div className="w-full max-w-md">
+            <form
+              onSubmit={handleSubmit}
+              className="bg-card border border-border/70 rounded-2xl shadow-[0_4px_24px_oklch(0_0_0/0.15)] px-4 pt-4 pb-3"
+            >
+              <input
+                ref={resolvedRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) handleSubmit(e)
+                }}
+                placeholder="Tell me about your goals, habits, tasks…"
+                disabled={busy}
+                autoFocus
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none min-h-[48px] resize-none"
+              />
+              <div className="flex items-center justify-end mt-2 pt-2 border-t border-border/40">
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  className="flex items-center gap-1.5 text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg disabled:opacity-30 transition-opacity hover:opacity-90"
+                >
+                  Send
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+
+            {/* Suggestion chips */}
+            <div className="flex flex-wrap gap-2 mt-3 justify-center">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s.label}
+                  onClick={() => {
+                    setInput(s.prompt)
+                    resolvedRef.current?.focus()
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Active chat ────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 px-5 py-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-start pt-10 pb-6">
-            <p
-              className="text-2xl font-medium italic text-foreground/80 leading-snug mb-2"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              What&apos;s on your mind?
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Tell me about your goals, habits, tasks, or anything you want to track.
-            </p>
-          </div>
-        )}
-
         <div className="space-y-5">
           {messages.map((msg) => (
             <div
@@ -52,14 +124,14 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
               {msg.role === 'assistant' && (
-                <p className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-widest mb-1.5 ml-0.5">
+                <p className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-widest mb-1.5 ml-0.5">
                   LifeP
                 </p>
               )}
               <div
                 className={`max-w-[88%] text-[13.5px] leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5'
+                    ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 font-medium'
                     : 'text-foreground/90'
                 }`}
               >
@@ -71,12 +143,10 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
           ))}
 
           {busy && (
-            <div className="flex items-start">
-              <div className="flex items-center gap-1.5 px-1 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:0ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:150ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:300ms]" />
-              </div>
+            <div className="flex items-center gap-1.5 px-1 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:300ms]" />
             </div>
           )}
 
@@ -89,11 +159,11 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
         <div ref={bottomRef} />
       </ScrollArea>
 
-      {/* Input */}
+      {/* Bottom input */}
       <div className="shrink-0 px-4 pb-4 pt-2">
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-2 bg-muted/50 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border transition-colors"
+          className="flex items-center gap-2 bg-muted/40 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border/80 transition-colors"
         >
           <input
             ref={resolvedRef}
@@ -102,10 +172,9 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) handleSubmit(e)
             }}
-            placeholder="Talk to LifeP…"
+            placeholder="Reply…"
             disabled={busy}
-            autoFocus
-            className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/50 outline-none resize-none min-h-[24px] py-0.5"
+            className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/40 outline-none"
           />
           <button
             type="submit"
@@ -118,9 +187,6 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
             </svg>
           </button>
         </form>
-        <p className="text-[10px] text-muted-foreground/40 mt-1.5 ml-1 font-mono">
-          / to focus · ⌘K to search
-        </p>
       </div>
     </div>
   )

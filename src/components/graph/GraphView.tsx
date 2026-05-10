@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -58,8 +58,23 @@ interface GraphViewProps {
   refreshKey?: number
 }
 
+// Observe dark class changes so controls/minimap re-theme on toggle
+function useDarkMode() {
+  const [dark, setDark] = useState(false)
+  const ref = useRef<MutationObserver | null>(null)
+  useEffect(() => {
+    const update = () => setDark(document.documentElement.classList.contains('dark'))
+    update()
+    ref.current = new MutationObserver(update)
+    ref.current.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => ref.current?.disconnect()
+  }, [])
+  return dark
+}
+
 export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [filter, setFilter] = useState('')
+  const dark = useDarkMode()
   const [viewState, setViewState] = useState<ViewState>({ status: 'loading' })
   const [resolvedNodeTypes, setResolvedNodeTypes] = useState<NodeTypes>(BASE_NODE_TYPES)
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode<NodeData>>([])
@@ -132,9 +147,30 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background />
-          <Controls />
-          <MiniMap />
+          <Background
+            color={dark ? 'oklch(1 0 0 / 5%)' : 'oklch(0 0 0 / 8%)'}
+            gap={24}
+            size={1}
+          />
+          <Controls
+            style={{
+              background: dark ? 'oklch(0.125 0.004 255)' : 'oklch(1 0 0)',
+              border: `1px solid ${dark ? 'oklch(1 0 0 / 10%)' : 'oklch(0 0 0 / 10%)'}`,
+              borderRadius: '0.5rem',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px oklch(0 0 0 / 0.2)',
+            }}
+          />
+          <MiniMap
+            style={{
+              background: dark ? 'oklch(0.125 0.004 255)' : 'oklch(1 0 0)',
+              border: `1px solid ${dark ? 'oklch(1 0 0 / 10%)' : 'oklch(0 0 0 / 10%)'}`,
+              borderRadius: '0.5rem',
+            }}
+            maskColor={dark ? 'oklch(0.095 0.004 255 / 75%)' : 'oklch(0.975 0.003 75 / 75%)'}
+            nodeColor={dark ? 'oklch(0.22 0.004 255)' : 'oklch(0.85 0 0)'}
+            nodeStrokeWidth={0}
+          />
         </ReactFlow>
       </div>
     </div>

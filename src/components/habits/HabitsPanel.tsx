@@ -59,12 +59,7 @@ export function HabitsPanel() {
           {data ? formatDate(data.date) : '—'}
         </p>
         <div className="flex items-baseline justify-between">
-          <p
-            className="text-lg font-medium italic text-foreground/80"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            Habits
-          </p>
+          <p className="text-lg font-bold text-foreground">Habits</p>
           {total > 0 && (
             <span className="text-[11px] font-mono text-muted-foreground/50">
               {completed}/{total}

@@ -71,12 +71,7 @@ export function TasksPanel() {
     <div className="flex flex-col h-full">
       <div className="px-5 py-4 border-b border-border/60 shrink-0">
         <div className="flex items-baseline justify-between">
-          <p
-            className="text-lg font-medium italic text-foreground/80"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            Tasks
-          </p>
+          <p className="text-lg font-bold text-foreground">Tasks</p>
           {tasks.length > 0 && (
             <span className="text-[11px] font-mono text-muted-foreground/50">
               {active} remaining

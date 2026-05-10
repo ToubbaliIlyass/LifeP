@@ -97,15 +97,12 @@ export default function Home() {
       {/* ── Header ── */}
       <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
         {/* Logo */}
-        <div className="flex items-baseline gap-2">
-          <span
-            className="text-xl font-medium italic leading-none tracking-tight text-foreground"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
+        <div className="flex items-baseline gap-2.5">
+          <span className="text-xl font-extrabold tracking-tight text-foreground leading-none">
             LifeP
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground/60 hidden sm:block tracking-widest uppercase">
-            your life graph
+          <span className="text-[10px] font-mono text-muted-foreground/50 hidden sm:block tracking-widest uppercase">
+            life graph
           </span>
         </div>
 
