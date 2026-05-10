@@ -16,6 +16,9 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { toFlowGraph, computeRadialLayout } from '@/lib/graph/layout'
+import { FloatingEdge } from './FloatingEdge'
+
+const EDGE_TYPES = { floating: FloatingEdge }
 import { GoalNode } from './nodes/GoalNode'
 import { HabitNode } from './nodes/HabitNode'
 import { TaskNode } from './nodes/TaskNode'
@@ -142,8 +145,10 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
         ...n,
         style: {
           ...n.style,
-          opacity: hoveredId === null || highlightedIds.has(n.id) ? 1 : 0.12,
-          transition: 'opacity 0.15s ease',
+          opacity: hoveredId === null || highlightedIds.has(n.id) ? 1 : 0.1,
+          transition: hoveredId === null
+            ? 'opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+            : 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         },
       })),
     [nodes, hoveredId, highlightedIds],
@@ -160,7 +165,9 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           style: {
             ...e.style,
             opacity: highlighted ? 1 : 0.05,
-            transition: 'opacity 0.15s ease',
+            transition: hoveredId === null
+              ? 'opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+              : 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           },
         }
       }),
@@ -204,6 +211,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
+          edgeTypes={EDGE_TYPES}
           onNodeMouseEnter={(_, n) => setHoveredId(n.id)}
           onNodeMouseLeave={() => setHoveredId(null)}
           fitView

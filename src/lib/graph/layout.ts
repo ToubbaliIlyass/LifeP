@@ -14,6 +14,7 @@ export type NodeData = {
   dbNode: Node
   label: string
   properties: Record<string, unknown>
+  circleR?: number
 }
 
 const TYPE_ORDER = ['Goal', 'Habit', 'Task', 'Event']
@@ -55,6 +56,7 @@ export function toFlowNodes(nodes: Node[]): FlowNode<NodeData>[] {
           dbNode: node,
           label: getLabel(node),
           properties: node.properties as Record<string, unknown>,
+          circleR: 19,
         },
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
@@ -131,13 +133,13 @@ export function toFlowGraph(
   types.forEach((type) => {
     const catId = `__cat__:${type}`
     d3nodes.push({ id: catId, radius: 26 })
-    d3links.push({ source: '__root__', target: catId, distance: 200 })
+    d3links.push({ source: '__root__', target: catId, distance: 140 })
 
     const group = byType.get(type) ?? []
     group.forEach((node) => {
       const nodeId = String(node.id)
       d3nodes.push({ id: nodeId, radius: 18 })
-      d3links.push({ source: catId, target: nodeId, distance: 150 })
+      d3links.push({ source: catId, target: nodeId, distance: 100 })
     })
   })
 
@@ -146,7 +148,7 @@ export function toFlowGraph(
     const src = String(edge.sourceId)
     const tgt = String(edge.targetId)
     if (filteredNodeIds.has(src) && filteredNodeIds.has(tgt)) {
-      d3links.push({ source: src, target: tgt, distance: 120 })
+      d3links.push({ source: src, target: tgt, distance: 80 })
     }
   }
 
@@ -161,7 +163,7 @@ export function toFlowGraph(
         .distance((d) => d.distance)
         .strength(0.7),
     )
-    .force('charge', forceManyBody<D3Node>().strength(-500))
+    .force('charge', forceManyBody<D3Node>().strength(-320))
     .force('center', forceCenter(0, 0))
     .force('collide', forceCollide<D3Node>((d) => d.radius + 22))
     .stop()
@@ -185,7 +187,7 @@ export function toFlowGraph(
     type: 'root',
     position: rootPos,
     origin: [0.5, 0.5],
-    data: { label: 'Ilyass' },
+    data: { label: 'Ilyass', circleR: 36 },
   })
 
   types.forEach((type) => {
@@ -197,14 +199,14 @@ export function toFlowGraph(
       type: 'category',
       position: catPos,
       origin: [0.5, 0.5],
-      data: { label: pluralize(type), nodeType: type.toLowerCase() },
+      data: { label: pluralize(type), nodeType: type.toLowerCase(), circleR: 27 },
     })
 
     flowEdges.push({
       id: `__e__root__${type}`,
       source: '__root__',
       target: catId,
-      type: 'default',
+      type: 'floating',
       style: STRUCT_EDGE,
     })
 
@@ -222,6 +224,7 @@ export function toFlowGraph(
           dbNode: node,
           label: getLabel(node),
           properties: node.properties as Record<string, unknown>,
+          circleR: 19,
         },
       })
 
@@ -245,7 +248,7 @@ export function toFlowGraph(
       source: src,
       target: tgt,
       label: edge.type,
-      type: 'default',
+      type: 'floating',
       style: SEMANTIC_EDGE,
       markerEnd: { type: 'arrowclosed' as const, color: 'oklch(0.74 0.14 72)' },
       labelStyle: { fontSize: 9 },
@@ -261,9 +264,9 @@ export function toFlowGraph(
 // Radial re-layout — places nodes in clean concentric levels with minimal overlap
 // ---------------------------------------------------------------------------
 
-const CAT_RADIUS_RL = 260
-const BASE_LEAF_RADIUS = 540
-const LEAF_ROW_STEP = 140    // extra radius for overflow rows
+const CAT_RADIUS_RL = 170
+const BASE_LEAF_RADIUS = 360
+const LEAF_ROW_STEP = 100    // extra radius for overflow rows
 
 /**
  * Recompute positions for all nodes already in the graph.
