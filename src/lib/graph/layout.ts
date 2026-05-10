@@ -1,4 +1,13 @@
 import type { Node as FlowNode, Edge as FlowEdge } from '@xyflow/react'
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide,
+  type SimulationNodeDatum,
+  type SimulationLinkDatum,
+} from 'd3-force'
 import type { Node, Edge } from '@/lib/db/schema'
 
 export type NodeData = {
@@ -70,13 +79,20 @@ export function toFlowEdges(edges: Edge[]): FlowEdge[] {
 }
 
 // ---------------------------------------------------------------------------
-// Radial tree layout
+// Force-directed graph layout (Obsidian style)
 // ---------------------------------------------------------------------------
 
-const CAT_RADIUS = 280
-const DIM_STYLE = { stroke: 'oklch(0.5 0 0 / 30%)', strokeWidth: 1 }
-const LEAF_CARD_W = 180
-const LEAF_CARD_H = 80
+interface D3Node extends SimulationNodeDatum {
+  id: string
+  radius: number
+}
+
+interface D3Link extends SimulationLinkDatum<D3Node> {
+  distance: number
+}
+
+const STRUCT_EDGE = { stroke: 'oklch(0.55 0 0 / 25%)', strokeWidth: 1 }
+const SEMANTIC_EDGE = { stroke: 'oklch(0.74 0.14 72 / 80%)', strokeWidth: 1.5 }
 
 function pluralize(type: string): string {
   const lower = type.toLowerCase()
@@ -90,11 +106,9 @@ export function toFlowGraph(
   nodes: Node[],
   edges: Edge[],
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  // Filter out HabitLog nodes
   const filteredNodes = nodes.filter((n) => n.type.toLowerCase() !== 'habitlog')
   const filteredNodeIds = new Set(filteredNodes.map((n) => String(n.id)))
 
-  // Group by type
   const byType = new Map<string, Node[]>()
   for (const node of filteredNodes) {
     const bucket = byType.get(node.type) ?? []
@@ -102,72 +116,108 @@ export function toFlowGraph(
     byType.set(node.type, bucket)
   }
 
-  // Build ordered type list: pinned first, then alphabetical
   const types = [
     ...TYPE_ORDER.filter((t) => byType.has(t)),
     ...[...byType.keys()].filter((t) => !TYPE_ORDER.includes(t)).sort(),
   ]
 
-  const maxLeafCount = Math.max(1, ...types.map((t) => (byType.get(t) ?? []).length))
-  const leafRadius = Math.max(560, maxLeafCount * 60)
+  // ── Build d3 simulation nodes ──────────────────────────
+  const d3nodes: D3Node[] = []
+  const d3links: D3Link[] = []
 
+  // Root (fixed at center)
+  d3nodes.push({ id: '__root__', radius: 38, fx: 0, fy: 0 })
+
+  types.forEach((type) => {
+    const catId = `__cat__:${type}`
+    d3nodes.push({ id: catId, radius: 26 })
+    d3links.push({ source: '__root__', target: catId, distance: 200 })
+
+    const group = byType.get(type) ?? []
+    group.forEach((node) => {
+      const nodeId = String(node.id)
+      d3nodes.push({ id: nodeId, radius: 18 })
+      d3links.push({ source: catId, target: nodeId, distance: 150 })
+    })
+  })
+
+  // Semantic edges also influence the layout
+  for (const edge of edges) {
+    const src = String(edge.sourceId)
+    const tgt = String(edge.targetId)
+    if (filteredNodeIds.has(src) && filteredNodeIds.has(tgt)) {
+      d3links.push({ source: src, target: tgt, distance: 120 })
+    }
+  }
+
+  // ── Run force simulation ───────────────────────────────
+  const nodeById = new Map(d3nodes.map((n) => [n.id, n]))
+
+  const sim = forceSimulation<D3Node>(d3nodes)
+    .force(
+      'link',
+      forceLink<D3Node, D3Link>(d3links)
+        .id((d) => d.id)
+        .distance((d) => d.distance)
+        .strength(0.7),
+    )
+    .force('charge', forceManyBody<D3Node>().strength(-500))
+    .force('center', forceCenter(0, 0))
+    .force('collide', forceCollide<D3Node>((d) => d.radius + 22))
+    .stop()
+
+  // Run synchronously for stable initial layout
+  sim.tick(350)
+
+  // ── Build React Flow nodes & edges ────────────────────
   const flowNodes: FlowNode[] = []
   const flowEdges: FlowEdge[] = []
 
-  // Root node
+  const pos = (id: string) => {
+    const n = nodeById.get(id)
+    return { x: n?.x ?? 0, y: n?.y ?? 0 }
+  }
+
+  // Root
+  const rootPos = pos('__root__')
   flowNodes.push({
     id: '__root__',
     type: 'root',
-    position: { x: 0, y: 0 },
+    position: rootPos,
+    origin: [0.5, 0.5],
     data: { label: 'Ilyass' },
   })
 
-  types.forEach((type, i) => {
-    const catAngle = (i / types.length) * 2 * Math.PI - Math.PI / 2
-    const catX = Math.cos(catAngle) * CAT_RADIUS
-    const catY = Math.sin(catAngle) * CAT_RADIUS
+  types.forEach((type) => {
     const catId = `__cat__:${type}`
+    const catPos = pos(catId)
 
-    // Category node
     flowNodes.push({
       id: catId,
       type: 'category',
-      position: { x: catX, y: catY },
+      position: catPos,
+      origin: [0.5, 0.5],
       data: { label: pluralize(type), nodeType: type.toLowerCase() },
     })
 
-    // Root → category edge
     flowEdges.push({
-      id: `__edge__root__${catId}`,
+      id: `__e__root__${type}`,
       source: '__root__',
       target: catId,
-      type: 'straight',
-      style: DIM_STYLE,
+      type: 'default',
+      style: STRUCT_EDGE,
     })
 
     const group = byType.get(type) ?? []
-    const spread = Math.min(Math.PI * 0.75, ((2 * Math.PI) / types.length) * 0.7)
-
-    group.forEach((node, j) => {
-      let leafAngle: number
-      if (group.length === 1) {
-        leafAngle = catAngle
-      } else {
-        const half = spread / 2
-        leafAngle = catAngle - half + (j / (group.length - 1)) * spread
-      }
-
-      const leafX = Math.cos(leafAngle) * leafRadius
-      const leafY = Math.sin(leafAngle) * leafRadius
+    group.forEach((node) => {
       const nodeId = String(node.id)
+      const leafPos = pos(nodeId)
 
       flowNodes.push({
         id: nodeId,
         type: node.type.toLowerCase(),
-        position: {
-          x: leafX - LEAF_CARD_W / 2,
-          y: leafY - LEAF_CARD_H / 2,
-        },
+        position: leafPos,
+        origin: [0.5, 0.5],
         data: {
           dbNode: node,
           label: getLabel(node),
@@ -175,18 +225,17 @@ export function toFlowGraph(
         },
       })
 
-      // Category → leaf edge
       flowEdges.push({
-        id: `__edge__${catId}__${nodeId}`,
+        id: `__e__${catId}__${nodeId}`,
         source: catId,
         target: nodeId,
-        type: 'straight',
-        style: DIM_STYLE,
+        type: 'default',
+        style: STRUCT_EDGE,
       })
     })
   })
 
-  // Semantic DB edges (leaf → leaf)
+  // Semantic DB edges
   for (const edge of edges) {
     const src = String(edge.sourceId)
     const tgt = String(edge.targetId)
@@ -196,8 +245,8 @@ export function toFlowGraph(
       source: src,
       target: tgt,
       label: edge.type,
-      type: 'straight',
-      style: { stroke: 'oklch(0.74 0.14 72)', strokeWidth: 1.5 },
+      type: 'default',
+      style: SEMANTIC_EDGE,
       markerEnd: { type: 'arrowclosed' as const, color: 'oklch(0.74 0.14 72)' },
       labelStyle: { fontSize: 9 },
       labelBgPadding: [4, 2] as [number, number],
