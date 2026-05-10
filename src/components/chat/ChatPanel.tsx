@@ -53,7 +53,7 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
       <div className="flex flex-col h-full">
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
           {/* Greeting */}
-          <p className="text-3xl font-bold text-foreground mb-1" style={{ fontFamily: 'var(--font-source-serif)' }}>
+          <p className="text-3xl font-bold text-foreground mb-1">
             {getGreeting()}, Ilyass
           </p>
           <p className="text-sm text-muted-foreground mb-8">
@@ -134,7 +134,6 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
                     ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 font-medium'
                     : 'text-foreground/90'
                 }`}
-                style={msg.role === 'assistant' ? { fontFamily: 'var(--font-source-serif)' } : undefined}
               >
                 {msg.parts.map((part, i) =>
                   part.type === 'text' ? <span key={i}>{part.text}</span> : null,

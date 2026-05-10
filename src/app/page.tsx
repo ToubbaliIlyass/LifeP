@@ -30,7 +30,6 @@ const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: st
   { id: 'proposals', label: 'Proposals', Icon: Inbox },
 ]
 
-// Placeholder logo mark — two lines converging into a node (the "A + node" concept)
 function ActureMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
@@ -50,7 +49,7 @@ export default function Home() {
   const [graphRefreshKey, setGraphRefreshKey] = useState(0)
   const chatInputRef = useRef<HTMLInputElement>(null)
 
-  // ── Resize logic ──────────────────────────────────────
+  // ── Resize (chat is now on the right — drag handle on left edge) ──
   const dragging = useRef(false)
   const dragStartX = useRef(0)
   const dragStartWidth = useRef(0)
@@ -65,8 +64,9 @@ export default function Home() {
 
     function onMove(ev: MouseEvent) {
       if (!dragging.current) return
+      // Dragging left = bigger chat, right = smaller
       const delta = ev.clientX - dragStartX.current
-      setChatWidth(Math.max(260, Math.min(680, dragStartWidth.current + delta)))
+      setChatWidth(Math.max(260, Math.min(680, dragStartWidth.current - delta)))
     }
     function onUp() {
       dragging.current = false
@@ -108,7 +108,6 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // ── Import ────────────────────────────────────────────
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -143,7 +142,6 @@ export default function Home() {
         {/* Logo + collapse toggle */}
         <div className={`mb-7 flex items-center ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}>
           {sidebarCollapsed ? (
-            // Collapsed: logo mark that swaps to expand icon on hover
             <button
               onClick={() => setSidebarCollapsed(false)}
               title="Expand sidebar"
@@ -153,12 +151,11 @@ export default function Home() {
               <PanelLeft className="w-[15px] h-[15px] text-foreground absolute transition-opacity duration-150 opacity-0 group-hover:opacity-100" />
             </button>
           ) : (
-            // Expanded: logo mark + wordmark + collapse button
             <>
               <div className="w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
                 <ActureMark className="w-[17px] h-[17px] text-foreground" />
               </div>
-              <span className="text-[21px] font-bold tracking-tight text-foreground whitespace-nowrap ml-2.5 flex-1" style={{ fontFamily: 'var(--font-montserrat)' }}>
+              <span className="text-[21px] font-bold tracking-tight text-foreground whitespace-nowrap ml-2.5 flex-1">
                 Acture
               </span>
               <button
@@ -179,7 +176,6 @@ export default function Home() {
               key={t.id}
               onClick={() => setTab(t.id)}
               title={sidebarCollapsed ? t.label : undefined}
-              style={{ fontFamily: 'var(--font-montserrat)' }}
               className={`
                 relative flex items-center rounded-lg text-[13px] font-medium transition-colors
                 ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'gap-3 px-3 py-2 w-full text-left'}
@@ -235,35 +231,16 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* ── Chat panel (resizable) ──────────────────────── */}
-      <div
-        className="flex flex-col shrink-0 relative border-r border-border/60"
-        style={{ width: `min(${chatWidth}px, 100%)` }}
-      >
-        <ChatPanel inputRef={chatInputRef} />
-
-        {/* Drag handle — sits on the right border */}
-        <div
-          onMouseDown={startChatResize}
-          className="hidden md:block absolute inset-y-0 right-[-3px] w-[6px] z-20 cursor-ew-resize group"
-        >
-          {/* Visible indicator on hover */}
-          <div className="absolute inset-y-0 left-[2px] w-[2px] rounded-full opacity-0 group-hover:opacity-100 bg-primary/40 transition-opacity duration-150" />
-        </div>
-      </div>
-
       {/* ── Main panel ─────────────────────────────────── */}
       <div className="hidden md:flex flex-col flex-1 overflow-hidden relative">
-        {/* Slim top bar */}
         <header className="flex items-center px-5 h-[52px] border-b border-border/60 shrink-0">
-          <p className="text-[15px] font-semibold text-foreground" style={{ fontFamily: 'var(--font-montserrat)' }}>
+          <p className="text-[15px] font-semibold text-foreground">
             {tab === 'today'
               ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
               : activeTab?.label}
           </p>
         </header>
 
-        {/* Panel content */}
         <div className="flex-1 overflow-hidden">
           {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} />}
           {tab === 'graph'     && <GraphView refreshKey={graphRefreshKey} />}
@@ -279,6 +256,22 @@ export default function Home() {
             />
           )}
         </div>
+      </div>
+
+      {/* ── Chat panel (right side, resizable) ─────────── */}
+      <div
+        className="flex flex-col shrink-0 relative border-l border-border/60 w-full"
+        style={{ width: `min(${chatWidth}px, 100%)` }}
+      >
+        {/* Drag handle — left edge of chat panel */}
+        <div
+          onMouseDown={startChatResize}
+          className="hidden md:block absolute inset-y-0 left-[-3px] w-[6px] z-20 cursor-ew-resize group"
+        >
+          <div className="absolute inset-y-0 left-[2px] w-[2px] rounded-full opacity-0 group-hover:opacity-100 bg-primary/40 transition-opacity duration-150" />
+        </div>
+
+        <ChatPanel inputRef={chatInputRef} />
       </div>
 
       {searchOpen && <SearchBar onClose={() => setSearchOpen(false)} />}
