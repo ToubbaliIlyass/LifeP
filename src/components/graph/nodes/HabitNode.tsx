@@ -7,23 +7,22 @@ export function HabitNode({ data }: NodeProps) {
   const frequency = typeof d.properties.frequency === 'string' ? d.properties.frequency : null
   const streak = typeof d.properties.streak === 'number' ? d.properties.streak : null
   return (
-    <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 shadow-sm min-w-[160px] max-w-[200px]">
-      <Handle type="target" position={Position.Top} className="!bg-emerald-400" />
-      <div className="flex items-start justify-between gap-1">
-        <p className="text-[10px] text-emerald-600 uppercase tracking-wide font-medium mb-0.5">
-          Habit
-        </p>
-        {streak !== null && streak > 0 && (
-          <span className="text-[10px] text-orange-500 font-medium">🔥{streak}</span>
+    <div className="relative bg-card border border-border/60 rounded-lg overflow-hidden min-w-[172px] max-w-[220px] shadow-[0_2px_12px_oklch(0_0_0/0.15)]">
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-400 dark:bg-emerald-500/80" />
+      <Handle type="target" position={Position.Top} className="!bg-emerald-400/50 !w-1.5 !h-1.5 !border-0 !min-w-0 !min-h-0" />
+      <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <p className="text-[9px] text-emerald-400 dark:text-emerald-400/80 uppercase tracking-widest font-mono font-medium">Habit</p>
+          {streak !== null && streak > 0 && (
+            <span className="text-[10px] text-orange-400/80 font-mono">🔥{streak}</span>
+          )}
+        </div>
+        <p className="text-[13px] font-medium leading-snug text-foreground/90 line-clamp-2">{d.label}</p>
+        {frequency && (
+          <p className="text-[10px] text-muted-foreground/50 font-mono mt-1">{frequency}</p>
         )}
       </div>
-      <p className="text-sm font-semibold leading-tight truncate text-emerald-900 dark:text-emerald-100">
-        {d.label}
-      </p>
-      {frequency && (
-        <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">{frequency}</p>
-      )}
-      <Handle type="source" position={Position.Bottom} className="!bg-emerald-400" />
+      <Handle type="source" position={Position.Bottom} className="!bg-emerald-400/50 !w-1.5 !h-1.5 !border-0 !min-w-0 !min-h-0" />
     </div>
   )
 }

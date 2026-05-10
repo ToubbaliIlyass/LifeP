@@ -2,40 +2,34 @@
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 
-const STATUS_STYLES: Record<string, string> = {
-  'todo':        'bg-muted text-muted-foreground',
-  'in-progress': 'bg-sky-200 text-sky-700 dark:bg-sky-800 dark:text-sky-300',
-  'done':        'bg-emerald-200 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-300',
+const STATUS_COLOR: Record<string, string> = {
+  'todo':        'text-muted-foreground/50',
+  'in-progress': 'text-sky-400/80',
+  'done':        'text-emerald-400/70',
 }
 
 export function TaskNode({ data }: NodeProps) {
   const d = data as { label: string; properties: Record<string, unknown> }
   const status = typeof d.properties.status === 'string' ? d.properties.status : 'todo'
   const dueDate = typeof d.properties.dueDate === 'string' ? d.properties.dueDate : null
-  const overdue = dueDate && new Date(dueDate) < new Date(new Date().toDateString()) && status !== 'done'
-
+  const done = status === 'done'
   return (
-    <div className={`border rounded-xl px-3 py-2 shadow-sm min-w-[160px] max-w-[200px] ${
-      status === 'done'
-        ? 'bg-muted/40 border-border opacity-70'
-        : 'bg-sky-50 dark:bg-sky-950 border-sky-200 dark:border-sky-800'
-    }`}>
-      <Handle type="target" position={Position.Top} className="!bg-sky-400" />
-      <div className="flex items-start justify-between gap-1 mb-0.5">
-        <p className="text-[10px] text-sky-600 uppercase tracking-wide font-medium">Task</p>
-        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${STATUS_STYLES[status] ?? STATUS_STYLES['todo']}`}>
-          {status}
-        </span>
-      </div>
-      <p className={`text-sm font-semibold leading-tight truncate ${status === 'done' ? 'line-through text-muted-foreground' : 'text-sky-900 dark:text-sky-100'}`}>
-        {d.label}
-      </p>
-      {dueDate && (
-        <p className={`text-[10px] mt-1 ${overdue ? 'text-red-500 font-medium' : 'text-sky-500'}`}>
-          {overdue ? 'Overdue · ' : ''}{dueDate}
+    <div className="relative bg-card border border-border/60 rounded-lg overflow-hidden min-w-[172px] max-w-[220px] shadow-[0_2px_12px_oklch(0_0_0/0.15)]">
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${done ? 'bg-muted-foreground/30' : 'bg-sky-400 dark:bg-sky-500/80'}`} />
+      <Handle type="target" position={Position.Top} className="!bg-sky-400/50 !w-1.5 !h-1.5 !border-0 !min-w-0 !min-h-0" />
+      <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <p className="text-[9px] text-sky-400 dark:text-sky-400/80 uppercase tracking-widest font-mono font-medium">Task</p>
+          <span className={`text-[9px] font-mono ${STATUS_COLOR[status] ?? STATUS_COLOR.todo}`}>{status}</span>
+        </div>
+        <p className={`text-[13px] font-medium leading-snug line-clamp-2 ${done ? 'line-through text-muted-foreground/50' : 'text-foreground/90'}`}>
+          {d.label}
         </p>
-      )}
-      <Handle type="source" position={Position.Bottom} className="!bg-sky-400" />
+        {dueDate && (
+          <p className="text-[10px] text-muted-foreground/50 font-mono mt-1">{dueDate}</p>
+        )}
+      </div>
+      <Handle type="source" position={Position.Bottom} className="!bg-sky-400/50 !w-1.5 !h-1.5 !border-0 !min-w-0 !min-h-0" />
     </div>
   )
 }

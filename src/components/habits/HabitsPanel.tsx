@@ -17,15 +17,6 @@ interface HabitsData {
   date: string
 }
 
-function StreakBadge({ streak }: { streak: number }) {
-  if (streak === 0) return null
-  return (
-    <span className="text-[10px] font-medium text-orange-500">
-      🔥 {streak}
-    </span>
-  )
-}
-
 function formatDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric',
@@ -62,18 +53,28 @@ export function HabitsPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-xs text-muted-foreground">{data ? formatDate(data.date) : '—'}</p>
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-sm font-semibold">Today&apos;s Habits</p>
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-border/60 shrink-0">
+        <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest mb-1">
+          {data ? formatDate(data.date) : '—'}
+        </p>
+        <div className="flex items-baseline justify-between">
+          <p
+            className="text-lg font-medium italic text-foreground/80"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            Habits
+          </p>
           {total > 0 && (
-            <span className="text-xs text-muted-foreground">{completed}/{total} done</span>
+            <span className="text-[11px] font-mono text-muted-foreground/50">
+              {completed}/{total}
+            </span>
           )}
         </div>
         {total > 0 && (
-          <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className="mt-2.5 h-px bg-border/60 overflow-hidden rounded-full">
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all"
+              className="h-full bg-primary/70 rounded-full transition-all duration-500"
               style={{ width: `${(completed / total) * 100}%` }}
             />
           </div>
@@ -81,47 +82,52 @@ export function HabitsPanel() {
       </div>
 
       <ScrollArea className="flex-1">
-        {loading && (
-          <p className="text-sm text-muted-foreground text-center pt-8">Loading…</p>
-        )}
+        {loading && <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>}
         {!loading && total === 0 && (
-          <p className="text-sm text-muted-foreground text-center pt-8 px-4">
+          <p className="text-[12px] text-muted-foreground/50 text-center pt-10 px-5">
             No habits yet — tell the AI about a habit you want to build.
           </p>
         )}
         {!loading && total > 0 && (
-          <div className="p-3 space-y-2">
+          <div className="p-4 space-y-1.5">
             {data!.habits.map((habit) => (
               <button
                 key={habit.id}
                 onClick={() => toggle(habit)}
                 disabled={toggling === habit.id}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${
                   habit.todayCompleted
-                    ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800'
-                    : 'bg-card border-border hover:bg-muted/50'
+                    ? 'bg-emerald-500/8 dark:bg-emerald-500/[0.06]'
+                    : 'bg-muted/30 hover:bg-muted/60'
                 }`}
               >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                {/* Circle check */}
+                <div className={`w-[18px] h-[18px] rounded-full border flex items-center justify-center shrink-0 transition-all ${
                   habit.todayCompleted
                     ? 'bg-emerald-500 border-emerald-500'
-                    : 'border-muted-foreground/40'
+                    : 'border-border/60'
                 }`}>
                   {habit.todayCompleted && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </div>
+
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium truncate ${habit.todayCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                  <p className={`text-[13px] font-medium truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
                     {habit.name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[10px] text-muted-foreground/40 font-mono mt-0.5">
                     {habit.frequency}{habit.durationMinutes ? ` · ${habit.durationMinutes}min` : ''}
                   </p>
                 </div>
-                <StreakBadge streak={habit.streak} />
+
+                {habit.streak > 0 && (
+                  <span className="text-[11px] font-mono text-orange-400/70 shrink-0">
+                    🔥{habit.streak}
+                  </span>
+                )}
               </button>
             ))}
           </div>

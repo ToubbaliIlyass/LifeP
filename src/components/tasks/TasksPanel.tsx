@@ -16,20 +16,20 @@ const STATUS_CYCLE: Record<string, string> = {
   'done': 'todo',
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  'todo':        'bg-muted text-muted-foreground',
-  'in-progress': 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300',
-  'done':        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
+const STATUS_DOT: Record<string, string> = {
+  'todo':        'bg-muted-foreground/30',
+  'in-progress': 'bg-sky-400',
+  'done':        'bg-emerald-400',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  'todo': 'To do',
-  'in-progress': 'In progress',
-  'done': 'Done',
+const STATUS_LABEL: Record<string, string> = {
+  'todo':        'to do',
+  'in-progress': 'in progress',
+  'done':        'done',
 }
 
-function isOverdue(dueDate: string | null): boolean {
-  if (!dueDate) return false
+function isOverdue(dueDate: string | null, status: string): boolean {
+  if (!dueDate || status === 'done') return false
   return new Date(dueDate) < new Date(new Date().toDateString())
 }
 
@@ -59,70 +59,78 @@ export function TasksPanel() {
     load()
   }
 
-  const groups = {
+  const active = tasks.filter((t) => t.status !== 'done').length
+
+  const groups: Record<string, TaskRow[]> = {
     'todo':        tasks.filter((t) => t.status === 'todo'),
     'in-progress': tasks.filter((t) => t.status === 'in-progress'),
     'done':        tasks.filter((t) => t.status === 'done'),
   }
 
-  const active = tasks.filter((t) => t.status !== 'done').length
-  const total = tasks.length
-
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b shrink-0">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">Tasks</p>
-          {total > 0 && (
-            <span className="text-xs text-muted-foreground">{active} remaining</span>
+      <div className="px-5 py-4 border-b border-border/60 shrink-0">
+        <div className="flex items-baseline justify-between">
+          <p
+            className="text-lg font-medium italic text-foreground/80"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            Tasks
+          </p>
+          {tasks.length > 0 && (
+            <span className="text-[11px] font-mono text-muted-foreground/50">
+              {active} remaining
+            </span>
           )}
         </div>
       </div>
 
       <ScrollArea className="flex-1">
-        {loading && (
-          <p className="text-sm text-muted-foreground text-center pt-8">Loading…</p>
-        )}
-        {!loading && total === 0 && (
-          <p className="text-sm text-muted-foreground text-center pt-8 px-4">
+        {loading && <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>}
+        {!loading && tasks.length === 0 && (
+          <p className="text-[12px] text-muted-foreground/50 text-center pt-10 px-5">
             No tasks yet — tell the AI about something you need to get done.
           </p>
         )}
-        {!loading && total > 0 && (
-          <div className="p-3 space-y-4">
+        {!loading && tasks.length > 0 && (
+          <div className="p-4 space-y-5">
             {(['todo', 'in-progress', 'done'] as const).map((status) => {
               const group = groups[status]
               if (group.length === 0) return null
               return (
                 <div key={status}>
-                  <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1.5 px-1">
-                    {STATUS_LABELS[status]} · {group.length}
+                  <p className="text-[9px] uppercase tracking-widest font-mono text-muted-foreground/40 mb-2 px-1">
+                    {STATUS_LABEL[status]} · {group.length}
                   </p>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {group.map((task) => (
-                      <div
-                        key={task.id}
-                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border bg-card ${
-                          status === 'done' ? 'opacity-60' : ''
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
-                            {task.name}
-                          </p>
-                          {task.dueDate && (
-                            <p className={`text-xs mt-0.5 ${isOverdue(task.dueDate) && status !== 'done' ? 'text-red-500' : 'text-muted-foreground'}`}>
-                              {isOverdue(task.dueDate) && status !== 'done' ? 'Overdue · ' : ''}{task.dueDate}
-                            </p>
-                          )}
-                        </div>
+                      <div key={task.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors group">
+                        {/* Status dot — click to cycle */}
                         <button
                           onClick={() => cycleStatus(task)}
                           disabled={cycling === task.id}
-                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 transition-colors hover:opacity-80 ${STATUS_STYLES[task.status]}`}
+                          className="shrink-0"
+                          title={`Advance to: ${STATUS_CYCLE[task.status]}`}
                         >
-                          {STATUS_LABELS[task.status]}
+                          <div className={`w-2 h-2 rounded-full transition-all group-hover:scale-125 ${STATUS_DOT[task.status]}`} />
                         </button>
+
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[13px] font-medium truncate ${status === 'done' ? 'line-through text-muted-foreground/40' : 'text-foreground/85'}`}>
+                            {task.name}
+                          </p>
+                          {task.dueDate && (
+                            <p className={`text-[10px] font-mono mt-0.5 ${isOverdue(task.dueDate, task.status) ? 'text-red-400/70' : 'text-muted-foreground/40'}`}>
+                              {isOverdue(task.dueDate, task.status) ? 'overdue · ' : ''}{task.dueDate}
+                            </p>
+                          )}
+                        </div>
+
+                        <span className={`text-[9px] font-mono shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
+                          status === 'done' ? 'text-muted-foreground/40' : 'text-muted-foreground/50'
+                        }`}>
+                          → {STATUS_CYCLE[task.status]}
+                        </span>
                       </div>
                     ))}
                   </div>

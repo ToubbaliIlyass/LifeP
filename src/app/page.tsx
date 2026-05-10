@@ -15,12 +15,12 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 type RightTab = 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes'
 
 const TABS: { id: RightTab; label: string; key: string }[] = [
-  { id: 'graph',  label: 'Graph',  key: '1' },
-  { id: 'habits', label: 'Habits', key: '2' },
-  { id: 'tasks',  label: 'Tasks',  key: '3' },
-  { id: 'events', label: 'Events', key: '4' },
-  { id: 'school', label: 'School', key: '5' },
-  { id: 'notes',  label: 'Notes',  key: '6' },
+  { id: 'graph',  label: 'graph',  key: '1' },
+  { id: 'habits', label: 'habits', key: '2' },
+  { id: 'tasks',  label: 'tasks',  key: '3' },
+  { id: 'events', label: 'events', key: '4' },
+  { id: 'school', label: 'school', key: '5' },
+  { id: 'notes',  label: 'notes',  key: '6' },
 ]
 
 export default function Home() {
@@ -44,49 +44,32 @@ export default function Home() {
     return () => clearInterval(id)
   }, [refreshCount])
 
-  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable
 
-      // Cmd/Ctrl+K → open search
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setSearchOpen(true)
         return
       }
-
-      // Cmd/Ctrl+E → export
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
         e.preventDefault()
         window.open('/api/export', '_blank')
         return
       }
-
       if (inInput) return
-
-      // 1-6 → switch tabs
       const tabByKey = TABS.find((t) => t.key === e.key)
       if (tabByKey) { setTab(tabByKey.id); return }
-
-      // / → focus chat input
-      if (e.key === '/') {
-        e.preventDefault()
-        chatInputRef.current?.focus()
-      }
-
-      // p → open proposals
+      if (e.key === '/') { e.preventDefault(); chatInputRef.current?.focus() }
       if (e.key === 'p') setQueueOpen(true)
     }
-
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  function handleExport() {
-    window.open('/api/export', '_blank')
-  }
+  function handleExport() { window.open('/api/export', '_blank') }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -104,84 +87,110 @@ export default function Home() {
         setGraphRefreshKey((k) => k + 1)
         alert(`Imported ${data.importedNodes} nodes and ${data.importedEdges} edges.`)
       }
-    } catch {
-      alert('Import failed — invalid file format.')
-    }
+    } catch { alert('Import failed — invalid file format.') }
     e.target.value = ''
   }
 
   return (
     <main className="flex flex-col h-screen bg-background text-foreground">
-      <header className="flex items-center justify-between px-4 h-12 border-b shrink-0 gap-2">
-        <span className="text-sm font-semibold tracking-tight">LifeP</span>
 
-        <div className="flex items-center gap-1.5 flex-1 justify-end">
+      {/* ── Header ── */}
+      <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
+        {/* Logo */}
+        <div className="flex items-baseline gap-2">
+          <span
+            className="text-xl font-medium italic leading-none tracking-tight text-foreground"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            LifeP
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground/60 hidden sm:block tracking-widest uppercase">
+            your life graph
+          </span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5">
           {/* Search */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/60 transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
             </svg>
             <span className="hidden sm:inline">Search</span>
-            <kbd className="hidden sm:inline text-[9px] border rounded px-1">⌘K</kbd>
+            <kbd className="hidden sm:inline text-[9px] text-muted-foreground/50 border border-border/60 rounded px-1 py-px font-mono">⌘K</kbd>
           </button>
 
           {/* Export */}
           <button
             onClick={handleExport}
-            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted transition-colors hidden sm:block"
-            title="Export graph as JSON (⌘E)"
+            className="text-[11px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/60 transition-colors hidden sm:block"
+            title="Export graph (⌘E)"
           >
             Export
           </button>
 
           {/* Import */}
-          <label className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted transition-colors cursor-pointer hidden sm:block">
+          <label className="text-[11px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/60 transition-colors cursor-pointer hidden sm:block">
             Import
             <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
           </label>
 
-          {/* Dark mode */}
+          <div className="w-px h-4 bg-border/60 mx-1 hidden sm:block" />
+
           <ThemeToggle />
 
-          {/* Proposals */}
+          {/* Proposals badge */}
           <button
             onClick={() => setQueueOpen(true)}
-            className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+            className={`ml-1 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
               pendingCount > 0
-                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-200'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60'
             }`}
           >
-            {pendingCount > 0 ? `${pendingCount} pending` : 'Proposals'}
+            {pendingCount > 0 ? (
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                {pendingCount} pending
+              </span>
+            ) : 'proposals'}
           </button>
         </div>
       </header>
 
+      {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-full md:w-2/5 border-r flex flex-col shrink-0">
+        {/* Chat panel */}
+        <div className="w-full md:w-[42%] border-r border-border/60 flex flex-col shrink-0">
           <ChatPanel inputRef={chatInputRef} />
         </div>
 
+        {/* Right panel */}
         <div className="hidden md:flex flex-col flex-1 overflow-hidden">
-          <div className="flex gap-0.5 px-3 pt-2 border-b shrink-0 bg-background overflow-x-auto">
+          {/* Tab bar */}
+          <div className="flex items-end gap-0 px-4 border-b border-border/60 shrink-0 overflow-x-auto">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`px-4 py-1.5 text-xs font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
+                className={`relative px-3 py-3 text-[11px] font-medium tracking-wide transition-colors whitespace-nowrap shrink-0 ${
                   tab === t.id
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground/80'
                 }`}
               >
                 {t.label}
+                {tab === t.id && (
+                  <span className="absolute bottom-0 left-3 right-3 h-px bg-primary rounded-full" />
+                )}
               </button>
             ))}
           </div>
 
+          {/* Tab content */}
           <div className="flex-1 overflow-hidden">
             {tab === 'graph'  && <GraphView refreshKey={graphRefreshKey} />}
             {tab === 'habits' && <HabitsPanel />}

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import type { NodeType } from '@/lib/db/schema'
 
-// Built-in types always appear first in this order
 const PINNED = ['Goal', 'Habit', 'Task', 'Event']
 
 interface FilterBarProps {
@@ -21,7 +20,6 @@ export function FilterBar({ active, onChange }: FilterBarProps) {
       .catch(() => {})
   }, [])
 
-  // Build ordered filter list: All → pinned built-ins → user-created types (alphabetical) → Concept
   const pinned = PINNED.filter((name) => nodeTypes.some((t) => t.name === name))
   const userCreated = nodeTypes
     .filter((t) => !t.isBuiltin && !PINNED.includes(t.name))
@@ -30,24 +28,27 @@ export function FilterBar({ active, onChange }: FilterBarProps) {
 
   const filters = [
     { label: 'All', value: '' },
-    ...pinned.map((name) => ({ label: `${name}s`, value: `type:${name}` })),
+    ...pinned.map((name) => ({ label: name + 's', value: `type:${name}` })),
     ...userCreated.map((t) => ({ label: t.name, value: `type:${t.name}` })),
     ...(hasConcept ? [{ label: 'Concepts', value: 'type:Concept' }] : []),
   ]
 
   return (
-    <div className="flex gap-1.5 px-3 py-2 border-b overflow-x-auto shrink-0">
+    <div className="flex items-end gap-0 px-4 border-b border-border/60 shrink-0 overflow-x-auto">
       {filters.map((f) => (
         <button
           key={f.value}
           onClick={() => onChange(f.value)}
-          className={`px-3 py-1 text-xs rounded-full font-medium transition-colors whitespace-nowrap ${
+          className={`relative px-3 py-2.5 text-[11px] font-medium tracking-wide transition-colors whitespace-nowrap shrink-0 ${
             active === f.value
-              ? 'bg-foreground text-background'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground/70'
           }`}
         >
           {f.label}
+          {active === f.value && (
+            <span className="absolute bottom-0 left-3 right-3 h-px bg-primary rounded-full" />
+          )}
         </button>
       ))}
     </div>

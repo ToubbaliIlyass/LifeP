@@ -2,30 +2,30 @@
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 
-const STATUS_COLORS: Record<string, string> = {
-  todo:      'bg-muted text-muted-foreground',
-  submitted: 'bg-sky-200 text-sky-700 dark:bg-sky-800 dark:text-sky-300',
-  graded:    'bg-emerald-200 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-300',
-}
-
 export function AssignmentNode({ data }: NodeProps) {
   const d = data as { label: string; properties: Record<string, unknown> }
   const status = typeof d.properties.status === 'string' ? d.properties.status : 'todo'
   const dueDate = typeof d.properties.dueDate === 'string' ? d.properties.dueDate : null
   const grade = typeof d.properties.grade === 'string' ? d.properties.grade : null
+  const done = status === 'graded'
   return (
-    <div className="bg-pink-50 dark:bg-pink-950 border border-pink-200 dark:border-pink-800 rounded-xl px-3 py-2 shadow-sm min-w-[160px] max-w-[200px]">
-      <Handle type="target" position={Position.Top} className="!bg-pink-400" />
-      <div className="flex items-start justify-between gap-1 mb-0.5">
-        <p className="text-[10px] text-pink-500 uppercase tracking-wide font-medium">Assignment</p>
-        {grade && <span className="text-[10px] font-bold text-emerald-600">{grade}</span>}
+    <div className="relative bg-card border border-border/60 rounded-lg overflow-hidden min-w-[172px] max-w-[220px] shadow-[0_2px_12px_oklch(0_0_0/0.15)]">
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-400 dark:bg-pink-500/80" />
+      <Handle type="target" position={Position.Top} className="!bg-pink-400/50 !w-1.5 !h-1.5 !border-0 !min-w-0 !min-h-0" />
+      <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <p className="text-[9px] text-pink-400 dark:text-pink-400/80 uppercase tracking-widest font-mono font-medium">Assignment</p>
+          {grade && <span className="text-[10px] font-mono font-semibold text-emerald-400">{grade}</span>}
+        </div>
+        <p className={`text-[13px] font-medium leading-snug line-clamp-2 ${done ? 'line-through text-muted-foreground/50' : 'text-foreground/90'}`}>
+          {d.label}
+        </p>
+        <div className="flex gap-2 mt-1">
+          <span className="text-[9px] text-muted-foreground/50 font-mono">{status}</span>
+          {dueDate && <span className="text-[9px] text-muted-foreground/40 font-mono">{dueDate}</span>}
+        </div>
       </div>
-      <p className={`text-sm font-semibold leading-tight truncate text-pink-900 dark:text-pink-100 ${status === 'graded' ? 'line-through opacity-60' : ''}`}>{d.label}</p>
-      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[status] ?? STATUS_COLORS.todo}`}>{status}</span>
-        {dueDate && <span className="text-[10px] text-pink-500">{dueDate}</span>}
-      </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-pink-400" />
+      <Handle type="source" position={Position.Bottom} className="!bg-pink-400/50 !w-1.5 !h-1.5 !border-0 !min-w-0 !min-h-0" />
     </div>
   )
 }

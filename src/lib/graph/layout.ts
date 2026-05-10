@@ -62,5 +62,9 @@ export function toFlowEdges(edges: Edge[]): FlowEdge[] {
     target: String(edge.targetId),
     label: edge.type,
     type: 'smoothstep',
+    style: { strokeWidth: 1.5 },
+    labelStyle: { fontSize: 9 },
+    labelBgPadding: [4, 2] as [number, number],
+    labelBgBorderRadius: 3,
   }))
 }
