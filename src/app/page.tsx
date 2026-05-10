@@ -146,7 +146,7 @@ export default function Home() {
             <ActureMark className="w-[17px] h-[17px] text-foreground" />
           </div>
           {!sidebarCollapsed && (
-            <span className="text-[21px] font-bold tracking-tight text-foreground font-serif whitespace-nowrap">
+            <span className="text-[21px] font-bold tracking-tight text-foreground whitespace-nowrap" style={{ fontFamily: 'var(--font-montserrat)' }}>
               Acture
             </span>
           )}
@@ -159,6 +159,7 @@ export default function Home() {
               key={t.id}
               onClick={() => setTab(t.id)}
               title={sidebarCollapsed ? t.label : undefined}
+              style={{ fontFamily: 'var(--font-montserrat)' }}
               className={`
                 flex items-center rounded-lg text-[13px] font-medium transition-colors
                 ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'gap-3 px-3 py-2 w-full text-left'}
@@ -238,7 +239,7 @@ export default function Home() {
       <div className="hidden md:flex flex-col flex-1 overflow-hidden">
         {/* Slim top bar */}
         <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
-          <p className="text-[15px] font-semibold text-foreground font-serif">
+          <p className="text-[15px] font-semibold text-foreground" style={{ fontFamily: 'var(--font-montserrat)' }}>
             {activeTab?.label}
           </p>
           <button
