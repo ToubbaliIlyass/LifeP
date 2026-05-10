@@ -139,7 +139,7 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-serif;
+    font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
   }
 }
 
