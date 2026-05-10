@@ -135,12 +135,12 @@ export default function Home() {
 
       {/* ── Sidebar ────────────────────────────────────── */}
       <aside className={`
-        hidden md:flex flex-col border-r border-border/60 shrink-0 py-5
+        hidden md:flex flex-col border-r border-border/60 shrink-0
         transition-[width] duration-200 overflow-hidden
         ${sidebarCollapsed ? 'w-[52px]' : 'w-[200px]'}
       `}>
-        {/* Logo + collapse toggle */}
-        <div className={`mb-7 flex items-center ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}>
+        {/* Logo + collapse toggle — same height as main panel header */}
+        <div className={`h-[52px] shrink-0 border-b border-border/60 flex items-center ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}>
           {sidebarCollapsed ? (
             <button
               onClick={() => setSidebarCollapsed(false)}
@@ -170,7 +170,7 @@ export default function Home() {
         </div>
 
         {/* Nav */}
-        <nav className={`flex flex-col gap-0.5 flex-1 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
+        <nav className={`flex flex-col gap-0.5 flex-1 pt-3 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -200,7 +200,7 @@ export default function Home() {
         </nav>
 
         {/* Bottom */}
-        <div className={`pt-3 border-t border-border/40 mt-3 space-y-0.5 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
+        <div className={`pt-3 pb-4 border-t border-border/40 mt-3 space-y-0.5 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           <button
             onClick={() => setSearchOpen(true)}
             title={sidebarCollapsed ? 'Search' : undefined}
