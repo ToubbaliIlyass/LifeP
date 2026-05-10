@@ -59,7 +59,7 @@ export function HabitsPanel() {
           {data ? formatDate(data.date) : '—'}
         </p>
         <div className="flex items-baseline justify-between">
-          <p className="text-lg font-bold text-foreground">Habits</p>
+          <p className="text-lg font-bold text-foreground font-serif">Habits</p>
           {total > 0 && (
             <span className="text-[11px] font-mono text-muted-foreground/50">
               {completed}/{total}
@@ -110,7 +110,7 @@ export function HabitsPanel() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className={`text-[13px] font-medium truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
+                  <p className={`text-[13px] font-serif truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
                     {habit.name}
                   </p>
                   <p className="text-[10px] text-muted-foreground/40 font-mono mt-0.5">

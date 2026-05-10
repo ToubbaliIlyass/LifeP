@@ -39,7 +39,7 @@ export function NotesPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-sm font-semibold">Notes & Journal</p>
+        <p className="text-lg font-bold font-serif">Notes & Journal</p>
         {notes.length > 0 && (
           <p className="text-xs text-muted-foreground mt-0.5">{notes.length} entr{notes.length !== 1 ? 'ies' : 'y'}</p>
         )}
@@ -71,7 +71,7 @@ export function NotesPanel() {
                           <span className="text-sm">{MOOD_EMOJI[note.mood] ?? note.mood}</span>
                         )}
                       </div>
-                      <p className="text-sm font-medium truncate mt-0.5">{note.title}</p>
+                      <p className="text-[13px] font-serif truncate mt-0.5">{note.title}</p>
                       {!isOpen && note.content && (
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{note.content}</p>
                       )}

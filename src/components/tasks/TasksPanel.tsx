@@ -71,7 +71,7 @@ export function TasksPanel() {
     <div className="flex flex-col h-full">
       <div className="px-5 py-4 border-b border-border/60 shrink-0">
         <div className="flex items-baseline justify-between">
-          <p className="text-lg font-bold text-foreground">Tasks</p>
+          <p className="text-lg font-bold text-foreground font-serif">Tasks</p>
           {tasks.length > 0 && (
             <span className="text-[11px] font-mono text-muted-foreground/50">
               {active} remaining
@@ -111,7 +111,7 @@ export function TasksPanel() {
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <p className={`text-[13px] font-medium truncate ${status === 'done' ? 'line-through text-muted-foreground/40' : 'text-foreground/85'}`}>
+                          <p className={`text-[13px] font-serif truncate ${status === 'done' ? 'line-through text-muted-foreground/40' : 'text-foreground/85'}`}>
                             {task.name}
                           </p>
                           {task.dueDate && (

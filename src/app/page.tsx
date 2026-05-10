@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useCallback, useRef, useState } from 'react'
+import {
+  House, Share2, Activity, CheckSquare, Calendar, BookOpen,
+  FileText, Search, Download, Upload,
+} from 'lucide-react'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { GraphView } from '@/components/graph/GraphView'
 import { HabitsPanel } from '@/components/habits/HabitsPanel'
@@ -8,23 +12,25 @@ import { TasksPanel } from '@/components/tasks/TasksPanel'
 import { EventsPanel } from '@/components/events/EventsPanel'
 import { SchoolPanel } from '@/components/school/SchoolPanel'
 import { NotesPanel } from '@/components/notes/NotesPanel'
+import { TodayView } from '@/components/today/TodayView'
 import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { SearchBar } from '@/components/search/SearchBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
-type RightTab = 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes'
+type Tab = 'today' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes'
 
-const TABS: { id: RightTab; label: string; key: string }[] = [
-  { id: 'graph',  label: 'graph',  key: '1' },
-  { id: 'habits', label: 'habits', key: '2' },
-  { id: 'tasks',  label: 'tasks',  key: '3' },
-  { id: 'events', label: 'events', key: '4' },
-  { id: 'school', label: 'school', key: '5' },
-  { id: 'notes',  label: 'notes',  key: '6' },
+const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'today',  label: 'Today',   Icon: House },
+  { id: 'graph',  label: 'Graph',   Icon: Share2 },
+  { id: 'habits', label: 'Habits',  Icon: Activity },
+  { id: 'tasks',  label: 'Tasks',   Icon: CheckSquare },
+  { id: 'events', label: 'Events',  Icon: Calendar },
+  { id: 'school', label: 'School',  Icon: BookOpen },
+  { id: 'notes',  label: 'Notes',   Icon: FileText },
 ]
 
 export default function Home() {
-  const [tab, setTab] = useState<RightTab>('graph')
+  const [tab, setTab] = useState<Tab>('today')
   const [queueOpen, setQueueOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
@@ -49,27 +55,15 @@ export default function Home() {
       const tag = (e.target as HTMLElement).tagName
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable
 
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setSearchOpen(true)
-        return
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
-        e.preventDefault()
-        window.open('/api/export', '_blank')
-        return
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(true); return }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); window.open('/api/export', '_blank'); return }
       if (inInput) return
-      const tabByKey = TABS.find((t) => t.key === e.key)
-      if (tabByKey) { setTab(tabByKey.id); return }
       if (e.key === '/') { e.preventDefault(); chatInputRef.current?.focus() }
       if (e.key === 'p') setQueueOpen(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-
-  function handleExport() { window.open('/api/export', '_blank') }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -91,58 +85,81 @@ export default function Home() {
     e.target.value = ''
   }
 
-  return (
-    <main className="flex flex-col h-screen bg-background text-foreground">
+  const activeTab = TABS.find((t) => t.id === tab)
 
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
-        {/* Logo */}
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-xl font-extrabold tracking-tight text-foreground leading-none">
-            LifeP
-          </span>
-          <span className="text-[10px] font-mono text-muted-foreground/50 hidden sm:block tracking-widest uppercase">
-            life graph
+  return (
+    <main className="flex h-screen bg-background text-foreground overflow-hidden">
+
+      {/* ── Sidebar ── */}
+      <aside className="hidden md:flex flex-col w-[200px] shrink-0 border-r border-border/60 py-5">
+        {/* Wordmark */}
+        <div className="px-5 mb-7">
+          <span className="text-[22px] font-bold tracking-tight text-foreground font-serif">
+            Acture
           </span>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-0.5">
-          {/* Search */}
+        {/* Primary nav */}
+        <nav className="flex flex-col gap-0.5 px-3 flex-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors text-left w-full ${
+                tab === t.id
+                  ? 'bg-foreground/8 text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              }`}
+            >
+              <t.Icon className={`w-[15px] h-[15px] shrink-0 ${tab === t.id ? 'opacity-100' : 'opacity-60'}`} />
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Bottom utilities */}
+        <div className="px-3 pt-3 border-t border-border/40 mt-3 space-y-0.5">
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/60 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full text-left"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-            </svg>
-            <span className="hidden sm:inline">Search</span>
-            <kbd className="hidden sm:inline text-[9px] text-muted-foreground/50 border border-border/60 rounded px-1 py-px font-mono">⌘K</kbd>
+            <Search className="w-[15px] h-[15px] shrink-0 opacity-60" />
+            Search
+            <kbd className="ml-auto text-[9px] text-muted-foreground/40 border border-border/50 rounded px-1 py-px font-mono">⌘K</kbd>
           </button>
-
-          {/* Export */}
           <button
-            onClick={handleExport}
-            className="text-[11px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/60 transition-colors hidden sm:block"
-            title="Export graph (⌘E)"
+            onClick={() => window.open('/api/export', '_blank')}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full text-left"
           >
+            <Download className="w-[15px] h-[15px] shrink-0 opacity-60" />
             Export
           </button>
-
-          {/* Import */}
-          <label className="text-[11px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/60 transition-colors cursor-pointer hidden sm:block">
+          <label className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full text-left cursor-pointer">
+            <Upload className="w-[15px] h-[15px] shrink-0 opacity-60" />
             Import
             <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
           </label>
+          <div className="px-3 py-1.5">
+            <ThemeToggle />
+          </div>
+        </div>
+      </aside>
 
-          <div className="w-px h-4 bg-border/60 mx-1 hidden sm:block" />
+      {/* ── Chat ── */}
+      <div className="w-full md:w-[420px] border-r border-border/60 flex flex-col shrink-0">
+        <ChatPanel inputRef={chatInputRef} />
+      </div>
 
-          <ThemeToggle />
-
-          {/* Proposals badge */}
+      {/* ── Main panel ── */}
+      <div className="hidden md:flex flex-col flex-1 overflow-hidden">
+        {/* Slim top bar */}
+        <header className="flex items-center justify-between px-5 h-[52px] border-b border-border/60 shrink-0">
+          <p className="text-[15px] font-semibold text-foreground font-serif">
+            {activeTab?.label}
+          </p>
           <button
             onClick={() => setQueueOpen(true)}
-            className={`ml-1 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
               pendingCount > 0
                 ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60'
@@ -155,47 +172,17 @@ export default function Home() {
               </span>
             ) : 'proposals'}
           </button>
-        </div>
-      </header>
+        </header>
 
-      {/* ── Body ── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Chat panel */}
-        <div className="w-full md:w-[42%] border-r border-border/60 flex flex-col shrink-0">
-          <ChatPanel inputRef={chatInputRef} />
-        </div>
-
-        {/* Right panel */}
-        <div className="hidden md:flex flex-col flex-1 overflow-hidden">
-          {/* Tab bar */}
-          <div className="flex items-end gap-0 px-4 border-b border-border/60 shrink-0 overflow-x-auto">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`relative px-3 py-3 text-[13px] font-medium tracking-wide transition-colors whitespace-nowrap shrink-0 ${
-                  tab === t.id
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground/80'
-                }`}
-              >
-                {t.label}
-                {tab === t.id && (
-                  <span className="absolute bottom-0 left-3 right-3 h-px bg-primary rounded-full" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          <div className="flex-1 overflow-hidden">
-            {tab === 'graph'  && <GraphView refreshKey={graphRefreshKey} />}
-            {tab === 'habits' && <HabitsPanel />}
-            {tab === 'tasks'  && <TasksPanel />}
-            {tab === 'events' && <EventsPanel />}
-            {tab === 'school' && <SchoolPanel />}
-            {tab === 'notes'  && <NotesPanel />}
-          </div>
+        {/* Panel content */}
+        <div className="flex-1 overflow-hidden">
+          {tab === 'today'  && <TodayView onNavigate={(t) => setTab(t as Tab)} />}
+          {tab === 'graph'  && <GraphView refreshKey={graphRefreshKey} />}
+          {tab === 'habits' && <HabitsPanel />}
+          {tab === 'tasks'  && <TasksPanel />}
+          {tab === 'events' && <EventsPanel />}
+          {tab === 'school' && <SchoolPanel />}
+          {tab === 'notes'  && <NotesPanel />}
         </div>
       </div>
 

@@ -24,8 +24,8 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "LifeP",
-  description: "Your personal life planning assistant",
+  title: "Acture",
+  description: "Your life, tracked.",
 };
 
 const themeScript = `
