@@ -8,6 +8,27 @@
       "when": 1778369164274,
       "tag": "0000_neat_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778421564841,
+      "tag": "0001_typical_makkari",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778424356451,
+      "tag": "0002_huge_justin_hammer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1778426765987,
+      "tag": "0003_burly_paper_doll",
+      "breakpoints": true
     }
   ]
 }

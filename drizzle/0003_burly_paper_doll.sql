@@ -1,0 +1,1 @@
+ALTER TABLE `proposals` ADD `execution_result` text;

@@ -6,8 +6,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const filterParam = searchParams.get('filter') // e.g. "type:Habit"
   const focusId = searchParams.get('focus')
-  const depth = parseInt(searchParams.get('depth') ?? '1', 10)
-
   // Neighborhood view: return a node and its neighbors up to depth
   if (focusId) {
     const nodeId = parseInt(focusId, 10)

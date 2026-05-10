@@ -7,13 +7,15 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface ChatPanelProps {
-  apiKeyMissing?: boolean
+  inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
-export function ChatPanel({ apiKeyMissing = false }: ChatPanelProps) {
+export function ChatPanel({ inputRef }: ChatPanelProps) {
   const { messages, sendMessage, status, error } = useChat()
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const localInputRef = useRef<HTMLInputElement>(null)
+  const resolvedRef = inputRef ?? localInputRef
   const busy = status === 'submitted' || status === 'streaming'
 
   useEffect(() => {
@@ -26,19 +28,6 @@ export function ChatPanel({ apiKeyMissing = false }: ChatPanelProps) {
     if (!text || busy) return
     setInput('')
     sendMessage({ text })
-  }
-
-  if (apiKeyMissing) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center gap-3 p-8 text-center">
-        <p className="text-sm font-medium text-destructive">API key not configured</p>
-        <p className="text-xs text-muted-foreground">
-          Copy <code className="bg-muted px-1 py-0.5 rounded">.env.example</code> to{' '}
-          <code className="bg-muted px-1 py-0.5 rounded">.env.local</code> and add your{' '}
-          <code className="bg-muted px-1 py-0.5 rounded">GOOGLE_GENERATIVE_AI_API_KEY</code>.
-        </p>
-      </div>
-    )
   }
 
   return (
@@ -88,6 +77,7 @@ export function ChatPanel({ apiKeyMissing = false }: ChatPanelProps) {
 
       <form onSubmit={handleSubmit} className="flex gap-2 p-4 border-t">
         <Input
+          ref={resolvedRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Talk to LifeP…"

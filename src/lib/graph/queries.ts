@@ -107,3 +107,25 @@ export function deleteNode(userId: number, nodeId: number): void {
   // Foreign key cascade removes connected edges when the node is deleted.
   db.delete(nodes).where(and(eq(nodes.id, nodeId), eq(nodes.userId, userId))).run()
 }
+
+export function deleteEdge(userId: number, edgeId: number): void {
+  db.delete(edges).where(and(eq(edges.id, edgeId), eq(edges.userId, userId))).run()
+}
+
+export function getNodeById(userId: number, nodeId: number): Node | undefined {
+  return db
+    .select()
+    .from(nodes)
+    .where(and(eq(nodes.id, nodeId), eq(nodes.userId, userId)))
+    .get()
+}
+
+export function searchNodes(userId: number, query: string): Node[] {
+  const lower = query.toLowerCase()
+  return db
+    .select()
+    .from(nodes)
+    .where(eq(nodes.userId, userId))
+    .all()
+    .filter((n) => JSON.stringify(n.properties).toLowerCase().includes(lower))
+}

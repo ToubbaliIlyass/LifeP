@@ -17,6 +17,17 @@ export const metadata: Metadata = {
   description: 'Your personal life planning assistant',
 }
 
+// Inline script runs before React hydration to prevent dark mode flash
+const themeScript = `
+(function(){
+  try {
+    var s = localStorage.getItem('theme');
+    var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (s === 'dark' || (!s && d)) document.documentElement.classList.add('dark');
+  } catch(e){}
+})()
+`
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,6 +38,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

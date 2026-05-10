@@ -81,6 +81,35 @@ export const nodeTypes = sqliteTable(
   ],
 )
 
+export const proposals = sqliteTable(
+  'proposals',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    summary: text('summary').notNull(),
+    operations: text('operations', { mode: 'json' }).notNull().default('[]'),
+    status: text('status', { enum: ['pending', 'approved', 'rejected'] })
+      .notNull()
+      .default('pending'),
+    rejectionReason: text('rejection_reason'),
+    createdAt: text('created_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    resolvedAt: text('resolved_at'),
+    schemaVersion: integer('schema_version').notNull().default(0),
+    executionResult: text('execution_result', { mode: 'json' }),
+  },
+  (t) => [
+    index('proposals_user_id_idx').on(t.userId),
+    index('proposals_user_id_status_idx').on(t.userId, t.status),
+  ],
+)
+
+export type Proposal = typeof proposals.$inferSelect
+export type NewProposal = typeof proposals.$inferInsert
+
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Node = typeof nodes.$inferSelect

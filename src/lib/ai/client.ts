@@ -1,5 +1,4 @@
-import { google } from '@ai-sdk/google'
+import { openai } from '@ai-sdk/openai'
 
 // Swap the model string here to change providers without touching call sites.
-// Alternatives: openai('gpt-4o-mini'), anthropic('claude-haiku-4-5')
-export const defaultModel = google('gemini-2.0-flash')
+export const defaultModel = openai('gpt-4o-mini')
