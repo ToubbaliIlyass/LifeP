@@ -6,6 +6,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
   type NodeTypes,
@@ -14,7 +15,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import { toFlowGraph } from '@/lib/graph/layout'
+import { toFlowGraph, computeRadialLayout } from '@/lib/graph/layout'
 import { GoalNode } from './nodes/GoalNode'
 import { HabitNode } from './nodes/HabitNode'
 import { TaskNode } from './nodes/TaskNode'
@@ -80,6 +81,11 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+
+  function handleRelayout() {
+    setNodes((current) => computeRadialLayout(current))
+    setHoveredId(null)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -204,6 +210,24 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
         >
+          <Panel position="top-right">
+            <button
+              onClick={handleRelayout}
+              title="Arrange in radial layers"
+              className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-card border border-border/60 text-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors shadow-sm backdrop-blur-sm"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="2" x2="12" y2="4" />
+                <line x1="12" y1="20" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="4" y2="12" />
+                <line x1="20" y1="12" x2="22" y2="12" />
+              </svg>
+              Re-layout
+            </button>
+          </Panel>
           <Background
             color={dark ? 'oklch(1 0 0 / 5%)' : 'oklch(0 0 0 / 8%)'}
             gap={24}

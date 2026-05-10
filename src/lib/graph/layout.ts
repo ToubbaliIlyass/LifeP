@@ -256,3 +256,77 @@ export function toFlowGraph(
 
   return { nodes: flowNodes, edges: flowEdges }
 }
+
+// ---------------------------------------------------------------------------
+// Radial re-layout — places nodes in clean concentric levels with minimal overlap
+// ---------------------------------------------------------------------------
+
+const CAT_RADIUS_RL = 260
+const BASE_LEAF_RADIUS = 540
+const LEAF_ROW_STEP = 140    // extra radius for overflow rows
+
+/**
+ * Recompute positions for all nodes already in the graph.
+ * - Level 0: root at (0, 0)
+ * - Level 1: categories in equal angular slices
+ * - Level 2: leaves fanned proportionally within their category's arc
+ *            with extra rows if a category has many leaves
+ */
+export function computeRadialLayout(currentNodes: FlowNode[]): FlowNode[] {
+  const root       = currentNodes.find((n) => n.id === '__root__')
+  const categories = currentNodes.filter((n) => n.id.startsWith('__cat__:'))
+  const leaves     = currentNodes.filter((n) => n.id !== '__root__' && !n.id.startsWith('__cat__:'))
+
+  if (!root) return currentNodes
+
+  const numCats = categories.length
+  if (numCats === 0) return currentNodes
+
+  // Angular slot per category (full circle divided equally)
+  const slotAngle = (2 * Math.PI) / numCats
+  // Each category uses 72% of its slot so gaps separate the clusters
+  const spreadFraction = 0.72
+
+  const updated: FlowNode[] = [{ ...root, position: { x: 0, y: 0 } }]
+
+  categories.forEach((cat, i) => {
+    const baseAngle = i * slotAngle - Math.PI / 2   // start from 12 o'clock
+
+    // Category position
+    const catX = Math.cos(baseAngle) * CAT_RADIUS_RL
+    const catY = Math.sin(baseAngle) * CAT_RADIUS_RL
+    updated.push({ ...cat, position: { x: catX, y: catY } })
+
+    // Leaves for this category
+    const typeKey = cat.id.replace('__cat__:', '').toLowerCase()
+    const catLeaves = leaves.filter((n) => n.type === typeKey)
+    const n = catLeaves.length
+    if (n === 0) return
+
+    const spread = slotAngle * spreadFraction
+    const COLS = 6   // max leaves per radial row before adding another row
+
+    catLeaves.forEach((leaf, j) => {
+      const row = Math.floor(j / COLS)
+      const col = j % COLS
+      const colsInRow = Math.min(COLS, n - row * COLS)
+      const leafAngle = n === 1
+        ? baseAngle
+        : baseAngle - spread / 2 + (col / Math.max(colsInRow - 1, 1)) * spread * (colsInRow / Math.max(n, COLS))
+
+      const r = BASE_LEAF_RADIUS + row * LEAF_ROW_STEP
+      updated.push({
+        ...leaf,
+        position: { x: Math.cos(leafAngle) * r, y: Math.sin(leafAngle) * r },
+      })
+    })
+  })
+
+  // Append any nodes that weren't matched (shouldn't happen normally)
+  const updatedIds = new Set(updated.map((n) => n.id))
+  for (const n of currentNodes) {
+    if (!updatedIds.has(n.id)) updated.push(n)
+  }
+
+  return updated
+}
