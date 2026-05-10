@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
-  FileText, Search, Download, Upload, ChevronLeft, Inbox,
+  FileText, Search, Download, Upload, Inbox, PanelLeft, PanelLeftClose,
 } from 'lucide-react'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { GraphView } from '@/components/graph/GraphView'
@@ -140,15 +140,35 @@ export default function Home() {
         transition-[width] duration-200 overflow-hidden
         ${sidebarCollapsed ? 'w-[52px]' : 'w-[200px]'}
       `}>
-        {/* Logo */}
-        <div className={`mb-7 flex items-center gap-2.5 ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}>
-          <div className="w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
-            <ActureMark className="w-[17px] h-[17px] text-foreground" />
-          </div>
-          {!sidebarCollapsed && (
-            <span className="text-[21px] font-bold tracking-tight text-foreground whitespace-nowrap" style={{ fontFamily: 'var(--font-montserrat)' }}>
-              Acture
-            </span>
+        {/* Logo + collapse toggle */}
+        <div className={`mb-7 flex items-center ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}>
+          {sidebarCollapsed ? (
+            // Collapsed: logo mark that swaps to expand icon on hover
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              title="Expand sidebar"
+              className="w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center group relative"
+            >
+              <ActureMark className="w-[17px] h-[17px] text-foreground absolute transition-opacity duration-150 group-hover:opacity-0" />
+              <PanelLeft className="w-[15px] h-[15px] text-foreground absolute transition-opacity duration-150 opacity-0 group-hover:opacity-100" />
+            </button>
+          ) : (
+            // Expanded: logo mark + wordmark + collapse button
+            <>
+              <div className="w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
+                <ActureMark className="w-[17px] h-[17px] text-foreground" />
+              </div>
+              <span className="text-[21px] font-bold tracking-tight text-foreground whitespace-nowrap ml-2.5 flex-1" style={{ fontFamily: 'var(--font-montserrat)' }}>
+                Acture
+              </span>
+              <button
+                onClick={() => setSidebarCollapsed(true)}
+                title="Collapse sidebar"
+                className="text-muted-foreground/50 hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted/40"
+              >
+                <PanelLeftClose className="w-[15px] h-[15px]" />
+              </button>
+            </>
           )}
         </div>
 
@@ -214,15 +234,6 @@ export default function Home() {
           <div className={`${sidebarCollapsed ? 'flex justify-center py-1' : 'px-3 py-1'}`}>
             <ThemeToggle />
           </div>
-          {/* Collapse toggle */}
-          <button
-            onClick={() => setSidebarCollapsed((v) => !v)}
-            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
-            className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full ${sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}`}
-          >
-            <ChevronLeft className={`w-[15px] h-[15px] shrink-0 opacity-55 transition-transform duration-200 ${sidebarCollapsed ? 'rotate-180' : ''}`} />
-            {!sidebarCollapsed && 'Collapse'}
-          </button>
         </div>
       </aside>
 
