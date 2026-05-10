@@ -84,10 +84,25 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   function handleRelayout() {
     setNodes((current) => computeRadialLayout(current))
     setHoveredId(null)
+  }
+
+  async function handleReset() {
+    setResetting(true)
+    try {
+      await fetch('/api/graph/reset', { method: 'POST' })
+      setNodes([])
+      setEdges([])
+      setViewState({ status: 'ready', data: { nodes: [], edges: [] } })
+    } finally {
+      setResetting(false)
+      setResetOpen(false)
+    }
   }
 
   useEffect(() => {
@@ -186,7 +201,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   }, [nodes])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       <div className="flex-1 relative">
         {viewState.status === 'loading' && (
           <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/50">
@@ -219,22 +234,34 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           proOptions={{ hideAttribution: true }}
         >
           <Panel position="top-right">
-            <button
-              onClick={handleRelayout}
-              title="Arrange in radial layers"
-              className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-card border border-border/60 text-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors shadow-sm backdrop-blur-sm"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="12" cy="12" r="6" />
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="2" x2="12" y2="4" />
-                <line x1="12" y1="20" x2="12" y2="22" />
-                <line x1="2" y1="12" x2="4" y2="12" />
-                <line x1="20" y1="12" x2="22" y2="12" />
-              </svg>
-              Re-layout
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleRelayout}
+                title="Compact layout"
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-card border border-border/60 text-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors shadow-sm backdrop-blur-sm"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="12" cy="12" r="6" />
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="2" x2="12" y2="4" />
+                  <line x1="12" y1="20" x2="12" y2="22" />
+                  <line x1="2" y1="12" x2="4" y2="12" />
+                  <line x1="20" y1="12" x2="22" y2="12" />
+                </svg>
+                Re-layout
+              </button>
+              <button
+                onClick={() => setResetOpen(true)}
+                title="Reset graph"
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-card border border-border/60 text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors shadow-sm backdrop-blur-sm"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                </svg>
+                Reset
+              </button>
+            </div>
           </Panel>
           <Background
             color={dark ? 'oklch(1 0 0 / 5%)' : 'oklch(0 0 0 / 8%)'}
@@ -262,6 +289,34 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           />
         </ReactFlow>
       </div>
+      {resetOpen && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+          <div className="bg-card border border-border/60 rounded-2xl shadow-xl p-6 w-80 flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-semibold text-foreground">Reset graph?</p>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">
+                This will permanently delete all nodes, edges, and pending proposals. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setResetOpen(false)}
+                disabled={resetting}
+                className="text-[12px] font-medium px-4 py-2 rounded-lg border border-border/60 hover:bg-muted/60 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={resetting}
+                className="text-[12px] font-semibold px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {resetting ? 'Resetting…' : 'Yes, reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

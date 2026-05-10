@@ -261,20 +261,10 @@ export function toFlowGraph(
 }
 
 // ---------------------------------------------------------------------------
-// Radial re-layout — places nodes in clean concentric levels with minimal overlap
+// Compact re-layout — re-runs force simulation with tight parameters to
+// produce an organic, uniform blob like the reference image
 // ---------------------------------------------------------------------------
 
-const CAT_RADIUS_RL = 170
-const BASE_LEAF_RADIUS = 360
-const LEAF_ROW_STEP = 100    // extra radius for overflow rows
-
-/**
- * Recompute positions for all nodes already in the graph.
- * - Level 0: root at (0, 0)
- * - Level 1: categories in equal angular slices
- * - Level 2: leaves fanned proportionally within their category's arc
- *            with extra rows if a category has many leaves
- */
 export function computeRadialLayout(currentNodes: FlowNode[]): FlowNode[] {
   const root       = currentNodes.find((n) => n.id === '__root__')
   const categories = currentNodes.filter((n) => n.id.startsWith('__cat__:'))
@@ -282,54 +272,40 @@ export function computeRadialLayout(currentNodes: FlowNode[]): FlowNode[] {
 
   if (!root) return currentNodes
 
-  const numCats = categories.length
-  if (numCats === 0) return currentNodes
+  // Build d3 simulation nodes and links mirroring the graph structure
+  const d3nodes: D3Node[] = [{ id: '__root__', radius: 38, fx: 0, fy: 0 }]
+  const d3links: D3Link[] = []
 
-  // Angular slot per category (full circle divided equally)
-  const slotAngle = (2 * Math.PI) / numCats
-  // Each category uses 72% of its slot so gaps separate the clusters
-  const spreadFraction = 0.72
+  for (const cat of categories) {
+    d3nodes.push({ id: cat.id, radius: 26 })
+    d3links.push({ source: '__root__', target: cat.id, distance: 90 })
 
-  const updated: FlowNode[] = [{ ...root, position: { x: 0, y: 0 } }]
-
-  categories.forEach((cat, i) => {
-    const baseAngle = i * slotAngle - Math.PI / 2   // start from 12 o'clock
-
-    // Category position
-    const catX = Math.cos(baseAngle) * CAT_RADIUS_RL
-    const catY = Math.sin(baseAngle) * CAT_RADIUS_RL
-    updated.push({ ...cat, position: { x: catX, y: catY } })
-
-    // Leaves for this category
     const typeKey = cat.id.replace('__cat__:', '').toLowerCase()
-    const catLeaves = leaves.filter((n) => n.type === typeKey)
-    const n = catLeaves.length
-    if (n === 0) return
-
-    const spread = slotAngle * spreadFraction
-    const COLS = 6   // max leaves per radial row before adding another row
-
-    catLeaves.forEach((leaf, j) => {
-      const row = Math.floor(j / COLS)
-      const col = j % COLS
-      const colsInRow = Math.min(COLS, n - row * COLS)
-      const leafAngle = n === 1
-        ? baseAngle
-        : baseAngle - spread / 2 + (col / Math.max(colsInRow - 1, 1)) * spread * (colsInRow / Math.max(n, COLS))
-
-      const r = BASE_LEAF_RADIUS + row * LEAF_ROW_STEP
-      updated.push({
-        ...leaf,
-        position: { x: Math.cos(leafAngle) * r, y: Math.sin(leafAngle) * r },
-      })
-    })
-  })
-
-  // Append any nodes that weren't matched (shouldn't happen normally)
-  const updatedIds = new Set(updated.map((n) => n.id))
-  for (const n of currentNodes) {
-    if (!updatedIds.has(n.id)) updated.push(n)
+    for (const leaf of leaves.filter((n) => n.type === typeKey)) {
+      d3nodes.push({ id: leaf.id, radius: 18 })
+      d3links.push({ source: cat.id, target: leaf.id, distance: 65 })
+    }
   }
 
-  return updated
+  const nodeById = new Map(d3nodes.map((n) => [n.id, n]))
+
+  forceSimulation<D3Node>(d3nodes)
+    .force(
+      'link',
+      forceLink<D3Node, D3Link>(d3links)
+        .id((d) => d.id)
+        .distance((d) => d.distance)
+        .strength(1.1),
+    )
+    .force('charge', forceManyBody<D3Node>().strength(-90))
+    .force('center', forceCenter(0, 0))
+    .force('collide', forceCollide<D3Node>((d) => d.radius + 10))
+    .stop()
+    .tick(500)
+
+  return currentNodes.map((n) => {
+    const d = nodeById.get(n.id)
+    if (!d) return n
+    return { ...n, position: { x: d.x ?? 0, y: d.y ?? 0 } }
+  })
 }
