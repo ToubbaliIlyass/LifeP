@@ -5,7 +5,27 @@
       "Bash(npm run *)",
       "Bash(npx skills *)",
       "Bash(npx tsc *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git push *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/ilyasstoubbali/Documents/Projects/LifeP/.claude/auto-commit.sh",
+            "timeout": 30,
+            "statusMessage": "Committing changes…"
+          }
+        ]
+      }
     ]
   }
 }
