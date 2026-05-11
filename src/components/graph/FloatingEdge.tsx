@@ -1,6 +1,6 @@
 'use client'
 
-import { BaseEdge, getBezierPath, useInternalNode, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, getStraightPath, useInternalNode, type EdgeProps } from '@xyflow/react'
 
 function circleCenter(node: ReturnType<typeof useInternalNode>) {
   if (!node) return null
@@ -33,7 +33,7 @@ export function FloatingEdge({
   const tx = tgt.cx - (dx / dist) * tgt.r
   const ty = tgt.cy - (dy / dist) * tgt.r
 
-  const [path, labelX, labelY] = getBezierPath({
+  const [path, labelX, labelY] = getStraightPath({
     sourceX: sx, sourceY: sy,
     targetX: tx, targetY: ty,
   })
