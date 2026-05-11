@@ -1,4 +1,4 @@
-import { createNode, createEdge, updateNode, deleteNode, getNodeById } from '@/lib/graph/queries'
+import { createNode, createEdge, updateNode, deleteNode, getNodeById, getNodes } from '@/lib/graph/queries'
 import { createNodeType, getSchemaVersion, nodeTypeExists } from '@/lib/db/node-types'
 import { logger } from '@/lib/log'
 import type { BatchOperation } from '@/lib/ai/tools'
@@ -45,6 +45,16 @@ export function executeBatch(
   for (const op of operations) {
     switch (op.kind) {
       case 'createNode': {
+        if (op.properties.name) {
+          const existing = getNodes(userId, { type: op.type }).find(
+            (n) => (n.properties as Record<string, unknown>).name === op.properties.name,
+          )
+          if (existing) {
+            result.createdNodeIds.push(existing.id)
+            summary.push(`Reused existing ${op.type} node #${existing.id} (deduplicated)`)
+            break
+          }
+        }
         const node = createNode(userId, op.type, op.properties)
         result.createdNodeIds.push(node.id)
         summary.push(`Created ${op.type} node #${node.id}`)

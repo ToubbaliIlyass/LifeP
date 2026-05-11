@@ -27,9 +27,12 @@ export async function POST(request: Request) {
           .join('\n')
       : ''
 
+  const today = new Date().toISOString().split('T')[0]
+  const dateContext = `\n\n## Current date\nToday is ${today}. Always use this exact date for "today". Derive "tomorrow", "next week", etc. from this date. Never use dates from your training data as defaults.`
+
   const result = streamText({
     model: defaultModel,
-    system: SYSTEM_PROMPT + rejectionContext,
+    system: SYSTEM_PROMPT + dateContext + rejectionContext,
     messages: await convertToModelMessages(messages),
     tools: buildTools(),
     stopWhen: stepCountIs(5),

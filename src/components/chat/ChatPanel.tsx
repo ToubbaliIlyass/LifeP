@@ -116,8 +116,8 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
   // ── Active chat ────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 px-5 py-4">
-        <div className="space-y-5">
+      <ScrollArea className="flex-1 py-4">
+        <div className="px-5 max-w-2xl mx-auto space-y-5">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -163,7 +163,7 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
       <div className="shrink-0 px-4 pb-4 pt-2">
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-2 bg-muted/40 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border/80 transition-colors"
+          className="flex items-center gap-2 bg-muted/40 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border/80 transition-colors max-w-2xl mx-auto"
         >
           <input
             ref={resolvedRef}

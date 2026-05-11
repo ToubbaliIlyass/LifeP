@@ -88,6 +88,12 @@ export function buildTools() {
       }),
       execute: async ({ type, properties, intent }) => {
         if (intent === 'auto') {
+          if (properties.name) {
+            const existing = getNodes(user.id, { type }).find(
+              (n) => (n.properties as Record<string, unknown>).name === properties.name,
+            )
+            if (existing) return { created: false, node: existing, deduplicated: true }
+          }
           const node = createNode(user.id, type, properties)
           return { created: true, node }
         }
