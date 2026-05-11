@@ -2,7 +2,6 @@
 
 import { useChat } from '@ai-sdk/react'
 import { useEffect, useRef, useState } from 'react'
-import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface ChatPanelProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
@@ -30,14 +29,16 @@ function autoResize(el: HTMLTextAreaElement) {
 export function ChatPanel({ inputRef }: ChatPanelProps) {
   const { messages, sendMessage, status, error } = useChat()
   const [input, setInput] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const localInputRef = useRef<HTMLTextAreaElement>(null)
   const resolvedRef = inputRef ?? localInputRef
   const busy = status === 'submitted' || status === 'streaming'
   const empty = messages.length === 0
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
   }, [messages])
 
   function submit(text?: string) {
@@ -130,7 +131,7 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
   // ── Active chat ────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 py-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 min-h-0">
         <div className="px-5 max-w-2xl mx-auto space-y-5">
           {messages.map((msg) => (
             <div
@@ -170,8 +171,7 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
             </div>
           )}
         </div>
-        <div ref={bottomRef} />
-      </ScrollArea>
+      </div>
 
       {/* Bottom input */}
       <div className="shrink-0 px-4 pb-4 pt-2">
