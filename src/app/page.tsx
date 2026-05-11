@@ -64,9 +64,11 @@ export default function Home() {
 
     function onMove(ev: MouseEvent) {
       if (!dragging.current) return
-      // Dragging left = bigger chat, right = smaller
       const delta = ev.clientX - dragStartX.current
-      setChatWidth(Math.max(260, Math.min(680, dragStartWidth.current - delta)))
+      const sidebarW = sidebarCollapsed ? 52 : 200
+      // Leave at least 400px for the main panel
+      const maxAllowed = Math.max(260, window.innerWidth - sidebarW - 400)
+      setChatWidth(Math.max(260, Math.min(Math.min(680, maxAllowed), dragStartWidth.current - delta)))
     }
     function onUp() {
       dragging.current = false
@@ -260,8 +262,8 @@ export default function Home() {
 
       {/* ── Chat panel (right side, resizable) ─────────── */}
       <div
-        className="flex flex-col shrink-0 relative border-l border-border/60 w-full"
-        style={{ width: `min(${chatWidth}px, 100%)` }}
+        className="flex flex-col shrink-0 relative border-l border-border/60 overflow-hidden"
+        style={{ width: chatWidth }}
       >
         {/* Drag handle — left edge of chat panel */}
         <div
