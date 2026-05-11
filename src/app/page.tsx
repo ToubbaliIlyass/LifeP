@@ -234,7 +234,7 @@ export default function Home() {
       </aside>
 
       {/* ── Main panel ─────────────────────────────────── */}
-      <div className="hidden md:flex flex-col flex-1 overflow-hidden relative min-w-[560px]">
+      <div className="hidden md:flex flex-col flex-1 overflow-hidden relative min-w-[400px]">
         <header className="flex items-center px-5 h-[52px] border-b border-border/60 shrink-0">
           <p className="text-[15px] font-semibold text-foreground">
             {tab === 'today'
