@@ -2,19 +2,12 @@
 
 import { BaseEdge, getBezierPath, useInternalNode, type EdgeProps } from '@xyflow/react'
 
-// Get the circle's absolute center and radius for a node.
-// Nodes use origin [0.5, 0.5] so positionAbsolute is the top-left of the bounding box.
-function circleGeometry(nodeId: string) {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const node = useInternalNode(nodeId)
+function circleCenter(node: ReturnType<typeof useInternalNode>) {
   if (!node) return null
-
   const pos = node.internals.positionAbsolute
-  const w   = node.measured?.width ?? 90
-  const r   = (node.data as Record<string, unknown>)?.circleR as number ?? 19
-
-  // The circle is centered horizontally; vertically it sits at the top of the
-  // node div with the label below, so its center y = top + circleRadius.
+  const w = node.measured?.width ?? 90
+  const r = (node.data as Record<string, unknown>)?.circleR as number ?? 19
+  // Circle is at the top of the node div, centered horizontally
   return { cx: pos.x + w / 2, cy: pos.y + r, r }
 }
 
@@ -22,13 +15,16 @@ export function FloatingEdge({
   id, source, target,
   style, label, labelStyle, labelBgPadding, labelBgBorderRadius, markerEnd,
 }: EdgeProps) {
-  const src = circleGeometry(source)
-  const tgt = circleGeometry(target)
+  const srcNode = useInternalNode(source)
+  const tgtNode = useInternalNode(target)
+
+  const src = circleCenter(srcNode)
+  const tgt = circleCenter(tgtNode)
 
   if (!src || !tgt) return null
 
-  const dx   = tgt.cx - src.cx
-  const dy   = tgt.cy - src.cy
+  const dx = tgt.cx - src.cx
+  const dy = tgt.cy - src.cy
   const dist = Math.sqrt(dx * dx + dy * dy) || 1
 
   // Start/end at the circle borders, not the centers

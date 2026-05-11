@@ -232,7 +232,7 @@ export function toFlowGraph(
         id: `__e__${catId}__${nodeId}`,
         source: catId,
         target: nodeId,
-        type: 'default',
+        type: 'floating',
         style: STRUCT_EDGE,
       })
     })
