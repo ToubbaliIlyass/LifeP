@@ -5,6 +5,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   Panel,
   useNodesState,
@@ -86,6 +87,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [showMinimap, setShowMinimap] = useState(true)
 
   function handleRelayout() {
     setNodes((current) => computeRadialLayout(current))
@@ -281,17 +283,32 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
               overflow: 'hidden',
               boxShadow: '0 2px 8px oklch(0 0 0 / 0.2)',
             }}
-          />
-          <MiniMap
-            style={{
-              background: dark ? 'oklch(0.125 0.004 255)' : 'oklch(1 0 0)',
-              border: `1px solid ${dark ? 'oklch(1 0 0 / 10%)' : 'oklch(0 0 0 / 10%)'}`,
-              borderRadius: '0.5rem',
-            }}
-            maskColor={dark ? 'oklch(0.095 0.004 255 / 75%)' : 'oklch(0.975 0.003 75 / 75%)'}
-            nodeColor={dark ? 'oklch(0.22 0.004 255)' : 'oklch(0.85 0 0)'}
-            nodeStrokeWidth={0}
-          />
+          >
+            <ControlButton
+              onClick={() => setShowMinimap((v) => !v)}
+              title={showMinimap ? 'Hide minimap' : 'Show minimap'}
+              style={{ opacity: showMinimap ? 1 : 0.4 }}
+            >
+              {/* Map icon */}
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="1,3 5,1 11,5 15,3 15,13 11,15 5,11 1,13" />
+                <line x1="5" y1="1" x2="5" y2="11" />
+                <line x1="11" y1="5" x2="11" y2="15" />
+              </svg>
+            </ControlButton>
+          </Controls>
+          {showMinimap && (
+            <MiniMap
+              style={{
+                background: dark ? 'oklch(0.125 0.004 255)' : 'oklch(1 0 0)',
+                border: `1px solid ${dark ? 'oklch(1 0 0 / 10%)' : 'oklch(0 0 0 / 10%)'}`,
+                borderRadius: '0.5rem',
+              }}
+              maskColor={dark ? 'oklch(0.095 0.004 255 / 75%)' : 'oklch(0.975 0.003 75 / 75%)'}
+              nodeColor={dark ? 'oklch(0.22 0.004 255)' : 'oklch(0.85 0 0)'}
+              nodeStrokeWidth={0}
+            />
+          )} 
         </ReactFlow>
       </div>
       {resetOpen && (
