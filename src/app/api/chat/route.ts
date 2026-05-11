@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     system: SYSTEM_PROMPT + dateContext + rejectionContext,
     messages: await convertToModelMessages(messages),
     tools: buildTools(),
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(8),
     onFinish({ usage }) {
       logger.info('chat_completion', {
         inputTokens: usage.inputTokens,
