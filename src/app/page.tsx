@@ -47,7 +47,7 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [graphRefreshKey, setGraphRefreshKey] = useState(0)
-  const chatInputRef = useRef<HTMLInputElement>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
   // ── Resize (chat is now on the right — drag handle on left edge) ──
   const dragging = useRef(false)
