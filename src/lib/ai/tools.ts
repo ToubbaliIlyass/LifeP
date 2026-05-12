@@ -45,6 +45,9 @@ const IntentSchema = z
     '"auto" executes immediately; "proposed" queues for user approval. Use "proposed" for structural changes (new goals, deleting anything, new top-level nodes). Use "auto" for lightweight annotations like tags or notes.',
   )
 
+// These types always go through the proposal queue regardless of what intent the AI picks
+const ALWAYS_PROPOSE_TYPES = new Set(['Goal', 'Habit', 'Task', 'Project', 'Event', 'Course', 'Exam', 'Assignment'])
+
 export function buildTools() {
   const user = getCurrentUser()
 
@@ -87,7 +90,8 @@ export function buildTools() {
         intent: IntentSchema,
       }),
       execute: async ({ type, properties, intent }) => {
-        if (intent === 'auto') {
+        const effectiveIntent = ALWAYS_PROPOSE_TYPES.has(type) ? 'proposed' : intent
+        if (effectiveIntent === 'auto') {
           if (properties.name) {
             const existing = getNodes(user.id, { type }).find(
               (n) => (n.properties as Record<string, unknown>).name === properties.name,

@@ -273,7 +273,7 @@ export default function Home() {
           <div className="absolute inset-y-0 left-[2px] w-[2px] rounded-full opacity-0 group-hover:opacity-100 bg-primary/40 transition-opacity duration-150" />
         </div>
 
-        <ChatPanel inputRef={chatInputRef} />
+        <ChatPanel inputRef={chatInputRef} onMutated={() => setGraphRefreshKey((k) => k + 1)} />
       </div>
 
       {searchOpen && <SearchBar onClose={() => setSearchOpen(false)} />}

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 interface ChatPanelProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
+  onMutated?: () => void
 }
 
 const SUGGESTIONS = [
@@ -26,7 +27,7 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = `${el.scrollHeight}px`
 }
 
-export function ChatPanel({ inputRef }: ChatPanelProps) {
+export function ChatPanel({ inputRef, onMutated }: ChatPanelProps) {
   const { messages, sendMessage, status, error } = useChat()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -40,6 +41,14 @@ export function ChatPanel({ inputRef }: ChatPanelProps) {
     if (!el) return
     el.scrollTop = el.scrollHeight
   }, [messages])
+
+  const prevStatus = useRef(status)
+  useEffect(() => {
+    if ((prevStatus.current === 'streaming' || prevStatus.current === 'submitted') && status === 'ready') {
+      onMutated?.()
+    }
+    prevStatus.current = status
+  }, [status, onMutated])
 
   function submit(text?: string) {
     const t = (text ?? input).trim()
