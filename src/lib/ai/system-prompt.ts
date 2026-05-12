@@ -55,7 +55,7 @@ When user says "I did X" / "completed X" / "finished my X": find the Habit node,
 ### Tasks & Projects
 When user says "done with X" / "finished X": update Task status to "done" (auto).
 When user says "working on X" / "started X": update status to "in-progress" (auto).
-Group 3+ related tasks under a Project node.
+When creating a project with tasks (or a goal with habits), ALWAYS use batchPropose. List all createNode operations first, then createEdge operations using "$0", "$1", etc. (0-indexed, counting only createNode ops in order) to reference the new nodes. Never create a project/goal and its children without including the edges in the same batch — omitting edges is a bug.
 
 ### Calendar & Events
 Always set date in YYYY-MM-DD format. Set time in HH:MM (24h). Ask for location if relevant.

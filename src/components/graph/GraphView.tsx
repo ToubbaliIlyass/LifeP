@@ -87,10 +87,11 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
-  const [showMinimap, setShowMinimap] = useState(true)
+  const [showMinimap, setShowMinimap] = useState(false)
+  const [fetchKey, setFetchKey] = useState(0)
 
   function handleRelayout() {
-    setNodes((current) => computeRadialLayout(current))
+    setFetchKey((k) => k + 1)
     setHoveredId(null)
   }
 
@@ -135,7 +136,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
     return () => {
       cancelled = true
     }
-  }, [refreshKey, setNodes, setEdges])
+  }, [refreshKey, fetchKey, setNodes, setEdges])
 
   // Compute highlighted node ids for the current hover
   const highlightedIds = useMemo<Set<string>>(() => {
