@@ -10,10 +10,10 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     const timers = [
       setTimeout(() => setPhase('in'),     50),
-      setTimeout(() => setPhase('merge'),  1200),
-      setTimeout(() => setPhase('hold'),   1900),
-      setTimeout(() => setPhase('out'),    2500),
-      setTimeout(() => { setPhase('done'); onDone() }, 3250),
+      setTimeout(() => setPhase('merge'),  600),
+      setTimeout(() => setPhase('hold'),   1250),
+      setTimeout(() => setPhase('out'),    1850),
+      setTimeout(() => { setPhase('done'); onDone() }, 2600),
     ]
     return () => timers.forEach(clearTimeout)
   }, [onDone])
@@ -31,7 +31,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
   const overlayTransition = phase === 'out' ? 'opacity 0.9s ease' : 'none'
 
   const textOpacity = phase === 'init' ? 0 : phase === 'out' || phase === 'done' ? 0 : 1
-  const textTransition = phase === 'in' ? 'opacity 1s cubic-bezier(0.4, 0, 0.6, 1)' : phase === 'out' ? 'opacity 0.4s ease' : 'none'
+  const textTransition = phase === 'in' ? 'opacity 0.5s cubic-bezier(0.4, 0, 0.6, 1)' : phase === 'out' ? 'opacity 0.4s ease' : 'none'
 
   return (
     <div
