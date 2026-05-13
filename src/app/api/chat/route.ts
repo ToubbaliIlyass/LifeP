@@ -2,6 +2,7 @@ import { convertToModelMessages, stepCountIs, streamText } from 'ai'
 import { defaultModel } from '@/lib/ai/client'
 import { SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 import { buildTools } from '@/lib/ai/tools'
+import { buildContextSnapshot } from '@/lib/ai/context'
 import { getRecentRejections } from '@/lib/db/proposals'
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { logger } from '@/lib/log'
@@ -13,6 +14,20 @@ export async function POST(request: Request) {
 
   const user = getCurrentUser()
   const { messages } = await request.json()
+
+  // Extract the last user message for keyword-based snapshot filtering
+  const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
+  const userText =
+    typeof lastUserMsg?.content === 'string'
+      ? lastUserMsg.content
+      : Array.isArray(lastUserMsg?.content)
+        ? (lastUserMsg.content as { type: string; text?: string }[])
+            .filter((p) => p.type === 'text')
+            .map((p) => p.text ?? '')
+            .join(' ')
+        : ''
+
+  const graphContext = buildContextSnapshot(user.id, userText)
 
   // Append recent rejection context so the AI learns from them
   const rejections = getRecentRejections(user.id)
@@ -32,7 +47,7 @@ export async function POST(request: Request) {
 
   const result = streamText({
     model: defaultModel,
-    system: SYSTEM_PROMPT + dateContext + rejectionContext,
+    system: SYSTEM_PROMPT + dateContext + graphContext + rejectionContext,
     messages: await convertToModelMessages(messages),
     tools: buildTools(),
     stopWhen: stepCountIs(8),

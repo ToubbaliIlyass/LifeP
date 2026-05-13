@@ -1,0 +1,80 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
+type Phase = 'init' | 'in' | 'merge' | 'hold' | 'out' | 'done'
+
+export function SplashScreen({ onDone }: { onDone: () => void }) {
+  const [phase, setPhase] = useState<Phase>('init')
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setPhase('in'),     50),
+      setTimeout(() => setPhase('merge'),  1200),
+      setTimeout(() => setPhase('hold'),   1800),
+      setTimeout(() => setPhase('out'),    2400),
+      setTimeout(() => { setPhase('done'); onDone() }, 3100),
+    ]
+    return () => timers.forEach(clearTimeout)
+  }, [onDone])
+
+  function skip() {
+    setPhase('out')
+    setTimeout(onDone, 700)
+  }
+
+  const merging = phase === 'merge' || phase === 'hold' || phase === 'out' || phase === 'done'
+  const overlayOpacity = phase === 'init' || phase === 'out' || phase === 'done' ? 0 : 1
+  const overlayTransition =
+    phase === 'in' ? 'opacity 0.5s ease' : phase === 'out' ? 'opacity 0.7s ease' : 'none'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background cursor-pointer select-none"
+      style={{
+        opacity: overlayOpacity,
+        transition: overlayTransition,
+        pointerEvents: phase === 'done' ? 'none' : 'auto',
+      }}
+      onClick={skip}
+      onKeyDown={(e) => ['Escape', ' ', 'Enter'].includes(e.key) && skip()}
+      tabIndex={0}
+    >
+      <div className="flex items-baseline overflow-hidden">
+        {/* "Where " — collapses on merge */}
+        <span
+          className="text-[28px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
+          style={{
+            maxWidth: merging ? '0px' : '180px',
+            opacity: merging ? 0 : 1,
+            transition: 'max-width 0.55s ease, opacity 0.35s ease',
+          }}
+        >
+          Where&nbsp;
+        </span>
+
+        {/* "Act" — serif */}
+        <span className="text-[28px] font-serif font-semibold text-foreground tracking-tight">
+          Act
+        </span>
+
+        {/* "-ion meets struct-" — collapses on merge */}
+        <span
+          className="text-[28px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
+          style={{
+            maxWidth: merging ? '0px' : '500px',
+            opacity: merging ? 0 : 1,
+            transition: 'max-width 0.55s ease, opacity 0.35s ease',
+          }}
+        >
+          -ion meets struct-
+        </span>
+
+        {/* "ure" — serif */}
+        <span className="text-[28px] font-serif font-semibold text-foreground tracking-tight">
+          ure
+        </span>
+      </div>
+    </div>
+  )
+}

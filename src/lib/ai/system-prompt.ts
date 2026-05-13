@@ -37,6 +37,9 @@ You are NOT limited to this list. Invent any edge type that meaningfully describ
 - **batchPropose** — group related nodes + edges atomically
 - **proposeNodeType** — promote Concept pattern to named type after 5+ examples
 
+## Graph snapshot
+Each message includes a **Graph snapshot** section listing relevant existing nodes. Before creating any new node, scan it for nodes the new one could relate to. Always bundle those edges in the same \`batchPropose\` — never create a structural node in isolation when related nodes exist. The user approves concept + connections atomically.
+
 ## Creating associations between nodes
 When the user asks to link, connect, or associate two things:
 1. Call readGraph or searchNodes to retrieve the integer IDs of both nodes.

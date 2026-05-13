@@ -16,6 +16,7 @@ import { TodayView } from '@/components/today/TodayView'
 import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { SearchBar } from '@/components/search/SearchBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { SplashScreen } from '@/components/SplashScreen'
 
 type Tab = 'today' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'proposals'
 
@@ -47,7 +48,19 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [graphRefreshKey, setGraphRefreshKey] = useState(0)
+  const [showSplash, setShowSplash] = useState(false)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!sessionStorage.getItem('acture-intro-seen')) {
+      setShowSplash(true)
+    }
+  }, [])
+
+  const handleSplashDone = useCallback(() => {
+    sessionStorage.setItem('acture-intro-seen', '1')
+    setShowSplash(false)
+  }, [])
 
   // ── Resize (chat is now on the right — drag handle on left edge) ──
   const dragging = useRef(false)
@@ -277,6 +290,8 @@ export default function Home() {
       </div>
 
       {searchOpen && <SearchBar onClose={() => setSearchOpen(false)} />}
+
+      {showSplash && <SplashScreen onDone={handleSplashDone} />}
     </main>
   )
 }

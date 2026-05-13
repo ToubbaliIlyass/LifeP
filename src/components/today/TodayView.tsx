@@ -108,7 +108,7 @@ export function TodayView({ onNavigate }: TodayViewProps) {
 
   return (
     <ScrollArea className="h-full">
-      <div className="px-8 py-8 max-w-2xl">
+      <div className="px-8 py-8">
 
         {isEmpty && (
           <div className="py-10 text-center">
