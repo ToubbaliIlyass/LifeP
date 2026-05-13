@@ -9,18 +9,18 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('in'),     50),    // text fades in (0.7s)
-      setTimeout(() => setPhase('merge'),  2800),  // hold to read ~2s, then merge
-      setTimeout(() => setPhase('hold'),   3600),  // merge takes 0.8s
-      setTimeout(() => setPhase('out'),    4500),  // hold "Acture" for 0.9s
-      setTimeout(() => { setPhase('done'); onDone() }, 5400), // fade out 0.9s
+      setTimeout(() => setPhase('in'),     50),
+      setTimeout(() => setPhase('merge'),  1800),
+      setTimeout(() => setPhase('hold'),   2450),
+      setTimeout(() => setPhase('out'),    3050),
+      setTimeout(() => { setPhase('done'); onDone() }, 3800),
     ]
     return () => timers.forEach(clearTimeout)
   }, [onDone])
 
   function skip() {
     setPhase('out')
-    setTimeout(onDone, 900)
+    setTimeout(onDone, 750)
   }
 
   const merging = phase === 'merge' || phase === 'hold' || phase === 'out' || phase === 'done'
