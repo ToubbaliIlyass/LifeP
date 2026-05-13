@@ -234,6 +234,58 @@ These were locked in during planning. Re-read before starting any phase.
 
 ---
 
+## Phase 9 — Iteration 1: AI awareness + daily-use UX
+
+**Goal:** sharpen the AI's graph awareness, refine task organization for real daily use, and add a brand-defining first-visit animation.
+
+**Status:** Not started.
+
+### 9.1 — Today panel: horizontal stretch
+- [ ] Drop the `max-w-2xl` constraint in `src/components/today/TodayView.tsx:111` so the Habits / Tasks / Events sections fill available horizontal width.
+
+### 9.2 — Tasks panel: regroup by date buckets
+Replace the current status-based grouping in `src/components/tasks/TasksPanel.tsx` with date-based buckets.
+
+- [ ] Buckets in order: **Overdue** (red) → **Next 3 days** → **Next week** (4–7 days) → **Two weeks** (8–14 days) → **Undated** → **Done** (collapsed).
+- [ ] Within each bucket, sort by due date ascending.
+- [ ] Tasks beyond 2 weeks: not shown for now.
+- [ ] Status dot still cycles status inline (preserve existing behavior).
+
+### 9.3 — AI: relevant-node snapshot + mandatory connection edges
+Inject a curated graph snapshot into the chat system prompt and require edges to existing nodes in proposals.
+
+- [ ] New `src/lib/ai/context.ts` exporting `buildContextSnapshot(userId, userMessage)`:
+  - **Always include:** Goal, Project, Course nodes; active Habits; non-done Tasks.
+  - **Plus:** any node whose `name` keyword-matches the user's current message.
+  - **Exclude:** HabitLog, JournalEntry (AI can fall back to `readGraph` for those).
+  - Format: compact `id · type · name` list grouped by type, capped at a sane size.
+- [ ] Wire snapshot into `src/app/api/chat/route.ts` alongside `dateContext` + `rejectionContext`.
+- [ ] Update `src/lib/ai/system-prompt.ts`:
+  - Add rule: "Before creating any new node, scan the graph snapshot for relevant existing nodes. Bundle edges to them in the same `batchPropose` so the user reviews the concept + its connections atomically."
+  - This is default behavior — not contingent on the user asking to link.
+
+### 9.4 — Opening animation (first visit per session)
+Brand intro that resolves into "Acture" before revealing the Today panel.
+
+- [ ] Tagline: *"Where **Act**-ion meets struct-**Ure**"* — `Act` and `Ure` in serif, rest sans-serif.
+- [ ] Animation phases:
+  1. Tagline fades in.
+  2. The two serif fragments (`Act`, `Ure`) slide toward each other to form `Acture` in the center.
+  3. Crossfade into the Today panel.
+- [ ] Gate on `sessionStorage` flag — plays only on first visit per session.
+- [ ] Skippable on click or key press.
+
+### Exit criteria
+- Today panel uses full horizontal width on wide displays.
+- Tasks panel shows date-bucket grouping with the buckets above.
+- AI creates new nodes with relevant edges bundled into the same proposal *without being asked*.
+- Opening animation plays once per session, is skippable, and crossfades smoothly into Today.
+
+### Deferred (future phase)
+- Calendar day-view to arrange tasks/habits across the day.
+
+---
+
 ## Phase 8 — Multi-user migration (only if/when needed)
 
 **Don't do this until you have actual users beyond yourself.** Premature deployment is the most common way personal projects die.
