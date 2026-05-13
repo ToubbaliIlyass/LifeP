@@ -9,18 +9,18 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('in'),     50),
-      setTimeout(() => setPhase('merge'),  1200),
-      setTimeout(() => setPhase('hold'),   1800),
-      setTimeout(() => setPhase('out'),    2400),
-      setTimeout(() => { setPhase('done'); onDone() }, 3100),
+      setTimeout(() => setPhase('in'),     50),    // text fades in (0.7s)
+      setTimeout(() => setPhase('merge'),  2800),  // hold to read ~2s, then merge
+      setTimeout(() => setPhase('hold'),   3600),  // merge takes 0.8s
+      setTimeout(() => setPhase('out'),    4500),  // hold "Acture" for 0.9s
+      setTimeout(() => { setPhase('done'); onDone() }, 5400), // fade out 0.9s
     ]
     return () => timers.forEach(clearTimeout)
   }, [onDone])
 
   function skip() {
     setPhase('out')
-    setTimeout(onDone, 700)
+    setTimeout(onDone, 900)
   }
 
   const merging = phase === 'merge' || phase === 'hold' || phase === 'out' || phase === 'done'
@@ -28,10 +28,10 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
   // Overlay is always opaque so it covers the dashboard from the very first render.
   // Only the text inside fades in/out — the overlay itself only fades on exit.
   const overlayOpacity = phase === 'out' || phase === 'done' ? 0 : 1
-  const overlayTransition = phase === 'out' ? 'opacity 0.7s ease' : 'none'
+  const overlayTransition = phase === 'out' ? 'opacity 0.9s ease' : 'none'
 
   const textOpacity = phase === 'init' ? 0 : phase === 'out' || phase === 'done' ? 0 : 1
-  const textTransition = phase === 'in' ? 'opacity 0.5s ease' : phase === 'out' ? 'opacity 0.3s ease' : 'none'
+  const textTransition = phase === 'in' ? 'opacity 0.7s ease' : phase === 'out' ? 'opacity 0.4s ease' : 'none'
 
   return (
     <div
@@ -51,35 +51,35 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       >
         {/* "Where " — collapses on merge */}
         <span
-          className="text-[28px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
+          className="text-[48px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
           style={{
-            maxWidth: merging ? '0px' : '180px',
+            maxWidth: merging ? '0px' : '280px',
             opacity: merging ? 0 : 1,
-            transition: 'max-width 0.55s ease, opacity 0.35s ease',
+            transition: 'max-width 0.7s ease, opacity 0.45s ease',
           }}
         >
           Where&nbsp;
         </span>
 
         {/* "Act" — serif */}
-        <span className="text-[28px] font-serif font-semibold text-foreground tracking-tight">
+        <span className="text-[48px] font-serif font-semibold text-foreground tracking-tight">
           Act
         </span>
 
         {/* "-ion meets struct-" — collapses on merge */}
         <span
-          className="text-[28px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
+          className="text-[48px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
           style={{
-            maxWidth: merging ? '0px' : '500px',
+            maxWidth: merging ? '0px' : '700px',
             opacity: merging ? 0 : 1,
-            transition: 'max-width 0.55s ease, opacity 0.35s ease',
+            transition: 'max-width 0.7s ease, opacity 0.45s ease',
           }}
         >
           -ion meets struct-
         </span>
 
         {/* "ure" — serif */}
-        <span className="text-[28px] font-serif font-semibold text-foreground tracking-tight">
+        <span className="text-[48px] font-serif font-semibold text-foreground tracking-tight">
           ure
         </span>
       </div>
