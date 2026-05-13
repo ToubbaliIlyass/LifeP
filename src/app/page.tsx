@@ -48,18 +48,18 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [graphRefreshKey, setGraphRefreshKey] = useState(0)
-  const [showSplash, setShowSplash] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (!sessionStorage.getItem('acture-intro-seen')) {
-      setShowSplash(true)
-    }
-  }, [])
 
   const handleSplashDone = useCallback(() => {
     sessionStorage.setItem('acture-intro-seen', '1')
     setShowSplash(false)
+  }, [])
+
+  useEffect(() => {
+    if (sessionStorage.getItem('acture-intro-seen')) {
+      setShowSplash(false)
+    }
   }, [])
 
   // ── Resize (chat is now on the right — drag handle on left edge) ──

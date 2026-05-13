@@ -24,9 +24,14 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
   }
 
   const merging = phase === 'merge' || phase === 'hold' || phase === 'out' || phase === 'done'
-  const overlayOpacity = phase === 'init' || phase === 'out' || phase === 'done' ? 0 : 1
-  const overlayTransition =
-    phase === 'in' ? 'opacity 0.5s ease' : phase === 'out' ? 'opacity 0.7s ease' : 'none'
+
+  // Overlay is always opaque so it covers the dashboard from the very first render.
+  // Only the text inside fades in/out — the overlay itself only fades on exit.
+  const overlayOpacity = phase === 'out' || phase === 'done' ? 0 : 1
+  const overlayTransition = phase === 'out' ? 'opacity 0.7s ease' : 'none'
+
+  const textOpacity = phase === 'init' ? 0 : phase === 'out' || phase === 'done' ? 0 : 1
+  const textTransition = phase === 'in' ? 'opacity 0.5s ease' : phase === 'out' ? 'opacity 0.3s ease' : 'none'
 
   return (
     <div
@@ -40,7 +45,10 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       onKeyDown={(e) => ['Escape', ' ', 'Enter'].includes(e.key) && skip()}
       tabIndex={0}
     >
-      <div className="flex items-baseline overflow-hidden">
+      <div
+        className="flex items-baseline overflow-hidden"
+        style={{ opacity: textOpacity, transition: textTransition }}
+      >
         {/* "Where " — collapses on merge */}
         <span
           className="text-[28px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
