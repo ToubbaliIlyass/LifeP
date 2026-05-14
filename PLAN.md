@@ -383,6 +383,101 @@ Apply across `TasksPanel`, `EventsPanel`, and the new Activity log. Aim for clea
 
 ---
 
+## Phase 11 — Calendar / time-blocking view
+
+**Goal:** a day-view calendar that lets the user drag Tasks and Habits onto a 24-hour timeline. Time-blocks are first-class graph nodes, so the AI can read/create them and we can query history.
+
+**Status:** Not started.
+
+### Design decisions (locked in)
+
+- **Calendar replaces the main panel, not chat.** Chat stays accessible on the right; AI scheduling ("block 90 min for deep work this afternoon") works from the same view.
+- **TimeBlock as a new node type, linked via edge.** Not a property on Task/Habit. Lets the same Task have multiple blocks across the day, preserves history, keeps source nodes clean.
+- **Day view only for v1.** Week view, recurrence, and AI scheduling helpers go to phase 12.
+- **24-hour grid**, 30-minute snap.
+
+### 11.1 — Data model
+
+- [ ] Register `TimeBlock` as a built-in node type seeded in `node_types` on startup.
+- [ ] TimeBlock properties shape: `{ date: YYYY-MM-DD, startTime: HH:MM, endTime: HH:MM }`. No source-node reference in properties — that's an edge.
+- [ ] New canonical edge type: `scheduled-for` (TimeBlock -> Task/Habit/Project/etc.). A TimeBlock with no `scheduled-for` edge is a raw block (lunch, break, free time). That's a feature, not a bug.
+- [ ] Add optional `defaultTime: HH:MM` to Habit properties. Not used by the calendar in v1 — reserved for phase 12 auto-render.
+
+### 11.2 — API
+
+- [ ] `GET /api/calendar?date=YYYY-MM-DD` — returns `{ blocks, events }` for that date. Blocks are joined with their source node via the `scheduled-for` edge.
+- [ ] `POST /api/calendar/blocks` — body `{ date, startTime, endTime, sourceNodeId? }`. Creates the TimeBlock node and (if `sourceNodeId` provided) the `scheduled-for` edge atomically. **Direct, no proposal queue** — scheduling is not a structural change.
+- [ ] `PATCH /api/calendar/blocks/[id]` — body `{ startTime?, endTime?, date? }`. Used for moving and resizing.
+- [ ] `DELETE /api/calendar/blocks/[id]` — cascade removes its edges.
+
+### 11.3 — Components
+
+Folder: `src/components/calendar/`
+
+- [ ] `CalendarView.tsx` — main container. Left rail (unscheduled today) + right grid.
+- [ ] `UnscheduledRail.tsx` — left rail showing today's eligible items that aren't yet time-blocked:
+  - Tasks where `dueDate <= today` AND status !== 'done' AND no TimeBlock for today
+  - Habits scheduled for today (via daysOfWeek/frequency) AND no completion log AND no TimeBlock
+  - Each item draggable via `@dnd-kit/core`.
+- [ ] `TimeGrid.tsx` — 24h × 2 slots × 32px tall (~1536px). Scrollable. Auto-scrolls to current hour on first mount. Renders a soft "now" line, updated every minute.
+- [ ] `Block.tsx` — single block. Different styling per source type (Task = sky, Habit = emerald, raw = neutral; Events keep their existing amber). Includes a bottom-edge resize handle and a delete control.
+
+### 11.4 — Drag-and-drop interactions (@dnd-kit/core)
+
+- [ ] **Rail item -> grid slot**: creates new TimeBlock + `scheduled-for` edge. Drop Y determines `startTime`; default duration 30 min.
+- [ ] **Existing block -> different slot**: PATCH new time range.
+- [ ] **Resize handle drag**: PATCH `endTime`.
+- [ ] **Click block**: opens `NodeDetailPanel` for the source Task/Habit (not the TimeBlock itself — the user wants to edit what they're working on, not the slot metadata).
+- [ ] **Delete control on block**: removes the TimeBlock, releases the source back to the rail.
+
+### 11.5 — Existing Events on the grid
+
+- [ ] `GET /api/calendar` merges Events for the date into the response.
+- [ ] Events render alongside TimeBlocks but with their amber styling, distinguishing external commitments from self-scheduled blocks.
+- [ ] Events are **not** draggable in v1 — edit via `NodeDetailPanel` (right-click or click-through).
+
+### 11.6 — Tab + page wiring
+
+- [ ] Add `Calendar` sidebar tab (CalendarRange icon) right after `Today`.
+- [ ] `tab === 'calendar' && <CalendarView />` in `src/app/page.tsx`.
+
+### 11.7 — AI integration (minimal)
+
+- [ ] Update `src/lib/ai/system-prompt.ts` to list `TimeBlock` as a node type and `scheduled-for` as a canonical edge.
+- [ ] Add `TimeBlock` to a new `DIRECT_CREATE_TYPES` set in `src/lib/ai/tools.ts` so `createNode` permits it directly (it's not structural). No proposal queue for scheduling.
+- [ ] System prompt note: "When user says 'block out 90 min for X tomorrow morning', create a TimeBlock directly with `createNode` + `createEdge`. Do not use batchPropose for scheduling existing tasks."
+
+### Order to ship
+
+1. Seed `TimeBlock` into `node_types`.
+2. Calendar API: GET / POST / PATCH / DELETE.
+3. Static `TimeGrid` rendering existing blocks (no interaction yet).
+4. `UnscheduledRail` with `useDraggable`.
+5. Drop-to-create flow end-to-end.
+6. Move and resize.
+7. Click-to-edit via `NodeDetailPanel`; delete control.
+8. Calendar tab in sidebar.
+9. System-prompt update + `DIRECT_CREATE_TYPES`.
+
+### Exit criteria
+
+- Drag a Task from the rail to 14:00 -> appears as a TimeBlock, persists across reloads.
+- Drag an existing TimeBlock from 09:00 to 11:00 -> time updates.
+- Resize a TimeBlock from 30 min to 90 min -> endTime updates.
+- Ask the AI "block out 2 hours for deep work this afternoon" -> it creates a TimeBlock directly, no proposal queue.
+- Existing Events appear on the grid in amber and are not movable.
+
+### Deferred (phase 12+)
+
+- Week view.
+- Recurring TimeBlocks ("repeat every Tuesday at 9 AM").
+- Auto-render of habits with `defaultTime` as soft pending blocks.
+- Dedicated AI scheduling tool (`scheduleBlock(taskId, time)`) wrapping the primitives with smarter defaults.
+- Calendar import/export (.ics).
+- Mobile / touch support.
+
+---
+
 ## Phase 8 — Multi-user migration (only if/when needed)
 
 **Don't do this until you have actual users beyond yourself.** Premature deployment is the most common way personal projects die.
