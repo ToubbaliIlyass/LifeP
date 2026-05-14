@@ -39,13 +39,7 @@ export const BatchOperationSchema = z.discriminatedUnion('kind', [
 
 export type BatchOperation = z.infer<typeof BatchOperationSchema>
 
-const IntentSchema = z
-  .enum(['auto', 'proposed'])
-  .describe(
-    '"auto" executes immediately; "proposed" queues for user approval. Use "proposed" for structural changes (new goals, deleting anything, new top-level nodes). Use "auto" for lightweight annotations like tags or notes.',
-  )
-
-// These types always go through the proposal queue regardless of what intent the AI picks
+// Structural types must go through batchPropose — createNode rejects these directly
 const ALWAYS_PROPOSE_TYPES = new Set(['Goal', 'Habit', 'Task', 'Project', 'Event', 'Course', 'Exam', 'Assignment'])
 
 export function buildTools() {
@@ -83,77 +77,59 @@ export function buildTools() {
 
     createNode: tool({
       description:
-        'Create a single node. Use intent="auto" for annotations/notes on existing concepts. Use intent="proposed" for new structural entities (Goals, Habits, Tasks, Projects).',
+        'Create a single node immediately (intent="auto" only). For structural entities (Goal, Habit, Task, Project, Event, Course, Exam, Assignment) you MUST use batchPropose instead — calling this tool for those types will be rejected.',
       inputSchema: z.object({
         type: z.string(),
         properties: z.record(z.string(), z.unknown()),
-        intent: IntentSchema,
       }),
-      execute: async ({ type, properties, intent }) => {
-        const effectiveIntent = ALWAYS_PROPOSE_TYPES.has(type) ? 'proposed' : intent
-        if (effectiveIntent === 'auto') {
-          if (properties.name) {
-            const existing = getNodes(user.id, { type }).find(
-              (n) => (n.properties as Record<string, unknown>).name === properties.name,
-            )
-            if (existing) return { created: false, node: existing, deduplicated: true }
-          }
-          const node = createNode(user.id, type, properties)
-          return { created: true, node }
+      execute: async ({ type, properties }) => {
+        if (ALWAYS_PROPOSE_TYPES.has(type)) {
+          return { error: `Cannot create ${type} directly. Use batchPropose with a createNode operation instead.` }
         }
-        const proposal = createProposal(user.id, `Create ${type} node`, [
-          { kind: 'createNode', type, properties },
-        ])
-        return { proposed: true, proposalId: proposal.id, summary: proposal.summary }
+        if (properties.name) {
+          const existing = getNodes(user.id, { type }).find(
+            (n) => (n.properties as Record<string, unknown>).name === properties.name,
+          )
+          if (existing) return { created: false, node: existing, deduplicated: true }
+        }
+        const node = createNode(user.id, type, properties)
+        return { created: true, node }
       },
     }),
 
     createEdge: tool({
       description:
-        'Create an edge between two existing nodes. Use intent="auto" when linking nodes that already exist. Use intent="proposed" when the relationship involves new top-level entities.',
+        'Create an edge between two existing nodes immediately. Only use this for linking already-existing nodes (intent="auto"). If the edge is part of a structural proposal, include it inside batchPropose instead.',
       inputSchema: z.object({
         sourceId: z.number().describe('Source node ID'),
         targetId: z.number().describe('Target node ID'),
         type: z.string().describe('Relationship type e.g. supports, blocks, part-of'),
         properties: z.record(z.string(), z.unknown()).optional(),
-        intent: IntentSchema,
       }),
-      execute: async ({ sourceId, targetId, type, properties, intent }) => {
-        if (intent === 'auto') {
-          const edge = createEdge(user.id, sourceId, targetId, type, properties ?? {})
-          return { created: true, edge }
-        }
-        const proposal = createProposal(
-          user.id,
-          `Create "${type}" edge between nodes ${sourceId} and ${targetId}`,
-          [{ kind: 'createEdge', sourceRef: String(sourceId), targetRef: String(targetId), type, properties }],
-        )
-        return { proposed: true, proposalId: proposal.id, summary: proposal.summary }
+      execute: async ({ sourceId, targetId, type, properties }) => {
+        const edge = createEdge(user.id, sourceId, targetId, type, properties ?? {})
+        return { created: true, edge }
       },
     }),
 
     updateNodeProperties: tool({
       description:
-        'Update properties on an existing node. Use intent="auto" for adding tags, notes, or labels. Use intent="proposed" for changing the name, type, or core structural fields.',
+        'Update properties on an existing node immediately. Use for status changes, habit completions, grade updates, and lightweight field edits. For renames or core structural changes to important nodes, use batchPropose with an updateNode operation instead.',
       inputSchema: z.object({
         nodeId: z.number(),
         properties: z.record(z.string(), z.unknown()),
-        intent: IntentSchema,
       }),
-      execute: async ({ nodeId, properties, intent }) => {
-        if (intent === 'auto') {
-          const node = updateNode(user.id, nodeId, properties)
-          return node ? { updated: true, node } : { updated: false, error: 'Node not found' }
-        }
-        const proposal = createProposal(user.id, `Update properties on node ${nodeId}`, [
-          { kind: 'updateNode', nodeId, properties },
-        ])
-        return { proposed: true, proposalId: proposal.id, summary: proposal.summary }
+      execute: async ({ nodeId, properties }) => {
+        const existing = getNodes(user.id).find((n) => n.id === nodeId)
+        if (!existing) return { updated: false, error: 'Node not found' }
+        const merged = { ...(existing.properties as Record<string, unknown>), ...properties }
+        const node = updateNode(user.id, nodeId, merged)
+        return node ? { updated: true, node } : { updated: false, error: 'Node not found' }
       },
     }),
 
     deleteNode: tool({
-      description: 'Propose deletion of a node and its edges. Always queued for user approval.',
+      description: 'Propose deletion of a node and its edges. Always queued for user approval — use batchPropose with a deleteNode operation.',
       inputSchema: z.object({
         nodeId: z.number(),
         reason: z.string().describe('Why this node should be deleted'),
