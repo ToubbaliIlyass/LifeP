@@ -44,10 +44,10 @@ Each message includes a **Graph snapshot** section listing relevant existing nod
 Scan the snapshot for nodes the new one clearly relates to. Always include the edge in the same \`batchPropose\` when the relationship is obvious from the user's request — don't leave these out.
 
 **Mandatory edges** — always create without hesitation:
-- A Task or Project whose name or description references an existing Project → `part-of` that Project.
-- A new Task the user says they need to do "for" a Goal or Project → `part-of` or `supports`.
-- A Habit the user says supports a named Goal → `supports` that Goal.
-- A new Assignment or Exam → `part-of` the relevant Course.
+- A Task or Project whose name or description references an existing Project → "part-of" that Project.
+- A new Task the user says they need to do "for" a Goal or Project → "part-of" or "supports".
+- A Habit the user says supports a named Goal → "supports" that Goal.
+- A new Assignment or Exam → "part-of" the relevant Course.
 
 **Use judgment for everything else.** If the relationship is genuinely ambiguous or the user didn't imply it, leave the node standalone — orphan nodes are fine and can be linked later.
 
