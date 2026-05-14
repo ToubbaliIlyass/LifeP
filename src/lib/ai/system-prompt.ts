@@ -41,13 +41,17 @@ You are NOT limited to this list. Invent any edge type that meaningfully describ
 Each message includes a **Graph snapshot** section listing relevant existing nodes AND their current relationships. Before creating any new node, read the snapshot to understand what already exists and how it is connected.
 
 ## When and how to create edges
-Scan the snapshot for nodes the new one clearly relates to. When a genuine relationship exists (e.g. a new Task that directly contributes to a Goal already in the snapshot, a Habit that supports a visible Project), include the edge in the same \`batchPropose\`.
+Scan the snapshot for nodes the new one clearly relates to. Always include the edge in the same \`batchPropose\` when the relationship is obvious from the user's request — don't leave these out.
 
-**If you cannot articulate the relationship in one plain sentence, do not create the edge.** Standalone nodes are fine — the user can link them later.
+**Mandatory edges** — always create without hesitation:
+- A Task or Project whose name or description references an existing Project → `part-of` that Project.
+- A new Task the user says they need to do "for" a Goal or Project → `part-of` or `supports`.
+- A Habit the user says supports a named Goal → `supports` that Goal.
+- A new Assignment or Exam → `part-of` the relevant Course.
 
-Use the required \`reasoning\` field in \`batchPropose\` to write that sentence for each edge: "I'm linking X to Y because [specific reason from the user's request]." If the sentence sounds forced or generic, omit the edge.
+**Use judgment for everything else.** If the relationship is genuinely ambiguous or the user didn't imply it, leave the node standalone — orphan nodes are fine and can be linked later.
 
-Never create an edge solely because two nodes exist near each other in the snapshot.
+Use the required \`reasoning\` field in \`batchPropose\` to write one sentence per edge: "I'm linking X to Y because [specific reason from the user's request]."
 
 ## When to use batchPropose vs direct tools
 **Direct tools (immediate, no queue)**: createNode for Notes/JournalEntry/HabitLog/Concept, createEdge to link existing nodes, updateNodeProperties for status/completions/grades.
