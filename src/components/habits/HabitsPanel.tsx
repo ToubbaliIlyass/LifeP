@@ -29,12 +29,14 @@ const FREQ_GROUPS: { key: string; label: string; borderClass: string; labelClass
 ]
 
 function habitSubLabel(habit: HabitRow): string {
-  if (habit.frequency === 'weekdays') return 'Mon – Fri'
-  if (habit.frequency === 'weekly' && habit.daysOfWeek?.length) {
-    return habit.daysOfWeek.map((d) => DOW_LABELS[d]).join(', ')
+  const parts: string[] = []
+  if (habit.frequency === 'weekdays') {
+    parts.push('Mon – Fri')
+  } else if (habit.frequency === 'weekly' && habit.daysOfWeek?.length) {
+    parts.push(habit.daysOfWeek.map((d) => DOW_LABELS[d]).join(', '))
   }
-  if (habit.durationMinutes) return `${habit.durationMinutes}min`
-  return ''
+  if (habit.durationMinutes) parts.push(`${habit.durationMinutes}min`)
+  return parts.join(' · ')
 }
 
 function formatDate(iso: string) {
@@ -164,14 +166,12 @@ export function HabitsPanel() {
                           </p>
                           <p className="text-[10px] text-muted-foreground/40 font-mono mt-0.5">
                             {habitSubLabel(habit)}
-                            {habit.durationMinutes && habit.frequency !== 'daily' ? ` · ${habit.durationMinutes}min` : ''}
-                            {habit.frequency === 'daily' && habit.durationMinutes ? `${habit.durationMinutes}min` : ''}
                           </p>
                         </div>
 
-                        {habit.streak > 0 && (
-                          <span className="text-[11px] font-mono text-orange-400/70 shrink-0">
-                            🔥{habit.streak}
+                        {habit.streak > 1 && (
+                          <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-full bg-orange-400/10 text-orange-400/60 shrink-0">
+                            {habit.streak}d
                           </span>
                         )}
 
