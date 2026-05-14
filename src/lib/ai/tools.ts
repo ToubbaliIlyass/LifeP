@@ -146,14 +146,16 @@ export function buildTools() {
 
     batchPropose: tool({
       description:
-        'Propose a set of related graph changes as a single atomic proposal the user can approve or reject together. Use this when creating multiple nodes and edges that form a coherent concept (e.g., a goal + supporting habits + edges). createEdge entries can reference createNode results by "$0", "$1", etc. (0-indexed, counting only createNode operations in order).',
+        'Propose a set of related graph changes as a single atomic proposal the user can approve or reject together. Use this when creating structural nodes (Goal, Habit, Task, Project, Event, Course, Exam, Assignment) and their edges. createEdge entries can reference createNode results by "$0", "$1", etc. (0-indexed, counting only createNode operations in order). Requires a reasoning field explaining each edge.',
       inputSchema: z.object({
-        summary: z.string().describe('Human-readable summary of what this batch does'),
+        summary: z.string().describe('One-sentence summary of what this batch does'),
+        reasoning: z.string().describe('For each edge in this batch, one sentence explaining why the relationship exists. If you cannot justify an edge, omit it.'),
         operations: z.array(BatchOperationSchema),
       }),
-      execute: async ({ summary, operations }) => {
+      execute: async ({ summary, reasoning, operations }) => {
         const schemaVersion = getSchemaVersion(user.id)
-        const proposal = createProposal(user.id, summary, operations, schemaVersion)
+        const fullSummary = reasoning.trim() ? `${summary}\n\n${reasoning}` : summary
+        const proposal = createProposal(user.id, fullSummary, operations, schemaVersion)
         return { proposed: true, proposalId: proposal.id, summary }
       },
     }),

@@ -15,9 +15,19 @@ export async function PATCH(
   const task = getNodes(user.id, { type: 'Task' }).find((n) => n.id === taskId)
   if (!task) return Response.json({ error: 'Task not found' }, { status: 404 })
 
-  const updated = updateNode(user.id, taskId, {
-    ...(task.properties as Record<string, unknown>),
-    status: body.status,
-  })
+  const props = { ...(task.properties as Record<string, unknown>) }
+  const prevStatus = typeof props.status === 'string' ? props.status : 'todo'
+  const newStatus = body.status
+
+  // Track transition timestamp for archive logic
+  if (newStatus === 'done' && prevStatus !== 'done') {
+    props.completedAt = new Date().toISOString()
+  } else if (newStatus !== 'done') {
+    delete props.completedAt
+  }
+
+  props.status = newStatus
+
+  const updated = updateNode(user.id, taskId, props)
   return Response.json({ ok: true, task: updated })
 }

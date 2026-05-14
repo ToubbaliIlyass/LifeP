@@ -290,7 +290,7 @@ Brand intro that resolves into "Acture" before revealing the Today panel.
 
 **Goal:** fix the two opposite failure modes in AI-created relationships (spurious links and missing links), give done tasks somewhere to go, fix Today-view bleed-through, and tighten visual hierarchy across panels.
 
-**Status:** Not started.
+**Status:** Complete ✅.
 
 ### Diagnosis (driving this phase)
 
@@ -304,11 +304,11 @@ Brand intro that resolves into "Acture" before revealing the Today panel.
 
 Mental model: tasks live in three tiers — **Active** (todo/in-progress), **Recently done** (≤7 days, collapsed in panel), **Archived** (>7 days, hidden from panel, visible in a log view). Nothing is ever deleted.
 
-- [ ] In `PATCH /api/tasks/[id]/route.ts`, set `completedAt` (ISO datetime) on transition to `done`; clear it on transition away from `done`. No schema change — lives in the existing `properties` JSON.
-- [ ] In `GET /api/tasks/route.ts`, derive `archived = completedAt && (now - completedAt) > 7d` and include it on each row.
-- [ ] In `src/components/tasks/TasksPanel.tsx`, filter archived tasks out of the Done bucket by default. Add a small "Show archived (N)" toggle at the bottom of the Done group.
-- [ ] New "Activity" view (decision below) that lists all archived tasks chronologically. Unify with other completion events (done Assignments, taken Exams) so it's a "what did I do this month" log, not just a tasks bin.
-- [ ] Add a sidebar tab for the Activity view or fold it into Today as a section.
+- [x] In `PATCH /api/tasks/[id]/route.ts`, set `completedAt` (ISO datetime) on transition to `done`; clear it on transition away from `done`. No schema change — lives in the existing `properties` JSON.
+- [x] In `GET /api/tasks/route.ts`, derive `archived = completedAt && (now - completedAt) > 7d` and include it on each row.
+- [x] In `src/components/tasks/TasksPanel.tsx`, filter archived tasks out of the Done bucket by default. Add a small "Show archived (N)" toggle at the bottom of the Done group.
+- [x] New "Activity" view (decision below) that lists all archived tasks chronologically. Unify with other completion events (done Assignments, taken Exams) so it's a "what did I do this month" log, not just a tasks bin.
+- [x] Add a sidebar tab for the Activity view or fold it into Today as a section.
 
 **Decision needed before building:** scope of the log — tasks-only vs unified completion log. Default to unified; revisit if it gets noisy.
 
@@ -318,11 +318,11 @@ Combining three changes so the AI *reasons* about relationships instead of just 
 
 #### Phase A — Surface edges in the snapshot
 
-- [ ] In `src/lib/ai/context.ts`, after the `relevant` node set is built:
+- [x] In `src/lib/ai/context.ts`, after the `relevant` node set is built:
   - Call `getEdges(userId)`.
   - Filter to edges where both endpoints are in `relevant`.
   - Build a node-id → name lookup from `relevant`.
-- [ ] Render a new section in the snapshot after the nodes:
+- [x] Render a new section in the snapshot after the nodes:
   ```
   ## Existing relationships
   - 14 (Project: Twitter content) --supports--> 8 (Goal: Make $500/month)
@@ -330,18 +330,18 @@ Combining three changes so the AI *reasons* about relationships instead of just 
   - 31 (Task: Draft thread) --part-of--> 14 (Project: Twitter content)
   ```
   Both IDs (for tool calls) and names (for reasoning) on each line.
-- [ ] If edge count is large, cap at ~30 edges, prioritizing edges that touch Goals/Projects/Courses over Task/Habit-only edges.
+- [x] If edge count is large, cap at ~30 edges, prioritizing edges that touch Goals/Projects/Courses over Task/Habit-only edges.
 
 #### Phase C — Soften but keep the bundling rule
 
-- [ ] In `src/lib/ai/system-prompt.ts`, replace the current "always bundle / never in isolation" sentence with:
+- [x] In `src/lib/ai/system-prompt.ts`, replace the current "always bundle / never in isolation" sentence with:
   > "When existing nodes in the snapshot are clearly relevant (e.g. a new Task that contributes to a visible Goal, a Habit that supports a visible Project), bundle the supporting edges in the same `batchPropose`. If no existing node has a clear, defensible relationship to the new one, leave it standalone — orphan nodes are fine and can be linked later. Use the `reasoning` field to articulate each edge; if you can't articulate it in one sentence, don't create it."
 
 #### Phase B — Verbalization in batchPropose
 
-- [ ] Extend the `batchPropose` input schema in `src/lib/ai/tools.ts` with a required `reasoning` field — short paragraph explaining each new edge. Persist it on the `proposals` row (schema already has flexible `operations`/`summary`; add to summary or extend the schema with a dedicated column if cleaner).
-- [ ] In `src/components/proposals/ProposalQueue.tsx`, render the reasoning prominently above the operations so the user sees the AI's justification before approving.
-- [ ] System-prompt note: "If you cannot write a one-sentence reason for an edge, do not create it."
+- [x] Extend the `batchPropose` input schema in `src/lib/ai/tools.ts` with a required `reasoning` field — short paragraph explaining each new edge. Persist it on the `proposals` row (schema already has flexible `operations`/`summary`; add to summary or extend the schema with a dedicated column if cleaner).
+- [x] In `src/components/proposals/ProposalQueue.tsx`, render the reasoning prominently above the operations so the user sees the AI's justification before approving.
+- [x] System-prompt note: "If you cannot write a one-sentence reason for an edge, do not create it."
 
 **On custom user types:** this whole plan operates at the prompt/snapshot layer, so any user-promoted type (via `proposeNodeType`) flows through unchanged. No allow-list to maintain.
 
@@ -349,23 +349,23 @@ Combining three changes so the AI *reasons* about relationships instead of just 
 
 Underlying problem: `Habit` schema has no day-of-week, so "weekly" can't be filtered to a specific day.
 
-- [ ] Extend `Habit` node properties with optional `daysOfWeek: number[]` — integers 0-6 (Sun-Sat). Conventions:
+- [x] Extend `Habit` node properties with optional `daysOfWeek: number[]` — integers 0-6 (Sun-Sat). Conventions:
   - `daily` → empty array or `[0,1,2,3,4,5,6]`
   - `weekdays` → `[1,2,3,4,5]`
   - `weekly` → single day the user specifies (e.g. `[0]` for Sunday)
-- [ ] Update `src/lib/ai/system-prompt.ts`: when creating a weekly habit, the AI must ask which day if not stated and populate `daysOfWeek`. Extract from phrases like "each Sunday" → `[0]`.
-- [ ] `GET /api/habits` and `TodayView` filter habits by `daysOfWeek.includes(today.getDay())`. Habits with **no** `daysOfWeek` keep current behavior (show every day) — backwards-compatible with existing data.
-- [ ] Surface `daysOfWeek` in `NodeDetailPanel` as a 7-checkbox row so existing weekly habits without it can be fixed by the user.
+- [x] Update `src/lib/ai/system-prompt.ts`: when creating a weekly habit, the AI must ask which day if not stated and populate `daysOfWeek`. Extract from phrases like "each Sunday" → `[0]`.
+- [x] `GET /api/habits` and `TodayView` filter habits by `daysOfWeek.includes(today.getDay())`. Habits with **no** `daysOfWeek` keep current behavior (show every day) — backwards-compatible with existing data.
+- [x] Surface `daysOfWeek` in `NodeDetailPanel` as a 7-checkbox row so existing weekly habits without it can be fixed by the user.
 
 ### 10.4 — Panel grouping: stronger visual hierarchy
 
 Apply across `TasksPanel`, `EventsPanel`, and the new Activity log. Aim for clear bucket boundaries without loud color.
 
-- [ ] **Stronger group headers**: bump from 9px mono uppercase to 11px medium-weight; keep mono only for the timestamp/count metadata.
-- [ ] **Visible separators**: hairline rule (`border-t border-border/30`) above each group header. Replaces the `space-y-5` gap as the structural cue.
-- [ ] **Semantic color accents**: 2px colored left bar on each group container — red for Overdue, amber for Next 3 days, neutral for further-out, green for Done. Subtle, not loud.
-- [ ] **Sticky group headers** on scroll for long sections (especially `EventsPanel` where a single day can have many entries).
-- [ ] Add grouping to `NotesPanel` (by week or by tagged subject) and `HabitsPanel` (by `frequency`: daily / weekdays / weekly).
+- [x] **Stronger group headers**: bump from 9px mono uppercase to 11px medium-weight; keep mono only for the timestamp/count metadata.
+- [x] **Visible separators**: hairline rule (`border-t border-border/30`) above each group header. Replaces the `space-y-5` gap as the structural cue.
+- [x] **Semantic color accents**: 2px colored left bar on each group container — red for Overdue, amber for Next 3 days, neutral for further-out, green for Done. Subtle, not loud.
+- [x] **Sticky group headers** on scroll for long sections (especially `EventsPanel` where a single day can have many entries).
+- [x] Add grouping to `NotesPanel` (by week or by tagged subject) and `HabitsPanel` (by `frequency`: daily / weekdays / weekly).
 
 ### Order to ship
 

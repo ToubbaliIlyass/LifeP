@@ -41,6 +41,7 @@ export async function GET() {
       id: habit.id,
       name: typeof props.name === 'string' ? props.name : typeof props.title === 'string' ? props.title : `Habit #${habit.id}`,
       frequency: typeof props.frequency === 'string' ? props.frequency : 'daily',
+      daysOfWeek: Array.isArray(props.daysOfWeek) ? (props.daysOfWeek as number[]) : null,
       durationMinutes: typeof props.durationMinutes === 'number' ? props.durationMinutes : null,
       todayCompleted: todayLog?.completed ?? false,
       streak: calculateStreak(logs),

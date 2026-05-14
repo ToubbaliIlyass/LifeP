@@ -91,10 +91,18 @@ function ProposalCard({ proposal, onResolved, onApproved }: ProposalCardProps) {
     onResolved()
   }
 
+  const [shortSummary, ...reasoningParts] = proposal.summary.split('\n\n')
+  const reasoning = reasoningParts.join('\n\n').trim()
+
   return (
     <div className="border rounded-xl p-3 space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium leading-snug">{proposal.summary}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium leading-snug">{shortSummary}</p>
+          {reasoning && (
+            <p className="text-[11px] text-muted-foreground/70 mt-1 leading-relaxed">{reasoning}</p>
+          )}
+        </div>
         <button
           onClick={() => setExpanded((v) => !v)}
           className="text-[10px] text-muted-foreground shrink-0 mt-0.5 hover:text-foreground"

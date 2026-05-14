@@ -8,6 +8,7 @@ interface HabitRow {
   id: number
   name: string
   frequency: string
+  daysOfWeek: number[] | null
   todayCompleted: boolean
   streak: number
 }
@@ -17,6 +18,7 @@ interface TaskRow {
   name: string
   status: 'todo' | 'in-progress' | 'done'
   dueDate: string | null
+  archived: boolean
 }
 
 interface EventRow {
@@ -47,6 +49,21 @@ function isDueToday(dueDate: string | null) {
   return dueDate === new Date().toISOString().split('T')[0]
 }
 
+function isHabitForToday(habit: HabitRow): boolean {
+  const { frequency, daysOfWeek } = habit
+  const todayDow = new Date().getDay()
+  if (frequency === 'daily') return true
+  if (frequency === 'weekdays') {
+    if (daysOfWeek && daysOfWeek.length > 0) return daysOfWeek.includes(todayDow)
+    return todayDow >= 1 && todayDow <= 5
+  }
+  if (frequency === 'weekly') {
+    if (!daysOfWeek || daysOfWeek.length === 0) return false
+    return daysOfWeek.includes(todayDow)
+  }
+  return true
+}
+
 export function TodayView({ onNavigate }: TodayViewProps) {
   const [habits, setHabits] = useState<HabitRow[]>([])
   const [tasks, setTasks] = useState<TaskRow[]>([])
@@ -63,7 +80,8 @@ export function TodayView({ onNavigate }: TodayViewProps) {
       fetch('/api/events').then((r) => r.json()),
     ])
       .then(([habitsData, tasksData, eventsData]) => {
-        setHabits((habitsData as { habits: HabitRow[] }).habits ?? [])
+        const allHabits = (habitsData as { habits: HabitRow[] }).habits ?? []
+        setHabits(allHabits.filter(isHabitForToday))
         setTasks((tasksData as { tasks: TaskRow[] }).tasks ?? [])
         setEvents((eventsData as { events: EventRow[] }).events?.filter((e: EventRow) => e.date === today) ?? [])
         setLoading(false)
@@ -94,7 +112,9 @@ export function TodayView({ onNavigate }: TodayViewProps) {
     load()
   }
 
-  const urgentTasks = tasks.filter((t) => t.status !== 'done' && (isOverdue(t.dueDate, t.status) || isDueToday(t.dueDate)))
+  const urgentTasks = tasks.filter(
+    (t) => !t.archived && t.status !== 'done' && (isOverdue(t.dueDate, t.status) || isDueToday(t.dueDate))
+  )
   const completedHabits = habits.filter((h) => h.todayCompleted).length
   const isEmpty = !loading && habits.length === 0 && urgentTasks.length === 0 && events.length === 0
 
@@ -133,7 +153,6 @@ export function TodayView({ onNavigate }: TodayViewProps) {
               </button>
             </div>
 
-            {/* Progress bar */}
             <div className="h-0.5 bg-border/40 rounded-full mb-4 overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all duration-500"

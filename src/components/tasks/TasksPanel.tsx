@@ -10,6 +10,8 @@ interface Task {
   name: string
   status: 'todo' | 'in-progress' | 'done'
   dueDate: string | null
+  completedAt: string | null
+  archived: boolean
 }
 
 const STATUS_CYCLE: Record<string, string> = {
@@ -46,11 +48,11 @@ function getBucket(dueDate: string | null, status: Task['status']): string {
 }
 
 const BUCKETS = [
-  { key: 'overdue',   label: 'Overdue',      labelClass: 'text-red-400/70' },
-  { key: 'next3',     label: 'Next 3 days',  labelClass: 'text-muted-foreground/40' },
-  { key: 'nextWeek',  label: 'Next week',    labelClass: 'text-muted-foreground/40' },
-  { key: 'twoWeeks',  label: 'Two weeks',    labelClass: 'text-muted-foreground/40' },
-  { key: 'undated',   label: 'No date',      labelClass: 'text-muted-foreground/40' },
+  { key: 'overdue',   label: 'Overdue',     labelClass: 'text-red-400/80',           borderClass: 'border-red-400/50' },
+  { key: 'next3',     label: 'Next 3 days', labelClass: 'text-amber-400/80',          borderClass: 'border-amber-400/40' },
+  { key: 'nextWeek',  label: 'Next week',   labelClass: 'text-muted-foreground/60',   borderClass: 'border-yellow-400/25' },
+  { key: 'twoWeeks',  label: 'Two weeks',   labelClass: 'text-muted-foreground/50',   borderClass: 'border-border/30' },
+  { key: 'undated',   label: 'No date',     labelClass: 'text-muted-foreground/40',   borderClass: 'border-border/20' },
 ]
 
 function sortByDate(a: Task, b: Task): number {
@@ -65,6 +67,7 @@ export function TasksPanel() {
   const [loading, setLoading] = useState(true)
   const [cycling, setCycling] = useState<number | null>(null)
   const [doneOpen, setDoneOpen] = useState(false)
+  const [archivedOpen, setArchivedOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const load = useCallback(() => {
@@ -88,20 +91,26 @@ export function TasksPanel() {
     load()
   }
 
-  // Sort into buckets, skip beyond-2-weeks
   const bucketed: Record<string, Task[]> = Object.fromEntries(BUCKETS.map((b) => [b.key, []]))
   const doneTasks: Task[] = []
+  const archivedTasks: Task[] = []
 
   for (const task of tasks) {
     const bucket = getBucket(task.dueDate, task.status)
     if (bucket === 'beyond') continue
-    if (bucket === 'done') { doneTasks.push(task); continue }
+    if (bucket === 'done') {
+      if (task.archived) archivedTasks.push(task)
+      else doneTasks.push(task)
+      continue
+    }
     bucketed[bucket].push(task)
   }
 
   for (const key of Object.keys(bucketed)) {
     bucketed[key].sort(sortByDate)
   }
+
+  const activeBuckets = BUCKETS.filter(({ key }) => bucketed[key]?.length > 0)
 
   return (
     <div className="flex flex-col h-full">
@@ -122,26 +131,29 @@ export function TasksPanel() {
           </p>
         )}
         {!loading && tasks.length > 0 && (
-          <div className="p-4 space-y-5">
-            {BUCKETS.map(({ key, label, labelClass }) => {
+          <div className="p-4 space-y-1">
+            {activeBuckets.map(({ key, label, labelClass, borderClass }, index) => {
               const group = bucketed[key]
-              if (!group || group.length === 0) return null
               return (
                 <div key={key}>
-                  <p className={`text-[9px] uppercase tracking-widest font-mono mb-2 px-1 ${labelClass}`}>
-                    {label} · {group.length}
-                  </p>
-                  <div className="space-y-1">
-                    {group.map((task) => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        cycling={cycling}
-                        overdue={key === 'overdue'}
-                        onCycle={cycleStatus}
-                        onEdit={() => setSelectedId(task.id)}
-                      />
-                    ))}
+                  {index > 0 && <div className="pt-4" />}
+                  <div className={`border-l-2 pl-3 ${borderClass}`}>
+                    <p className={`text-[11px] font-medium uppercase tracking-widest mb-2 ${labelClass}`}>
+                      {label}
+                      <span className="font-mono font-normal ml-1.5 opacity-60 text-[10px]">· {group.length}</span>
+                    </p>
+                    <div className="space-y-1">
+                      {group.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          cycling={cycling}
+                          overdue={key === 'overdue'}
+                          onCycle={cycleStatus}
+                          onEdit={() => setSelectedId(task.id)}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )
@@ -149,20 +161,50 @@ export function TasksPanel() {
 
             {doneTasks.length > 0 && (
               <div>
+                {activeBuckets.length > 0 && <div className="pt-4" />}
+                <div className="border-l-2 pl-3 border-emerald-400/30">
+                  <button
+                    onClick={() => setDoneOpen((o) => !o)}
+                    className="flex items-center gap-1.5 mb-2 w-full text-left"
+                  >
+                    <p className="text-[11px] font-medium uppercase tracking-widest text-emerald-600/60 dark:text-emerald-400/50">
+                      Done
+                      <span className="font-mono font-normal ml-1.5 opacity-60 text-[10px]">· {doneTasks.length}</span>
+                    </p>
+                    <ChevronDown
+                      className={`w-3 h-3 text-muted-foreground/30 transition-transform ml-auto ${doneOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {doneOpen && (
+                    <div className="space-y-1">
+                      {doneTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          cycling={cycling}
+                          overdue={false}
+                          onCycle={cycleStatus}
+                          onEdit={() => setSelectedId(task.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {archivedTasks.length > 0 && (
+              <div className="pt-2">
                 <button
-                  onClick={() => setDoneOpen((o) => !o)}
-                  className="flex items-center gap-1.5 px-1 mb-2"
+                  onClick={() => setArchivedOpen((o) => !o)}
+                  className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors px-3"
                 >
-                  <p className="text-[9px] uppercase tracking-widest font-mono text-muted-foreground/30">
-                    Done · {doneTasks.length}
-                  </p>
-                  <ChevronDown
-                    className={`w-3 h-3 text-muted-foreground/30 transition-transform ${doneOpen ? 'rotate-180' : ''}`}
-                  />
+                  <ChevronDown className={`w-3 h-3 transition-transform ${archivedOpen ? 'rotate-180' : ''}`} />
+                  Archived · {archivedTasks.length}
                 </button>
-                {doneOpen && (
-                  <div className="space-y-1">
-                    {doneTasks.map((task) => (
+                {archivedOpen && (
+                  <div className="mt-2 space-y-1 opacity-50">
+                    {archivedTasks.map((task) => (
                       <TaskItem
                         key={task.id}
                         task={task}
