@@ -23,6 +23,7 @@ const BUILTIN_TYPES = [
   { name: 'Note',         typeSchema: { title: 'string', content: 'string' } },
   { name: 'JournalEntry', typeSchema: { date: 'string', content: 'string', mood: 'string' } },
   { name: 'Concept',      typeSchema: { name: 'string', description: 'string', pattern: 'string' } },
+  { name: 'TimeBlock',    typeSchema: { date: 'string', startTime: 'string', endTime: 'string' } },
 ] as const
 
 for (const { name, typeSchema } of BUILTIN_TYPES) {

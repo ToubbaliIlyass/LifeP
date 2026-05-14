@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
-  FileText, Search, Download, Upload, Inbox, PanelLeft, PanelLeftClose, ClipboardList,
+  FileText, Search, Download, Upload, Inbox, PanelLeft, PanelLeftClose, ClipboardList, CalendarRange,
 } from 'lucide-react'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { GraphView } from '@/components/graph/GraphView'
@@ -15,14 +15,16 @@ import { NotesPanel } from '@/components/notes/NotesPanel'
 import { TodayView } from '@/components/today/TodayView'
 import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { ActivityPanel } from '@/components/activity/ActivityPanel'
+import { CalendarView } from '@/components/calendar/CalendarView'
 import { SearchBar } from '@/components/search/SearchBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { SplashScreen } from '@/components/SplashScreen'
 
-type Tab = 'today' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals'
+type Tab = 'today' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals'
 
 const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'today',     label: 'Today',     Icon: House },
+  { id: 'calendar',  label: 'Calendar',  Icon: CalendarRange },
   { id: 'graph',     label: 'Graph',     Icon: Share2 },
   { id: 'habits',    label: 'Habits',    Icon: Activity },
   { id: 'tasks',     label: 'Tasks',     Icon: CheckSquare },
@@ -266,6 +268,7 @@ export default function Home() {
           {tab === 'events'    && <EventsPanel />}
           {tab === 'school'    && <SchoolPanel />}
           {tab === 'notes'     && <NotesPanel />}
+          {tab === 'calendar'  && <CalendarView />}
           {tab === 'activity'  && <ActivityPanel />}
           {tab === 'proposals' && (
             <ProposalQueue

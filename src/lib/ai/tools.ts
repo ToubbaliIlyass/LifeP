@@ -41,6 +41,8 @@ export type BatchOperation = z.infer<typeof BatchOperationSchema>
 
 // Structural types must go through batchPropose — createNode rejects these directly
 const ALWAYS_PROPOSE_TYPES = new Set(['Goal', 'Habit', 'Task', 'Project', 'Event', 'Course', 'Exam', 'Assignment'])
+// Types that are always safe to create directly (scheduling, annotations)
+const DIRECT_CREATE_TYPES = new Set(['TimeBlock', 'Note', 'JournalEntry', 'HabitLog', 'Concept'])
 
 export function buildTools() {
   const user = getCurrentUser()
@@ -85,6 +87,9 @@ export function buildTools() {
       execute: async ({ type, properties }) => {
         if (ALWAYS_PROPOSE_TYPES.has(type)) {
           return { error: `Cannot create ${type} directly. Use batchPropose with a createNode operation instead.` }
+        }
+        if (!DIRECT_CREATE_TYPES.has(type) && !ALWAYS_PROPOSE_TYPES.has(type)) {
+          // Unknown type — allow but log
         }
         if (properties.name) {
           const existing = getNodes(user.id, { type }).find(
