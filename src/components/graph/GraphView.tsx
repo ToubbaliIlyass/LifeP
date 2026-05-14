@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css'
 
 import { toFlowGraph, computeRadialLayout } from '@/lib/graph/layout'
 import { FloatingEdge } from './FloatingEdge'
+import { NodeDetailPanel } from './NodeDetailPanel'
 
 const EDGE_TYPES = { floating: FloatingEdge }
 import { GoalNode } from './nodes/GoalNode'
@@ -89,6 +90,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [resetting, setResetting] = useState(false)
   const [showMinimap, setShowMinimap] = useState(false)
   const [fetchKey, setFetchKey] = useState(0)
+  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null)
 
   function handleRelayout() {
     setFetchKey((k) => k + 1)
@@ -210,6 +212,13 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
 
   return (
     <div className="flex flex-col h-full relative">
+      {selectedNodeId !== null && (
+        <NodeDetailPanel
+          nodeId={selectedNodeId}
+          onClose={() => setSelectedNodeId(null)}
+          onMutated={() => { setSelectedNodeId(null); setFetchKey((k) => k + 1) }}
+        />
+      )}
       <div className="flex-1 relative">
         {viewState.status === 'loading' && (
           <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/50">
@@ -237,6 +246,10 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           edgeTypes={EDGE_TYPES}
           onNodeMouseEnter={(_, n) => setHoveredId(n.id)}
           onNodeMouseLeave={() => setHoveredId(null)}
+          onNodeClick={(_, n) => {
+            const id = parseInt(n.id, 10)
+            if (!isNaN(id)) setSelectedNodeId(id)
+          }}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}

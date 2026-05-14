@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Pencil } from 'lucide-react'
+import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 
 interface Task {
   id: number
@@ -64,6 +65,7 @@ export function TasksPanel() {
   const [loading, setLoading] = useState(true)
   const [cycling, setCycling] = useState<number | null>(null)
   const [doneOpen, setDoneOpen] = useState(false)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const load = useCallback(() => {
     fetch('/api/tasks')
@@ -103,6 +105,13 @@ export function TasksPanel() {
 
   return (
     <div className="flex flex-col h-full">
+      {selectedId !== null && (
+        <NodeDetailPanel
+          nodeId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onMutated={() => { load(); setSelectedId(null) }}
+        />
+      )}
       <ScrollArea className="flex-1">
         {loading && (
           <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>
@@ -130,6 +139,7 @@ export function TasksPanel() {
                         cycling={cycling}
                         overdue={key === 'overdue'}
                         onCycle={cycleStatus}
+                        onEdit={() => setSelectedId(task.id)}
                       />
                     ))}
                   </div>
@@ -159,6 +169,7 @@ export function TasksPanel() {
                         cycling={cycling}
                         overdue={false}
                         onCycle={cycleStatus}
+                        onEdit={() => setSelectedId(task.id)}
                       />
                     ))}
                   </div>
@@ -177,11 +188,13 @@ function TaskItem({
   cycling,
   overdue,
   onCycle,
+  onEdit,
 }: {
   task: Task
   cycling: number | null
   overdue: boolean
   onCycle: (task: Task) => void
+  onEdit: () => void
 }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors group">
@@ -205,11 +218,13 @@ function TaskItem({
         )}
       </div>
 
-      <span className={`text-[9px] font-mono shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-        task.status === 'done' ? 'text-muted-foreground/40' : 'text-muted-foreground/50'
-      }`}>
-        → {STATUS_CYCLE[task.status]}
-      </span>
+      <button
+        onClick={onEdit}
+        className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground hover:text-foreground transition-all"
+        title="View / edit"
+      >
+        <Pencil className="w-3 h-3" />
+      </button>
     </div>
   )
 }

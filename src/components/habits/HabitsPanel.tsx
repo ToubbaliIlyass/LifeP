@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Pencil } from 'lucide-react'
+import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 
 interface HabitRow {
   id: number
@@ -27,6 +29,7 @@ export function HabitsPanel() {
   const [data, setData] = useState<HabitsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const load = useCallback(() => {
     fetch('/api/habits')
@@ -53,6 +56,13 @@ export function HabitsPanel() {
 
   return (
     <div className="flex flex-col h-full">
+      {selectedId !== null && (
+        <NodeDetailPanel
+          nodeId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onMutated={() => { load(); setSelectedId(null) }}
+        />
+      )}
       {/* Header — date + progress only, no title (shown in top bar) */}
       <div className="px-5 py-3 border-b border-border/60 shrink-0">
         <div className="flex items-center justify-between">
@@ -85,28 +95,32 @@ export function HabitsPanel() {
         {!loading && total > 0 && (
           <div className="p-4 space-y-1.5">
             {data!.habits.map((habit) => (
-              <button
+              <div
                 key={habit.id}
-                onClick={() => toggle(habit)}
-                disabled={toggling === habit.id}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                className={`group w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                   habit.todayCompleted
                     ? 'bg-emerald-500/8 dark:bg-emerald-500/[0.06]'
                     : 'bg-muted/30 hover:bg-muted/60'
                 }`}
               >
-                {/* Circle check */}
-                <div className={`w-[18px] h-[18px] rounded-full border flex items-center justify-center shrink-0 transition-all ${
-                  habit.todayCompleted
-                    ? 'bg-emerald-500 border-emerald-500'
-                    : 'border-border/60'
-                }`}>
-                  {habit.todayCompleted && (
-                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
+                {/* Circle check — click to toggle */}
+                <button
+                  onClick={() => toggle(habit)}
+                  disabled={toggling === habit.id}
+                  className="shrink-0"
+                >
+                  <div className={`w-[18px] h-[18px] rounded-full border flex items-center justify-center transition-all ${
+                    habit.todayCompleted
+                      ? 'bg-emerald-500 border-emerald-500'
+                      : 'border-border/60'
+                  }`}>
+                    {habit.todayCompleted && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
 
                 <div className="flex-1 min-w-0">
                   <p className={`text-[13px] font-serif truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
@@ -122,7 +136,15 @@ export function HabitsPanel() {
                     🔥{habit.streak}
                   </span>
                 )}
-              </button>
+
+                <button
+                  onClick={() => setSelectedId(habit.id)}
+                  className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground hover:text-foreground transition-all"
+                  title="View / edit"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
             ))}
           </div>
         )}

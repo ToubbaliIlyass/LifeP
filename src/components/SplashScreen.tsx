@@ -9,11 +9,11 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('in'),     50),
-      setTimeout(() => setPhase('merge'),  600),
+      setTimeout(() => setPhase('in'),     150),
+      setTimeout(() => setPhase('merge'),  1500),
       setTimeout(() => setPhase('hold'),   1250),
       setTimeout(() => setPhase('out'),    1850),
-      setTimeout(() => { setPhase('done'); onDone() }, 2600),
+      setTimeout(() => { setPhase('done'); onDone() }, 3600),
     ]
     return () => timers.forEach(clearTimeout)
   }, [onDone])
