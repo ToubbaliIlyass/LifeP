@@ -41,29 +41,66 @@ export type BatchOperation = z.infer<typeof BatchOperationSchema>
 
 // Structural types must go through batchPropose — createNode rejects these directly
 const ALWAYS_PROPOSE_TYPES = new Set(['Goal', 'Habit', 'Task', 'Project', 'Event', 'Course', 'Exam', 'Assignment'])
-// Types that are always safe to create directly (scheduling, annotations)
-const DIRECT_CREATE_TYPES = new Set(['TimeBlock', 'Note', 'JournalEntry', 'HabitLog', 'Concept'])
+
+// Tool results are billed as input tokens on every subsequent step, so they are
+// projected down to what the model actually needs (identity + the few fields it
+// reasons over) instead of the full row with timestamps and every property.
+const READ_GRAPH_NODE_LIMIT = 60
+const READ_GRAPH_EDGE_LIMIT = 80
+const SEARCH_LIMIT = 20
+
+const SUMMARY_KEYS = ['status', 'dueDate', 'date', 'targetDate', 'frequency', 'grade', 'code']
+
+function compactNode(node: { id: number; type: string; properties: unknown }) {
+  const p = (node.properties ?? {}) as Record<string, unknown>
+  const out: Record<string, unknown> = {
+    id: node.id,
+    type: node.type,
+    name: p.name ?? p.title ?? `#${node.id}`,
+  }
+  for (const key of SUMMARY_KEYS) {
+    if (p[key] !== undefined && p[key] !== null && p[key] !== '') out[key] = p[key]
+  }
+  return out
+}
+
+function compactEdge(edge: { id: number; sourceId: number; targetId: number; type: string }) {
+  return { id: edge.id, from: edge.sourceId, to: edge.targetId, type: edge.type }
+}
 
 export function buildTools() {
   const user = getCurrentUser()
 
   return {
     readGraph: tool({
-      description: 'Read the knowledge graph. Returns all nodes and edges for the current user, optionally filtered by type.',
+      description:
+        'Read the knowledge graph when you need node IDs or a type you cannot see in the Graph snapshot. The snapshot in your system context already lists the user\'s active Goals, Projects, Courses, Habits and open Tasks with their IDs — do NOT call this tool to re-read what is already there. Returns compact summaries, not full node bodies; use getNodeDetail for one node\'s full properties.',
       inputSchema: z.object({
         filter: z.string().optional().describe('e.g. "type:Goal" to get only goal nodes'),
       }),
       execute: async ({ filter }) => {
         let typeFilter: string | undefined
         if (filter?.startsWith('type:')) typeFilter = filter.slice(5)
-        const nodes = getNodes(user.id, typeFilter ? { type: typeFilter } : undefined)
-        const edges = getEdges(user.id)
-        return { nodes, edges }
+        const allNodes = getNodes(user.id, typeFilter ? { type: typeFilter } : undefined)
+        const nodes = allNodes.slice(0, READ_GRAPH_NODE_LIMIT)
+        const nodeIds = new Set(nodes.map((n) => n.id))
+        const allEdges = getEdges(user.id).filter(
+          (e) => nodeIds.has(e.sourceId) && nodeIds.has(e.targetId),
+        )
+        return {
+          nodes: nodes.map(compactNode),
+          edges: allEdges.slice(0, READ_GRAPH_EDGE_LIMIT).map(compactEdge),
+          truncated:
+            allNodes.length > nodes.length || allEdges.length > READ_GRAPH_EDGE_LIMIT
+              ? `Showing ${nodes.length} of ${allNodes.length} nodes. Narrow with a type filter or use searchNodes.`
+              : undefined,
+        }
       },
     }),
 
     searchNodes: tool({
-      description: 'Search nodes by keyword in their properties.',
+      description:
+        'Search nodes by keyword in their properties. Prefer this over readGraph when you are looking for a specific node by name. Returns compact summaries.',
       inputSchema: z.object({
         query: z.string().describe('Text to search for in node properties'),
       }),
@@ -73,7 +110,21 @@ export function buildTools() {
         const matches = allNodes.filter((n) =>
           JSON.stringify(n.properties).toLowerCase().includes(q),
         )
-        return { nodes: matches, count: matches.length }
+        return {
+          nodes: matches.slice(0, SEARCH_LIMIT).map(compactNode),
+          count: matches.length,
+        }
+      },
+    }),
+
+    getNodeDetail: tool({
+      description:
+        'Read the full properties of one node by ID. Use this only when the compact summary is not enough (e.g. you need a Note body or a description).',
+      inputSchema: z.object({ nodeId: z.number() }),
+      execute: async ({ nodeId }) => {
+        const node = getNodes(user.id).find((n) => n.id === nodeId)
+        if (!node) return { found: false as const }
+        return { found: true as const, id: node.id, type: node.type, properties: node.properties }
       },
     }),
 
@@ -88,17 +139,14 @@ export function buildTools() {
         if (ALWAYS_PROPOSE_TYPES.has(type)) {
           return { error: `Cannot create ${type} directly. Use batchPropose with a createNode operation instead.` }
         }
-        if (!DIRECT_CREATE_TYPES.has(type) && !ALWAYS_PROPOSE_TYPES.has(type)) {
-          // Unknown type — allow but log
-        }
         if (properties.name) {
           const existing = getNodes(user.id, { type }).find(
             (n) => (n.properties as Record<string, unknown>).name === properties.name,
           )
-          if (existing) return { created: false, node: existing, deduplicated: true }
+          if (existing) return { created: false, node: compactNode(existing), deduplicated: true }
         }
         const node = createNode(user.id, type, properties)
-        return { created: true, node }
+        return { created: true, node: compactNode(node) }
       },
     }),
 
@@ -113,7 +161,7 @@ export function buildTools() {
       }),
       execute: async ({ sourceId, targetId, type, properties }) => {
         const edge = createEdge(user.id, sourceId, targetId, type, properties ?? {})
-        return { created: true, edge }
+        return { created: true, edge: compactEdge(edge) }
       },
     }),
 
@@ -129,7 +177,9 @@ export function buildTools() {
         if (!existing) return { updated: false, error: 'Node not found' }
         const merged = { ...(existing.properties as Record<string, unknown>), ...properties }
         const node = updateNode(user.id, nodeId, merged)
-        return node ? { updated: true, node } : { updated: false, error: 'Node not found' }
+        return node
+          ? { updated: true, node: compactNode(node), changed: Object.keys(properties) }
+          : { updated: false, error: 'Node not found' }
       },
     }),
 

@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css'
 import { toFlowGraph, computeRadialLayout } from '@/lib/graph/layout'
 import { FloatingEdge } from './FloatingEdge'
 import { NodeDetailPanel } from './NodeDetailPanel'
+import { FilterBar } from './FilterBar'
 
 const EDGE_TYPES = { floating: FloatingEdge }
 import { GoalNode } from './nodes/GoalNode'
@@ -91,6 +92,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   const [showMinimap, setShowMinimap] = useState(false)
   const [fetchKey, setFetchKey] = useState(0)
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null)
+  const [filter, setFilter] = useState('')
 
   function handleRelayout() {
     setFetchKey((k) => k + 1)
@@ -113,7 +115,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   useEffect(() => {
     let cancelled = false
 
-    fetch('/api/graph')
+    fetch(filter ? `/api/graph?filter=${encodeURIComponent(filter)}` : '/api/graph')
       .then((r) => {
         if (!r.ok) throw new Error(`Graph fetch failed: ${r.status}`)
         return r.json() as Promise<GraphData>
@@ -138,7 +140,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
     return () => {
       cancelled = true
     }
-  }, [refreshKey, fetchKey, setNodes, setEdges])
+  }, [refreshKey, fetchKey, filter, setNodes, setEdges])
 
   // Compute highlighted node ids for the current hover
   const highlightedIds = useMemo<Set<string>>(() => {
@@ -233,11 +235,15 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
         {isEmpty && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <p className="text-sm text-muted-foreground text-center max-w-xs">
-              No nodes yet — say something to your AI to get started
+              {filter
+                ? `No ${filter.replace('type:', '')} nodes yet`
+                : 'No nodes yet — say something to your AI to get started'}
             </p>
           </div>
         )}
         <ReactFlow
+          // Remount on filter change so fitView re-runs against the new subset.
+          key={filter}
           nodes={displayNodes}
           edges={displayEdges}
           onNodesChange={onNodesChange}
@@ -254,6 +260,9 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
         >
+          <Panel position="top-left">
+            <FilterBar active={filter} onChange={setFilter} />
+          </Panel>
           <Panel position="top-right">
             <div className="flex items-center gap-1.5">
               <button

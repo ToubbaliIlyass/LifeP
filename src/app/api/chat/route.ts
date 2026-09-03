@@ -7,9 +7,16 @@ import { getRecentRejections } from '@/lib/db/proposals'
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { logger } from '@/lib/log'
 
+// Only the tail of the conversation is resent each turn. Older turns are
+// dropped rather than re-billed — the graph snapshot carries the durable state.
+const MAX_HISTORY_MESSAGES = 16
+
 export async function POST(request: Request) {
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return Response.json({ error: 'API key not configured' }, { status: 503 })
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json(
+      { error: 'OPENAI_API_KEY is not set. Add it to .env.local and restart the dev server.' },
+      { status: 503 },
+    )
   }
 
   const user = getCurrentUser()
@@ -29,15 +36,16 @@ export async function POST(request: Request) {
 
   const graphContext = buildContextSnapshot(user.id, userText)
 
-  // Append recent rejection context so the AI learns from them
-  const rejections = getRecentRejections(user.id)
+  // Append recent rejection context so the AI learns from them. Only the
+  // headline of each rejected proposal — the reasoning body is not worth resending.
+  const rejections = getRecentRejections(user.id, 3)
   const rejectionContext =
     rejections.length > 0
-      ? '\n\n## Recent rejected proposals (learn from these)\n' +
+      ? '\n\n## Recently rejected (do not repeat)\n' +
         rejections
           .map(
             (r) =>
-              `- "${r.summary}" was rejected${r.rejectionReason ? `: "${r.rejectionReason}"` : ' (no reason given)'}`,
+              `- "${r.summary.split('\n')[0]}"${r.rejectionReason ? ` — ${r.rejectionReason}` : ''}`,
           )
           .join('\n')
       : ''
@@ -45,16 +53,21 @@ export async function POST(request: Request) {
   const today = new Date().toISOString().split('T')[0]
   const dateContext = `\n\n## Current date\nToday is ${today}. Always use this exact date for "today". Derive "tomorrow", "next week", etc. from this date. Never use dates from your training data as defaults.`
 
+  const history = messages.slice(-MAX_HISTORY_MESSAGES)
+
   const result = streamText({
     model: defaultModel,
+    // SYSTEM_PROMPT stays first so the static prefix stays cacheable across turns.
     system: SYSTEM_PROMPT + dateContext + graphContext + rejectionContext,
-    messages: await convertToModelMessages(messages),
+    messages: await convertToModelMessages(history),
     tools: buildTools(),
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(5),
     onFinish({ usage }) {
       logger.info('chat_completion', {
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
+        historyMessages: history.length,
+        snapshotChars: graphContext.length,
       })
     },
   })

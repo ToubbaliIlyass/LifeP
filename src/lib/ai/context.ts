@@ -8,6 +8,13 @@ const STOP_WORDS = new Set([
   'just', 'also', 'then', 'its', 'was', 'are', 'has', 'had',
 ])
 
+// The snapshot is prepended to every request, so it is capped. Anchors stay
+// generous; everything else is trimmed to the most recent entries. Anything the
+// model needs beyond these caps it can pull with searchNodes / readGraph.
+const MAX_PER_TYPE = 20
+const MAX_TOTAL_NODES = 80
+const MAX_EDGES = 30
+
 export function buildContextSnapshot(userId: number, userMessage: string): string {
   const allNodes = getNodes(userId)
   if (allNodes.length === 0) return ''
@@ -17,7 +24,7 @@ export function buildContextSnapshot(userId: number, userMessage: string): strin
     .split(/\W+/)
     .filter((w) => w.length >= 3 && !STOP_WORDS.has(w))
 
-  const relevant = allNodes.filter((node) => {
+  const matched = allNodes.filter((node) => {
     if (EXCLUDE_TYPES.has(node.type)) return false
     if (ANCHOR_TYPES.has(node.type)) return true
     if (node.type === 'Habit') return true
@@ -29,7 +36,35 @@ export function buildContextSnapshot(userId: number, userMessage: string): strin
     return keywords.some((kw) => name.includes(kw))
   })
 
-  if (relevant.length === 0) return ''
+  if (matched.length === 0) return ''
+
+  // Cap per type (keeping the highest ids — most recently created), then overall,
+  // so a large graph cannot silently inflate every request.
+  const perType = new Map<string, typeof matched>()
+  for (const node of matched) {
+    const bucket = perType.get(node.type) ?? []
+    bucket.push(node)
+    perType.set(node.type, bucket)
+  }
+  const capped: typeof matched = []
+  const omittedByType: string[] = []
+  for (const [type, nodes] of perType) {
+    const sorted = [...nodes].sort((a, b) => b.id - a.id)
+    capped.push(...sorted.slice(0, MAX_PER_TYPE))
+    if (sorted.length > MAX_PER_TYPE) {
+      omittedByType.push(`${sorted.length - MAX_PER_TYPE} more ${type}`)
+    }
+  }
+  // Anchors survive the global cap first, then everything else by recency.
+  const relevant = capped
+    .sort((a, b) => {
+      const rank = (n: typeof capped[number]) => (ANCHOR_TYPES.has(n.type) ? 0 : 1)
+      return rank(a) - rank(b) || b.id - a.id
+    })
+    .slice(0, MAX_TOTAL_NODES)
+  if (capped.length > relevant.length) {
+    omittedByType.push(`${capped.length - relevant.length} others`)
+  }
 
   // Build lookups for edge rendering
   const relevantIds = new Set(relevant.map((n) => n.id))
@@ -67,7 +102,7 @@ export function buildContextSnapshot(userId: number, userMessage: string): strin
       const bHigh = ANCHOR_TYPES.has(typeById.get(b.sourceId) ?? '') || ANCHOR_TYPES.has(typeById.get(b.targetId) ?? '')
       return Number(bHigh) - Number(aHigh)
     })
-    .slice(0, 30)
+    .slice(0, MAX_EDGES)
 
   if (relevantEdges.length > 0) {
     lines.push('', '**Existing relationships**')
@@ -76,6 +111,13 @@ export function buildContextSnapshot(userId: number, userMessage: string): strin
       const tgt = labelById.get(edge.targetId) ?? edge.targetId
       lines.push(`  ${src} --${edge.type}--> ${tgt}`)
     }
+  }
+
+  if (omittedByType.length > 0) {
+    lines.push(
+      '',
+      `_Not shown: ${omittedByType.join(', ')}. Use searchNodes to find anything missing here._`,
+    )
   }
 
   return '\n\n' + lines.join('\n')

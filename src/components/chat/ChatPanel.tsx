@@ -2,10 +2,14 @@
 
 import { useChat } from '@ai-sdk/react'
 import { useEffect, useRef, useState } from 'react'
+import { SquarePen } from 'lucide-react'
+import { ToolActivity, isToolPart, type ToolPart } from './ToolActivity'
 
 interface ChatPanelProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
   onMutated?: () => void
+  /** Jump the main panel to a tab — used by the "Review" button on proposals. */
+  onNavigate?: (tab: string) => void
 }
 
 const SUGGESTIONS = [
@@ -27,8 +31,8 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = `${el.scrollHeight}px`
 }
 
-export function ChatPanel({ inputRef, onMutated }: ChatPanelProps) {
-  const { messages, sendMessage, status, error } = useChat()
+export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
+  const { messages, setMessages, sendMessage, stop, status, error } = useChat()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const localInputRef = useRef<HTMLTextAreaElement>(null)
@@ -64,6 +68,13 @@ export function ChatPanel({ inputRef, onMutated }: ChatPanelProps) {
   function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     submit()
+  }
+
+  function newChat() {
+    if (busy) stop()
+    setMessages([])
+    setInput('')
+    requestAnimationFrame(() => resolvedRef.current?.focus())
   }
 
   // ── Empty state ────────────────────────────────────────
@@ -138,8 +149,27 @@ export function ChatPanel({ inputRef, onMutated }: ChatPanelProps) {
   }
 
   // ── Active chat ────────────────────────────────────────
+  const lastMessage = messages[messages.length - 1]
+  const lastHasContent =
+    lastMessage?.role === 'assistant' &&
+    lastMessage.parts.some((p) => (p.type === 'text' && p.text.length > 0) || isToolPart(p))
+
   return (
     <div className="flex flex-col h-full">
+      {/* Header — aligns with the main panel header, holds the reset affordance */}
+      <div className="h-[52px] shrink-0 border-b border-border/60 flex items-center justify-between px-4">
+        <p className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+          Assistant
+        </p>
+        <button
+          onClick={newChat}
+          title="New chat"
+          className="text-muted-foreground/50 hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-muted/40"
+        >
+          <SquarePen className="w-[15px] h-[15px]" />
+        </button>
+      </div>
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 min-h-0">
         <div className="px-5 max-w-2xl mx-auto space-y-5">
           {messages.map((msg) => (
@@ -156,17 +186,27 @@ export function ChatPanel({ inputRef, onMutated }: ChatPanelProps) {
                 className={`max-w-[88%] text-[13.5px] leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 font-medium'
-                    : 'text-foreground/90'
+                    : 'text-foreground/90 space-y-2 w-full'
                 }`}
               >
-                {msg.parts.map((part, i) =>
-                  part.type === 'text' ? <span key={i}>{part.text}</span> : null,
-                )}
+                {msg.parts.map((part, i) => {
+                  if (part.type === 'text') return <p key={i} className="whitespace-pre-wrap">{part.text}</p>
+                  if (isToolPart(part)) {
+                    return (
+                      <ToolActivity
+                        key={i}
+                        part={part as ToolPart}
+                        onReviewProposals={onNavigate ? () => onNavigate('proposals') : undefined}
+                      />
+                    )
+                  }
+                  return null
+                })}
               </div>
             </div>
           ))}
 
-          {busy && (
+          {busy && !lastHasContent && (
             <div className="flex items-center gap-1.5 px-1 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:0ms]" />
               <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:150ms]" />
@@ -203,19 +243,32 @@ export function ChatPanel({ inputRef, onMutated }: ChatPanelProps) {
               }
             }}
             placeholder="Reply…"
-            disabled={busy}
             className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/40 outline-none resize-none overflow-hidden max-h-[160px] overflow-y-auto leading-relaxed"
           />
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            className="shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90 mb-0.5"
-            aria-label="Send"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              onClick={stop}
+              className="shrink-0 w-7 h-7 rounded-lg bg-muted border border-border/60 text-foreground flex items-center justify-center transition-opacity hover:opacity-80 mb-0.5"
+              aria-label="Stop generating"
+              title="Stop"
+            >
+              <svg className="w-2.5 h-2.5" viewBox="0 0 12 12" fill="currentColor">
+                <rect x="0" y="0" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90 mb-0.5"
+              aria-label="Send"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
         </form>
       </div>
     </div>
