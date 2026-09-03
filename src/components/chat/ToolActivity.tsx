@@ -153,11 +153,15 @@ export function ToolActivity({ part, onReviewProposals }: ToolActivityProps) {
   }
 
   if (name === 'createEdge') {
+    const out = part.output as { duplicate?: boolean } | undefined
+    const link = `#${input.sourceId} → #${input.targetId} as "${input.type}"`
     return (
-      <Row icon={<Link2 className={ICON} />}>
+      <Row icon={<Link2 className={ICON} />} faint={out?.duplicate}>
         {pending
           ? 'Linking…'
-          : `Linked #${input.sourceId} → #${input.targetId} as "${input.type}"`}
+          : out?.duplicate
+            ? `Already linked ${link}`
+            : `Linked ${link}`}
       </Row>
     )
   }

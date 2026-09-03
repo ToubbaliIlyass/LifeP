@@ -90,6 +90,22 @@ export function createEdge(
     .get()
 }
 
+/**
+ * An identical source→target→type edge already in the graph, if any.
+ *
+ * The AI re-proposes relationships it can already see in the graph snapshot,
+ * which silently accumulated duplicate parallel edges. Callers that write on
+ * the model's behalf dedupe through this.
+ */
+export function findExistingEdge(
+  userId: number,
+  sourceId: number,
+  targetId: number,
+  type: string,
+): Edge | undefined {
+  return getEdges(userId, { sourceId, targetId, type })[0]
+}
+
 export function updateNode(
   userId: number,
   nodeId: number,

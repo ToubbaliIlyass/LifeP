@@ -1,4 +1,4 @@
-import { createNode, createEdge, updateNode, deleteNode, getNodeById, getNodes } from '@/lib/graph/queries'
+import { createNode, createEdge, updateNode, deleteNode, getNodeById, getNodes, findExistingEdge } from '@/lib/graph/queries'
 import { createNodeType, getSchemaVersion, nodeTypeExists } from '@/lib/db/node-types'
 import { logger } from '@/lib/log'
 import type { BatchOperation } from '@/lib/ai/tools'
@@ -63,6 +63,11 @@ export function executeBatch(
       case 'createEdge': {
         const sourceId = resolveRef(op.sourceRef, result.createdNodeIds)
         const targetId = resolveRef(op.targetRef, result.createdNodeIds)
+        const duplicate = findExistingEdge(userId, sourceId, targetId, op.type)
+        if (duplicate) {
+          summary.push(`"${op.type}" edge ${sourceId} → ${targetId} already exists — skipped`)
+          break
+        }
         const edge = createEdge(userId, sourceId, targetId, op.type, op.properties ?? {})
         result.createdEdgeIds.push(edge.id)
         summary.push(`Created "${op.type}" edge #${edge.id} (${sourceId} → ${targetId})`)

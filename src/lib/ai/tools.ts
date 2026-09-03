@@ -1,7 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
-import { getNodes, getEdges, createNode, createEdge, updateNode } from '@/lib/graph/queries'
+import { getNodes, getEdges, createNode, createEdge, updateNode, findExistingEdge } from '@/lib/graph/queries'
 import { createProposal } from '@/lib/db/proposals'
 import { getSchemaVersion } from '@/lib/db/node-types'
 
@@ -160,6 +160,10 @@ export function buildTools() {
         properties: z.record(z.string(), z.unknown()).optional(),
       }),
       execute: async ({ sourceId, targetId, type, properties }) => {
+        const existing = findExistingEdge(user.id, sourceId, targetId, type)
+        if (existing) {
+          return { created: false, edge: compactEdge(existing), duplicate: true }
+        }
         const edge = createEdge(user.id, sourceId, targetId, type, properties ?? {})
         return { created: true, edge: compactEdge(edge) }
       },
