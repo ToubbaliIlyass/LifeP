@@ -56,7 +56,7 @@ const SKIP_FIELDS = new Set(['courseNodeId', 'habitNodeId'])
 const TYPE_FIELDS: Record<string, string[]> = {
   Goal: ['name', 'description', 'status', 'targetDate'],
   Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes'],
-  Task: ['name', 'status', 'priority', 'dueDate'],
+  Task: ['name', 'status', 'priority', 'estimatedMinutes', 'dueDate'],
   Project: ['name', 'description', 'status', 'dueDate'],
   Event: ['name', 'date', 'time', 'duration', 'location', 'recurring'],
   Course: ['name', 'code', 'semester', 'credits'],
@@ -196,7 +196,7 @@ function FieldEditor({
     )
   }
 
-  if (name === 'durationMinutes' || name === 'credits' || name === 'duration' || name === 'value') {
+  if (name === 'durationMinutes' || name === 'credits' || name === 'duration' || name === 'value' || name === 'estimatedMinutes') {
     return (
       <input
         type="number"

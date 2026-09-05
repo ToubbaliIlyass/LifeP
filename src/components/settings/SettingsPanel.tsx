@@ -11,6 +11,8 @@ export interface Settings {
   defaultCalendarView: 'day' | 'week'
   theme: string
   weather: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
+  autoScheduleTasks: boolean
+  workingHours: { start: string; end: string }
 }
 
 interface SettingsPanelProps {
@@ -269,6 +271,59 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
                 ))}
               </div>
             </div>
+          </div>
+        </Section>
+
+        <Section
+          title="Scheduling"
+          description="Habits already place themselves on the calendar. This does the same for tasks that are due or overdue, so deciding when to do them stops being your job."
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-serif text-foreground/85">Auto-schedule tasks</p>
+                <p className="text-[11px] text-muted-foreground/55 mt-0.5">
+                  Fills free gaps only — anything already on the calendar stays put.
+                </p>
+              </div>
+              <button
+                onClick={() => save({ autoScheduleTasks: !settings.autoScheduleTasks })}
+                className={`text-[11px] font-mono px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
+                  settings.autoScheduleTasks
+                    ? 'bg-primary/15 border-primary/40 text-primary'
+                    : 'border-border/50 text-muted-foreground/60 hover:text-foreground hover:bg-muted/40'
+                }`}
+              >
+                {settings.autoScheduleTasks ? 'on' : 'off'}
+              </button>
+            </div>
+
+            {settings.autoScheduleTasks && (
+              <div className="flex items-end gap-3">
+                <div>
+                  <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Day starts</label>
+                  <input
+                    type="time"
+                    defaultValue={settings.workingHours?.start ?? '09:00'}
+                    onChange={(e) =>
+                      save({ workingHours: { start: e.target.value, end: settings.workingHours?.end ?? '18:00' } })
+                    }
+                    className="bg-muted/40 border border-border/40 rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Day ends</label>
+                  <input
+                    type="time"
+                    defaultValue={settings.workingHours?.end ?? '18:00'}
+                    onChange={(e) =>
+                      save({ workingHours: { start: settings.workingHours?.start ?? '09:00', end: e.target.value } })
+                    }
+                    className="bg-muted/40 border border-border/40 rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </Section>
 

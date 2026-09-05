@@ -21,6 +21,7 @@ export async function GET() {
         now - new Date(completedAt).getTime() > ARCHIVE_MS
 
       const priority = typeof p.priority === 'string' ? p.priority : 'medium'
+      const estimatedMinutes = typeof p.estimatedMinutes === 'number' ? p.estimatedMinutes : null
 
       return {
         id: t.id,
@@ -30,6 +31,7 @@ export async function GET() {
         completedAt,
         archived,
         priority,
+        estimatedMinutes,
       }
     })
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
