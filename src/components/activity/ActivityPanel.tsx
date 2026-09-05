@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { WeeklyReview } from './WeeklyReview'
 
 interface ArchivedTask {
   id: number
@@ -49,6 +50,9 @@ export function ActivityPanel() {
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
+        <div className="px-4 pt-4">
+          <WeeklyReview />
+        </div>
         {loading && (
           <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>
         )}
@@ -77,7 +81,7 @@ export function ActivityPanel() {
                         <p className="text-[13px] font-serif text-foreground/50 line-through flex-1 truncate">
                           {task.name}
                         </p>
-                        <span className="text-[10px] font-mono text-muted-foreground/30 shrink-0">
+                        <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">
                           {task.completedAt.slice(0, 10)}
                         </span>
                       </div>

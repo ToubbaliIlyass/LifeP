@@ -136,12 +136,13 @@ export function getNodeById(userId: number, nodeId: number): Node | undefined {
     .get()
 }
 
-export function searchNodes(userId: number, query: string): Node[] {
+export function searchNodes(userId: number, query: string, types?: string[]): Node[] {
   const lower = query.toLowerCase()
   return db
     .select()
     .from(nodes)
     .where(eq(nodes.userId, userId))
     .all()
+    .filter((n) => (!types || types.length === 0 || types.includes(n.type)))
     .filter((n) => JSON.stringify(n.properties).toLowerCase().includes(lower))
 }
