@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges } from '@/lib/graph/queries'
 import { getNodeTypes } from '@/lib/db/node-types'
+import { todayStr } from '@/lib/date'
 
 export async function GET() {
   const user = getCurrentUser()
@@ -21,7 +22,7 @@ export async function GET() {
   return new Response(JSON.stringify(payload, null, 2), {
     headers: {
       'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="lifep-${new Date().toISOString().split('T')[0]}.json"`,
+      'Content-Disposition': `attachment; filename="lifep-${todayStr()}.json"`,
     },
   })
 }

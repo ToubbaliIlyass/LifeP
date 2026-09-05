@@ -1,9 +1,6 @@
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { getNodes, createNode, updateNode } from '@/lib/graph/queries'
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0]
-}
+import { todayStr } from '@/lib/date'
 
 export async function PATCH(
   request: Request,

@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
+import { localDateStr } from '@/lib/date'
 
 function labelOf(p: Record<string, unknown>, id: number, type: string) {
   return typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${type} #${id}`
@@ -35,5 +36,5 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => (a.date! < b.date! ? -1 : 1))
 
-  return Response.json({ events, from: today.toISOString().split('T')[0], days })
+  return Response.json({ events, from: localDateStr(today), days })
 }

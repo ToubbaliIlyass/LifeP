@@ -1,21 +1,15 @@
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0]
-}
+import { todayStr, addDays } from '@/lib/date'
 
 function calculateStreak(logs: Array<{ date: string; completed: boolean }>): number {
   const completedDates = new Set(
     logs.filter((l) => l.completed).map((l) => l.date),
   )
   let streak = 0
-  const today = new Date()
+  const today = todayStr()
   for (let i = 0; i < 365; i++) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    const ds = d.toISOString().split('T')[0]
-    if (completedDates.has(ds)) streak++
+    if (completedDates.has(addDays(today, -i))) streak++
     else break
   }
   return streak
