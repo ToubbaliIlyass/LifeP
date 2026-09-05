@@ -35,7 +35,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background cursor-pointer select-none"
+      className="splash-failsafe fixed inset-0 z-50 flex items-center justify-center bg-background cursor-pointer select-none px-4"
       style={{
         opacity: overlayOpacity,
         transition: overlayTransition,
@@ -51,7 +51,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       >
         {/* "Where " — collapses on merge */}
         <span
-          className="text-[48px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
+          className="text-[clamp(22px,7vw,48px)] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
           style={{
             maxWidth: merging ? '0px' : '280px',
             opacity: merging ? 0 : 1,
@@ -62,13 +62,13 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         </span>
 
         {/* "Act" — serif */}
-        <span className="text-[48px] font-serif font-semibold text-foreground tracking-tight">
+        <span className="text-[clamp(22px,7vw,48px)] font-serif font-semibold text-foreground tracking-tight">
           Act
         </span>
 
         {/* "-ion meets struct-" — collapses on merge */}
         <span
-          className="text-[48px] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
+          className="text-[clamp(22px,7vw,48px)] text-muted-foreground/50 overflow-hidden whitespace-nowrap"
           style={{
             maxWidth: merging ? '0px' : '700px',
             opacity: merging ? 0 : 1,
@@ -79,7 +79,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         </span>
 
         {/* "ure" — serif */}
-        <span className="text-[48px] font-serif font-semibold text-foreground tracking-tight">
+        <span className="text-[clamp(22px,7vw,48px)] font-serif font-semibold text-foreground tracking-tight">
           ure
         </span>
       </div>

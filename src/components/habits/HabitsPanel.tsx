@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Pencil } from 'lucide-react'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
+import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
 
 interface HabitRow {
   id: number
@@ -136,35 +137,21 @@ export function HabitsPanel() {
                     {grouped[key].map((habit) => (
                       <div
                         key={habit.id}
-                        className={`group w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                          habit.todayCompleted
-                            ? 'bg-emerald-500/8 dark:bg-emerald-500/[0.06]'
-                            : 'bg-muted/30 hover:bg-muted/60'
-                        }`}
+                        className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors"
                       >
                         <button
                           onClick={() => toggle(habit)}
                           disabled={toggling === habit.id}
                           className="shrink-0"
                         >
-                          <div className={`w-[18px] h-[18px] rounded-full border flex items-center justify-center transition-all ${
-                            habit.todayCompleted
-                              ? 'bg-emerald-500 border-emerald-500'
-                              : 'border-border/60'
-                          }`}>
-                            {habit.todayCompleted && (
-                              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
+                          <CompletionCheckbox checked={habit.todayCompleted} />
                         </button>
 
                         <div className="flex-1 min-w-0">
                           <p className={`text-[13px] font-serif truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
                             {habit.name}
                           </p>
-                          <p className="text-[10px] text-muted-foreground/40 font-mono mt-0.5">
+                          <p className="text-[10px] text-muted-foreground/65 font-mono mt-0.5">
                             {habitSubLabel(habit)}
                           </p>
                         </div>

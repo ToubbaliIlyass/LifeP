@@ -158,7 +158,7 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
     <div className="flex flex-col h-full">
       {/* Header — aligns with the main panel header, holds the reset affordance */}
       <div className="h-[52px] shrink-0 border-b border-border/60 flex items-center justify-between px-4">
-        <p className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+        <p className="text-[9px] font-mono text-muted-foreground/65 uppercase tracking-widest">
           Assistant
         </p>
         <button
@@ -177,16 +177,9 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
               key={msg.id}
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
-              {msg.role === 'assistant' && (
-                <p className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-widest mb-1.5 ml-0.5">
-                  LifeP
-                </p>
-              )}
               <div
-                className={`max-w-[88%] text-[13.5px] leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 font-medium'
-                    : 'text-foreground/90 space-y-2 w-full'
+                className={`max-w-[88%] text-[13.5px] leading-relaxed text-foreground/90 space-y-2 ${
+                  msg.role === 'user' ? 'font-medium' : 'w-full'
                 }`}
               >
                 {msg.parts.map((part, i) => {
@@ -226,7 +219,7 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
       <div className="shrink-0 px-4 pb-4 pt-2">
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-2 bg-muted/40 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border/80 transition-colors max-w-2xl mx-auto"
+          className="flex items-center gap-2 bg-muted/40 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border/80 transition-colors max-w-2xl mx-auto"
         >
           <textarea
             ref={resolvedRef}
@@ -242,14 +235,14 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
                 handleSubmit(e)
               }
             }}
-            placeholder="Reply…"
-            className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/40 outline-none resize-none overflow-hidden max-h-[160px] overflow-y-auto leading-relaxed"
+            placeholder="Write a message…"
+            className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/65 outline-none resize-none overflow-hidden max-h-[160px] overflow-y-auto leading-relaxed"
           />
           {busy ? (
             <button
               type="button"
               onClick={stop}
-              className="shrink-0 w-7 h-7 rounded-lg bg-muted border border-border/60 text-foreground flex items-center justify-center transition-opacity hover:opacity-80 mb-0.5"
+              className="shrink-0 w-7 h-7 rounded-lg bg-muted border border-border/60 text-foreground flex items-center justify-center transition-opacity hover:opacity-80"
               aria-label="Stop generating"
               title="Stop"
             >
@@ -261,7 +254,7 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
             <button
               type="submit"
               disabled={!input.trim()}
-              className="shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90 mb-0.5"
+              className="shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90"
               aria-label="Send"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

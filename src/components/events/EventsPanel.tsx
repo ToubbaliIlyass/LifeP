@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Pencil } from 'lucide-react'
+import { MapPin, Pencil } from 'lucide-react'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 
 interface EventRow {
@@ -77,9 +77,9 @@ export function EventsPanel() {
         />
       )}
       <ScrollArea className="flex-1">
-        {loading && <p className="text-sm text-muted-foreground text-center pt-8">Loading…</p>}
+        {loading && <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>}
         {!loading && grouped.size === 0 && (
-          <p className="text-sm text-muted-foreground text-center pt-8 px-4">
+          <p className="text-[12px] text-muted-foreground/50 text-center pt-10 px-5">
             No upcoming events — tell the AI about something on your calendar.
           </p>
         )}
@@ -97,29 +97,36 @@ export function EventsPanel() {
                     </p>
                     <div className="space-y-1.5">
                       {events.map((e: EventRow) => (
-                        <div key={e.id} className="group bg-amber-50 dark:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/40 rounded-xl px-3 py-2.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-[13px] font-serif text-amber-900 dark:text-amber-100">{e.name}</p>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {e.recurring !== 'none' && (
-                                <span className="text-[10px] text-amber-600/70">{RECURRING_LABELS[e.recurring] ?? e.recurring}</span>
-                              )}
-                              <button
-                                onClick={() => setSelectedId(e.id)}
-                                className="p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-all"
-                                title="View / edit"
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </button>
+                        <div key={e.id} className="group flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-[13px] font-serif text-foreground/85 truncate">{e.name}</p>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {e.recurring !== 'none' && (
+                                  <span className="text-[10px] font-mono text-muted-foreground/65">{RECURRING_LABELS[e.recurring] ?? e.recurring}</span>
+                                )}
+                                <button
+                                  onClick={() => setSelectedId(e.id)}
+                                  className="p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground hover:text-foreground transition-all"
+                                  title="View / edit"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
+                            {(e.time || e.duration || e.location) && (
+                              <div className="flex gap-2 mt-0.5 flex-wrap">
+                                {e.time && <span className="text-[10px] font-mono text-muted-foreground/65">{e.time}</span>}
+                                {e.duration && <span className="text-[10px] font-mono text-muted-foreground/65">{e.duration}min</span>}
+                                {e.location && (
+                                  <span className="text-[10px] text-muted-foreground/65 flex items-center gap-0.5">
+                                    <MapPin className="w-2.5 h-2.5" />{e.location}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          {(e.time || e.duration || e.location) && (
-                            <div className="flex gap-2 mt-0.5 flex-wrap">
-                              {e.time && <span className="text-[11px] font-mono text-amber-600/80">{e.time}</span>}
-                              {e.duration && <span className="text-[11px] font-mono text-amber-500/60">{e.duration}min</span>}
-                              {e.location && <span className="text-[11px] text-amber-500/60">@ {e.location}</span>}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>

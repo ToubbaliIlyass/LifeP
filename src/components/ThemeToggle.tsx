@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { safeGet, safeSet } from '@/lib/storage'
 
 interface ThemeToggleProps {
   /** When true, renders as a full sidebar row with icon + label */
@@ -25,21 +26,32 @@ function MoonIcon({ className }: { className?: string }) {
 }
 
 export function ThemeToggle({ sidebar = false, collapsed = false }: ThemeToggleProps) {
-  const [dark, setDark] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    const stored = localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    return stored ? stored === 'dark' : prefersDark
-  })
+  // Starts false unconditionally so the client's first hydration pass
+  // matches the server-rendered markup exactly — the real value (which
+  // needs localStorage, unavailable during SSR) is picked up right after
+  // mount instead. The inline script in layout.tsx already applies the
+  // `.dark` class to <html> before hydration, so the page's own colors
+  // never flash wrong; this only fixes the toggle button's own icon/label
+  // briefly showing the opposite state for a frame.
+  const [dark, setDark] = useState(false)
 
+  // Only reads state here — the inline script in layout.tsx already
+  // applied (or didn't) the `.dark` class to <html> before hydration, so
+  // this must NOT also toggle the class on mount: doing so with the
+  // placeholder `false` state would immediately undo a correct dark
+  // application for a frame before this effect's setDark re-render fixes
+  // it back. The class is only ever changed explicitly, in toggle().
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-  }, [dark])
+    const stored = safeGet('local', 'theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    setDark(stored ? stored === 'dark' : prefersDark)
+  }, [])
 
   function toggle() {
     const next = !dark
     setDark(next)
-    localStorage.setItem('theme', next ? 'dark' : 'light')
+    document.documentElement.classList.toggle('dark', next)
+    safeSet('local', 'theme', next ? 'dark' : 'light')
   }
 
   if (sidebar) {

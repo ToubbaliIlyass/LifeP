@@ -52,10 +52,21 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${plusJakarta.variable} ${geistMono.variable} ${sourceSerif.variable} ${montserrat.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
+      {/*
+        `main` (h-dvh) is meant to own the whole viewport with its own
+        internal ScrollAreas doing all the scrolling — but under real
+        browser zoom, viewport-unit rounding can still leave a few pixels
+        of content taller than the viewport outside of any inner scroll
+        region. Blocking the page's own scroll here previously made that
+        edge case unreachable rather than just untidy, so this stays a
+        working fallback; see the widened scrollbar rule in globals.css
+        for why it won't look like content is silently cut off again.
+      */}
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

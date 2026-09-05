@@ -51,7 +51,7 @@
 
 /* ─── Light theme ─────────────────────────────────────── */
 :root {
-  --background: oklch(0.955 0.006 80);
+  --background: #fcfdfa;
   --foreground: oklch(0.13 0.005 255);
   --card: oklch(0.975 0.004 80);
   --card-foreground: oklch(0.13 0.005 255);
@@ -62,10 +62,15 @@
   --secondary: oklch(0.925 0.005 80);
   --secondary-foreground: oklch(0.19 0.005 255);
   --muted: oklch(0.925 0.005 80);
-  --muted-foreground: oklch(0.50 0.008 75);
+  /* Darkened from the original 0.50 — against the near-white #fcfdfa
+     background, muted-foreground text at its typical /25–/40 opacity
+     measured at only 1.4–1.8:1 contrast (WCAG's floor is 3:1). */
+  --muted-foreground: oklch(0.26 0.008 75);
   --accent: oklch(0.925 0.005 80);
   --accent-foreground: oklch(0.19 0.005 255);
   --destructive: oklch(0.57 0.22 25);
+  /* Border/line darkening was tried and reversed per feedback — back to
+     the original, quieter values. Text contrast above is unaffected. */
   --border: oklch(0.86 0.005 80);
   --input: oklch(0.89 0.005 80);
   --ring: oklch(0.72 0.14 72);
@@ -80,7 +85,7 @@
   --chart-4: oklch(0.65 0.17 290);
   --chart-5: oklch(0.62 0.15 340);
 
-  --sidebar: oklch(0.935 0.006 80);
+  --sidebar: #fbfbf9;
   --sidebar-foreground: oklch(0.13 0.005 255);
   --sidebar-primary: oklch(0.19 0.005 255);
   --sidebar-primary-foreground: oklch(0.975 0.004 80);
@@ -92,7 +97,7 @@
 
 /* ─── Dark theme ──────────────────────────────────────── */
 .dark {
-  --background: oklch(0.28 0.004 265);
+  --background: #141415;
   --foreground: oklch(0.97 0.003 75);
   --card: oklch(0.32 0.004 265);
   --card-foreground: oklch(0.97 0.003 75);
@@ -120,7 +125,7 @@
   --chart-4: oklch(0.68 0.17 290);
   --chart-5: oklch(0.65 0.15 340);
 
-  --sidebar: oklch(0.32 0.004 265);
+  --sidebar: #101110;
   --sidebar-foreground: oklch(0.97 0.003 75);
   --sidebar-primary: oklch(0.74 0.14 72);
   --sidebar-primary-foreground: oklch(0.28 0.004 265);
@@ -160,7 +165,7 @@
 }
 .react-flow__edge-text {
   fill: var(--muted-foreground) !important;
-  font-size: 9px !important;
+  font-size: 10px !important;
 }
 .react-flow__controls {
   border: 1px solid var(--border) !important;
@@ -187,12 +192,45 @@
 }
 
 /* ─── Custom scrollbar ────────────────────────────────── */
-::-webkit-scrollbar { width: 3px; height: 3px; }
+/*
+  Was 3px at 25% opacity — easy to miss entirely, so a region that needed
+  scrolling to reveal more content could look like it was just cut off
+  with no way to reach the rest. Widened and darkened so it reads as an
+  obvious, grabbable scrollbar instead.
+*/
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.5 0 0 / 0.25);
-  border-radius: 2px;
+  background: oklch(0.5 0 0 / 0.35);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.5 0 0 / 0.45);
+  background: oklch(0.5 0 0 / 0.55);
+}
+
+/* ─── Splash failsafe ─────────────────────────────────── */
+/*
+  The intro overlay is server-rendered opaque (so it covers the dashboard
+  from the very first paint) and is normally torn down by React a few
+  seconds later. That made it a single point of failure: if the client
+  bundle never finishes — a dropped chunk, a phone crawling through the
+  multi-megabyte dev build over Wi-Fi — nothing ever dismisses it and the
+  whole app is a blank coloured rectangle forever. This was a real,
+  reproduced failure: the app "showed a dark screen" on an Android phone
+  while the HTML and CSS had loaded perfectly.
+
+  So the overlay also gets a pure-CSS escape hatch that needs no
+  JavaScript at all. It animates `visibility` (not opacity) precisely so
+  it never fights the inline opacity React drives during the normal
+  animated exit — and when JS is healthy React unmounts the element long
+  before this fires, making it a no-op.
+*/
+@keyframes acture-splash-failsafe {
+  to { visibility: hidden; }
+}
+.splash-failsafe {
+  animation: acture-splash-failsafe 0s linear 8s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-failsafe { animation-delay: 4s; }
 }
