@@ -10,7 +10,11 @@ const db = drizzle(sqlite, { schema })
 
 const userId = 1
 
-const builtinTypes = ['Goal', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept']
+const builtinTypes = [
+  'Goal', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
+  'HabitLog', 'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
+  'HealthMetric', 'SavedView',
+]
 
 function ensureUser() {
   const existing = db.select().from(schema.users).where(eq(schema.users.id, userId)).get()
@@ -42,26 +46,26 @@ function seedSampleGraph() {
     .values({
       userId,
       type: 'Goal',
-      properties: { title: 'Get fit', description: 'Build a consistent workout routine.' },
+      properties: { name: 'Get fit', description: 'Build a consistent workout routine.' },
     })
     .returning()
     .get()
 
   const habit1 = db
     .insert(schema.nodes)
-    .values({ userId, type: 'Habit', properties: { title: 'Morning run', frequency: 'daily', durationMinutes: 30 } })
+    .values({ userId, type: 'Habit', properties: { name: 'Morning run', frequency: 'daily', durationMinutes: 30 } })
     .returning()
     .get()
 
   const habit2 = db
     .insert(schema.nodes)
-    .values({ userId, type: 'Habit', properties: { title: 'Drink 2L water', frequency: 'daily' } })
+    .values({ userId, type: 'Habit', properties: { name: 'Drink 2L water', frequency: 'daily' } })
     .returning()
     .get()
 
   const task = db
     .insert(schema.nodes)
-    .values({ userId, type: 'Task', properties: { title: 'Buy running shoes', status: 'todo' } })
+    .values({ userId, type: 'Task', properties: { name: 'Buy running shoes', status: 'todo' } })
     .returning()
     .get()
 

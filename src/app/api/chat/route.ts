@@ -6,6 +6,7 @@ import { buildContextSnapshot } from '@/lib/ai/context'
 import { getRecentRejections } from '@/lib/db/proposals'
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 import { logger } from '@/lib/log'
+import { todayStr } from '@/lib/date'
 
 // Only the tail of the conversation is resent each turn. Older turns are
 // dropped rather than re-billed — the graph snapshot carries the durable state.
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
           .join('\n')
       : ''
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayStr()
   const dateContext = `\n\n## Current date\nToday is ${today}. Always use this exact date for "today". Derive "tomorrow", "next week", etc. from this date. Never use dates from your training data as defaults.`
 
   const history = messages.slice(-MAX_HISTORY_MESSAGES)
