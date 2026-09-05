@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Pencil } from 'lucide-react'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
+import { Markdown } from '@/components/notes/Markdown'
+import { localDateStr } from '@/lib/date'
 
 interface NoteRow {
   id: number
@@ -22,7 +24,7 @@ function getWeekStart(iso: string): string {
   const d = new Date(iso)
   d.setHours(0, 0, 0, 0)
   d.setDate(d.getDate() - d.getDay())
-  return d.toISOString().split('T')[0]
+  return localDateStr(d)
 }
 
 function formatWeekLabel(weekStart: string): string {
@@ -48,7 +50,7 @@ function groupByWeek(notes: NoteRow[]): Map<string, NoteRow[]> {
   return map
 }
 
-export function NotesPanel() {
+export function NotesPanel({ refreshKey }: { refreshKey?: number } = {}) {
   const [notes, setNotes] = useState<NoteRow[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -61,7 +63,7 @@ export function NotesPanel() {
       .catch(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [refreshKey])
 
   function toggleExpand(id: number) {
     setExpanded((prev) => {
@@ -85,7 +87,7 @@ export function NotesPanel() {
       <ScrollArea className="flex-1">
         {loading && <p className="text-[12px] text-muted-foreground/50 text-center pt-8 font-mono">loading…</p>}
         {!loading && notes.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center pt-8 px-4">
+          <p className="text-[12px] text-muted-foreground/50 text-center pt-10 px-5">
             No notes yet — tell the AI something you want to remember, or ask it to record a journal entry.
           </p>
         )}
@@ -135,7 +137,7 @@ export function NotesPanel() {
                               </button>
                               <button
                                 onClick={() => toggleExpand(note.id)}
-                                className="text-[10px] text-muted-foreground/40 w-4 text-center"
+                                className="text-[10px] text-muted-foreground/65 w-4 text-center"
                               >
                                 {isOpen ? '▲' : '▼'}
                               </button>
@@ -143,7 +145,9 @@ export function NotesPanel() {
                           </div>
                           {isOpen && note.content && (
                             <div className="px-3 pb-3 pt-0">
-                              <p className="text-[13px] font-serif text-foreground/80 whitespace-pre-wrap leading-relaxed border-t border-border/40 pt-2">{note.content}</p>
+                              <div className="border-t border-border/40 pt-2">
+                                <Markdown>{note.content}</Markdown>
+                              </div>
                             </div>
                           )}
                         </div>

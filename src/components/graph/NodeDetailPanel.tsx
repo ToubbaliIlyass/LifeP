@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { X, Trash2, Save, Pencil } from 'lucide-react'
+import { Markdown } from '@/components/notes/Markdown'
 
 interface RelatedNode {
   id: number
@@ -41,10 +42,31 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
   Exam:        'bg-red-500/15 text-red-400',
   Project:     'bg-purple-500/15 text-purple-400',
   Concept:     'bg-teal-500/15 text-teal-400',
+  HealthMetric:'bg-cyan-500/15 text-cyan-400',
 }
 
 // Fields to skip in the generic editor (displayed separately or not editable here)
 const SKIP_FIELDS = new Set(['courseNodeId', 'habitNodeId'])
+
+// The properties editor only showed keys already present on a node's stored
+// object — a Task created without a dueDate (e.g. via chat, if the AI
+// omitted it) had no way to ever gain one from this panel, since there was
+// no row to edit. This mirrors the node-type property lists in the AI
+// system prompt so every expected field always gets a row, even when null.
+const TYPE_FIELDS: Record<string, string[]> = {
+  Goal: ['name', 'description', 'status', 'targetDate'],
+  Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes'],
+  Task: ['name', 'status', 'priority', 'dueDate'],
+  Project: ['name', 'description', 'status', 'dueDate'],
+  Event: ['name', 'date', 'time', 'duration', 'location', 'recurring'],
+  Course: ['name', 'code', 'semester', 'credits'],
+  Assignment: ['name', 'dueDate', 'status', 'grade'],
+  Exam: ['name', 'date', 'time', 'location', 'status', 'grade'],
+  Note: ['title', 'content'],
+  JournalEntry: ['date', 'content', 'mood'],
+  Concept: ['name', 'description', 'pattern'],
+  HealthMetric: ['label', 'value', 'unit', 'date'],
+}
 
 function fieldLabel(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
@@ -71,6 +93,48 @@ function FieldEditor({
       >
         {opts.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
+    )
+  }
+
+  if (name === 'priority') {
+    return (
+      <select
+        value={strVal || 'medium'}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+      >
+        {['low', 'medium', 'high'].map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+  }
+
+  if (name === 'tags') {
+    const tags = Array.isArray(value) ? (value as unknown[]).map(String) : []
+    return (
+      <input
+        type="text"
+        value={tags.join(', ')}
+        onChange={(e) => onChange(e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
+        placeholder="health, urgent, …"
+        className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+      />
+    )
+  }
+
+  if (name === 'recurrence') {
+    // Structured { frequency, daysOfWeek? } object, same shape as Habit's
+    // frequency/daysOfWeek pair — edited as raw JSON here rather than a
+    // dedicated widget (daysOfWeek has the same rough edge on Habit today).
+    return (
+      <textarea
+        value={typeof value === 'string' ? value : JSON.stringify(value, null, 0)}
+        rows={2}
+        onChange={(e) => {
+          try { onChange(JSON.parse(e.target.value)) } catch { onChange(e.target.value) }
+        }}
+        placeholder='{"frequency":"weekly","daysOfWeek":[1]}'
+        className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[12px] font-mono text-foreground/85 resize-y focus:outline-none focus:ring-1 focus:ring-primary/50"
+      />
     )
   }
 
@@ -132,7 +196,7 @@ function FieldEditor({
     )
   }
 
-  if (name === 'durationMinutes' || name === 'credits' || name === 'duration') {
+  if (name === 'durationMinutes' || name === 'credits' || name === 'duration' || name === 'value') {
     return (
       <input
         type="number"
@@ -147,9 +211,10 @@ function FieldEditor({
     return (
       <textarea
         value={strVal}
-        rows={4}
+        rows={10}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-serif text-foreground/85 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+        placeholder="Markdown supported — **bold**, _italic_, lists, `code`, > quotes…"
+        className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 resize-y focus:outline-none focus:ring-1 focus:ring-primary/50"
       />
     )
   }
@@ -240,8 +305,12 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
 
-      {/* Panel */}
-      <div className="relative z-10 w-full max-w-md mx-4 bg-card border border-border/60 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+      {/* Panel — Note/JournalEntry get extra width since their content is
+          long-form markdown, unlike the short single-line fields other
+          node types show here. */}
+      <div className={`relative z-10 w-full mx-4 bg-card border border-border/60 rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] ${
+        detail && (detail.node.type === 'Note' || detail.node.type === 'JournalEntry') ? 'max-w-2xl' : 'max-w-md'
+      }`}>
 
         {/* Header */}
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border/40 shrink-0">
@@ -278,32 +347,40 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
             <>
               {/* Properties */}
               <div className="space-y-3">
-                {Object.entries(detail.node.properties as Record<string, unknown>)
-                  .filter(([k]) => !SKIP_FIELDS.has(k))
-                  .map(([key, val]) => (
-                    <div key={key}>
-                      <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest mb-1">
-                        {fieldLabel(key)}
-                      </p>
-                      {editing ? (
-                        <FieldEditor
-                          name={key}
-                          value={draft[key]}
-                          onChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
-                        />
-                      ) : (
-                        <p className="text-[13px] font-serif text-foreground/85 whitespace-pre-wrap">
-                          {val == null ? <span className="text-muted-foreground/30 italic">—</span> : String(val)}
+                {Array.from(new Set([
+                  ...(TYPE_FIELDS[detail.node.type] ?? []),
+                  ...Object.keys(detail.node.properties as Record<string, unknown>),
+                ]))
+                  .filter((k) => !SKIP_FIELDS.has(k))
+                  .map((key) => {
+                    const val = (detail.node.properties as Record<string, unknown>)[key]
+                    return (
+                      <div key={key}>
+                        <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest mb-1">
+                          {fieldLabel(key)}
                         </p>
-                      )}
-                    </div>
-                  ))}
+                        {editing ? (
+                          <FieldEditor
+                            name={key}
+                            value={draft[key]}
+                            onChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
+                          />
+                        ) : (key === 'content' || key === 'description') && typeof val === 'string' && val ? (
+                          <Markdown>{val}</Markdown>
+                        ) : (
+                          <p className="text-[13px] font-serif text-foreground/85 whitespace-pre-wrap">
+                            {val == null ? <span className="text-muted-foreground/55 italic">—</span> : typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
               </div>
 
               {/* Related notes */}
               {detail.relatedNotes.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest mb-2">
+                  <p className="text-[10px] font-mono text-muted-foreground/65 uppercase tracking-widest mb-2">
                     Notes & Logs
                   </p>
                   <div className="space-y-2">
@@ -312,7 +389,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
                       return (
                         <div key={rn.id} className="bg-muted/20 rounded-xl px-3 py-2.5">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+                            <span className="text-[9px] font-mono text-muted-foreground/65 uppercase tracking-widest">
                               {rn.type} · {rn.edgeType}
                             </span>
                           </div>
@@ -323,7 +400,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
                             <p className="text-[12px] text-muted-foreground/70 mt-0.5 whitespace-pre-wrap">{p.content}</p>
                           )}
                           {typeof p.date === 'string' && (
-                            <p className="text-[11px] font-mono text-muted-foreground/40">{p.date}</p>
+                            <p className="text-[11px] font-mono text-muted-foreground/65">{p.date}</p>
                           )}
                         </div>
                       )
@@ -335,7 +412,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
               {/* Related nodes */}
               {detail.relatedNodes.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest mb-2">
+                  <p className="text-[10px] font-mono text-muted-foreground/65 uppercase tracking-widest mb-2">
                     Related
                   </p>
                   <div className="space-y-1">
@@ -347,7 +424,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
                         <span className="text-[12px] font-serif text-foreground/70 flex-1 truncate">
                           {relatedNodeLabel(rn)}
                         </span>
-                        <span className="text-[9px] font-mono text-muted-foreground/30">
+                        <span className="text-[9px] font-mono text-muted-foreground/55">
                           {rn.direction === 'outgoing' ? '→' : '←'} {rn.edgeType}
                         </span>
                       </div>
@@ -357,7 +434,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
               )}
 
               {/* Metadata */}
-              <p className="text-[10px] font-mono text-muted-foreground/25">
+              <p className="text-[10px] font-mono text-muted-foreground/50">
                 #{detail.node.id} · created {detail.node.createdAt.slice(0, 10)}
               </p>
             </>
@@ -388,7 +465,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
               <>
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  className="p-1.5 rounded-lg text-muted-foreground/65 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   title="Delete node"
                 >
                   <Trash2 className="w-4 h-4" />

@@ -1,0 +1,185 @@
+'use client'
+
+import { useState } from 'react'
+import { Plus, X, CheckSquare, FileText, Calendar, HeartPulse, Target, Repeat, FolderKanban, BookOpen, GraduationCap, ClipboardList } from 'lucide-react'
+
+type QuickType = 'Task' | 'Note' | 'Event' | 'HealthMetric' | 'Goal' | 'Habit' | 'Project' | 'Course' | 'Exam' | 'Assignment'
+
+const TYPES: { id: QuickType; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'Task', label: 'Task', Icon: CheckSquare },
+  { id: 'Note', label: 'Note', Icon: FileText },
+  { id: 'Event', label: 'Event', Icon: Calendar },
+  { id: 'HealthMetric', label: 'Health', Icon: HeartPulse },
+  { id: 'Goal', label: 'Goal', Icon: Target },
+  { id: 'Habit', label: 'Habit', Icon: Repeat },
+  { id: 'Project', label: 'Project', Icon: FolderKanban },
+  { id: 'Course', label: 'Course', Icon: BookOpen },
+  { id: 'Exam', label: 'Exam', Icon: GraduationCap },
+  { id: 'Assignment', label: 'Assignment', Icon: ClipboardList },
+]
+
+interface SecondaryField {
+  label: string
+  type: 'date' | 'number' | 'text' | 'select'
+  placeholder?: string
+  options?: string[]
+}
+
+interface QuickAddButtonProps {
+  onAdded?: () => void
+}
+
+export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
+  const [open, setOpen] = useState(false)
+  const [type, setType] = useState<QuickType>('Task')
+  const [name, setName] = useState('')
+  const [secondary, setSecondary] = useState('') // dueDate / value / frequency / code, depending on type
+  const [submitting, setSubmitting] = useState(false)
+
+  function reset() {
+    setName('')
+    setSecondary('')
+    setType('Task')
+  }
+
+  function propertiesFor(): Record<string, unknown> {
+    const today = new Date().toISOString().slice(0, 10)
+    switch (type) {
+      case 'Task':
+        return { name, status: 'todo', dueDate: secondary || null }
+      case 'Note':
+        return { title: name, content: '' }
+      case 'Event':
+        return { name, date: secondary || null }
+      case 'HealthMetric':
+        return { label: name, value: secondary ? Number(secondary) : null, date: today }
+      case 'Goal':
+        return { name, status: 'active', targetDate: secondary || null }
+      case 'Habit':
+        return { name, frequency: secondary || 'daily' }
+      case 'Project':
+        return { name, status: 'active', dueDate: secondary || null }
+      case 'Course':
+        return { name, code: secondary || null }
+      case 'Exam':
+        return { name, status: 'upcoming', date: secondary || null }
+      case 'Assignment':
+        return { name, status: 'todo', dueDate: secondary || null }
+    }
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
+    await fetch('/api/quick-add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, properties: propertiesFor() }),
+    })
+    setSubmitting(false)
+    reset()
+    setOpen(false)
+    onAdded?.()
+  }
+
+  const secondaryField = (): SecondaryField | null => {
+    switch (type) {
+      case 'Task': return { label: 'Due date', type: 'date' }
+      case 'Event': return { label: 'Date', type: 'date' }
+      case 'HealthMetric': return { label: 'Value', type: 'number', placeholder: '0' }
+      case 'Goal': return { label: 'Target date', type: 'date' }
+      case 'Habit': return { label: 'Frequency', type: 'select', options: ['daily', 'weekly', 'weekdays'] }
+      case 'Project': return { label: 'Due date', type: 'date' }
+      case 'Course': return { label: 'Code', type: 'text', placeholder: 'CS 101' }
+      case 'Exam': return { label: 'Date', type: 'date' }
+      case 'Assignment': return { label: 'Due date', type: 'date' }
+      case 'Note': return null
+    }
+  }
+  const sf = secondaryField()
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90 transition-opacity"
+        title="Quick add"
+        aria-label="Quick add"
+      >
+        <Plus className="w-5 h-5" />
+      </button>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
+
+      <div className="relative z-10 w-full sm:max-w-sm sm:mx-4 bg-card border border-border/60 rounded-t-2xl sm:rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+          <p className="text-[13px] font-semibold text-foreground">Quick add</p>
+          <button onClick={() => setOpen(false)} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-muted/40 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 px-3 py-2.5 overflow-x-auto border-b border-border/40">
+          {TYPES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => { setType(t.id); setSecondary('') }}
+              className={`shrink-0 flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-full border transition-colors ${
+                type === t.id
+                  ? 'bg-primary/15 border-primary/40 text-primary'
+                  : 'border-border/50 text-muted-foreground/70 hover:text-foreground hover:bg-muted/40'
+              }`}
+            >
+              <t.Icon className="w-3 h-3" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={submit} className="p-4 space-y-3">
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={type === 'Note' ? 'Title…' : type === 'HealthMetric' ? 'e.g. Run, Weight…' : 'Name…'}
+            className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2.5 text-[14px] font-serif text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+          />
+          {sf && (
+            <div>
+              <label className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest mb-1 block">{sf.label}</label>
+              {sf.type === 'select' ? (
+                <select
+                  value={secondary || sf.options?.[0] || ''}
+                  onChange={(e) => setSecondary(e.target.value)}
+                  className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                >
+                  {sf.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input
+                  type={sf.type}
+                  value={secondary}
+                  onChange={(e) => setSecondary(e.target.value)}
+                  placeholder={sf.placeholder}
+                  className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              )}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={!name.trim() || submitting}
+            className="w-full text-[13px] font-semibold py-2.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {submitting ? 'Adding…' : 'Add'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
