@@ -43,8 +43,12 @@ const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: st
   { id: 'notes',     label: 'Notes',     Icon: FileText },
   { id: 'activity',  label: 'Activity',  Icon: ClipboardList },
   { id: 'proposals', label: 'Proposals', Icon: Inbox },
-  { id: 'settings',  label: 'Settings',  Icon: SettingsIcon },
 ]
+
+// Lives in the sidebar's bottom section rather than TABS: it is an app-level
+// action, and it must never be hideable — it is the only way to unhide
+// anything else.
+const SETTINGS_TAB = { id: 'settings' as const, label: 'Settings', Icon: SettingsIcon }
 
 // Backgrounded tabs (mobile Safari/Chrome switched away, laptop lid closed)
 // don't need to keep polling — pause while hidden and catch up the moment
@@ -241,7 +245,7 @@ export default function Home() {
 
   const hiddenTabs = new Set(settings?.hiddenTabs ?? [])
   const visibleTabs = TABS.filter((t) => t.id === 'settings' || !hiddenTabs.has(t.id))
-  const activeTab = TABS.find((t) => t.id === tab)
+  const activeTab = tab === 'settings' ? SETTINGS_TAB : TABS.find((t) => t.id === tab)
 
   return (
     <main
@@ -352,20 +356,43 @@ export default function Home() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => window.open('/api/export', '_blank')}
-            title={sidebarCollapsed ? 'Export' : undefined}
-            className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full ${sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}`}
-          >
-            <Download className={`shrink-0 opacity-55 ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
-            {!sidebarCollapsed && 'Export'}
-          </button>
-          <label className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full cursor-pointer ${sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'}`}>
-            <Upload className={`shrink-0 opacity-55 ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
-            {!sidebarCollapsed && 'Import'}
-            <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
-          </label>
+          {/* Export and Import share a row: they are a matched pair, and
+              stacking them spent two full lines on one idea. Collapsed, there
+              is no room for two, so they stack as icons again. */}
+          <div className={sidebarCollapsed ? 'space-y-0.5' : 'flex gap-1'}>
+            <button
+              onClick={() => window.open('/api/export', '_blank')}
+              title={sidebarCollapsed ? 'Export' : 'Export everything'}
+              className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'flex-1 gap-2 px-3 py-2 text-left'}`}
+            >
+              <Download className={`shrink-0 opacity-55 ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
+              {!sidebarCollapsed && 'Export'}
+            </button>
+            <label
+              title={sidebarCollapsed ? 'Import' : 'Import from a file'}
+              className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'flex-1 gap-2 px-3 py-2'}`}
+            >
+              <Upload className={`shrink-0 opacity-55 ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
+              {!sidebarCollapsed && 'Import'}
+              <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
+            </label>
+          </div>
           <ThemeToggle sidebar collapsed={sidebarCollapsed} />
+          <button
+            onClick={() => selectTab('settings')}
+            title={sidebarCollapsed ? 'Settings' : undefined}
+            className={`
+              relative flex items-center rounded-lg text-[13px] font-medium transition-colors w-full
+              ${sidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}
+              ${tab === 'settings'
+                ? 'bg-muted/80 text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              }
+            `}
+          >
+            <SettingsIcon className={`shrink-0 ${tab === 'settings' ? 'opacity-100' : 'opacity-55'} ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
+            {!sidebarCollapsed && 'Settings'}
+          </button>
         </div>
       </aside>
 
@@ -534,19 +561,32 @@ export default function Home() {
                 <Search className="shrink-0 opacity-55 w-[15px] h-[15px]" />
                 Search
               </button>
-              <button
-                onClick={() => window.open('/api/export', '_blank')}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full text-left"
-              >
-                <Download className="shrink-0 opacity-55 w-[15px] h-[15px]" />
-                Export
-              </button>
-              <label className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full cursor-pointer">
-                <Upload className="shrink-0 opacity-55 w-[15px] h-[15px]" />
-                Import
-                <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
-              </label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => window.open('/api/export', '_blank')}
+                  className="flex flex-1 items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-left"
+                >
+                  <Download className="shrink-0 opacity-55 w-[15px] h-[15px]" />
+                  Export
+                </button>
+                <label className="flex flex-1 items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer">
+                  <Upload className="shrink-0 opacity-55 w-[15px] h-[15px]" />
+                  Import
+                  <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
+                </label>
+              </div>
               <ThemeToggle sidebar />
+              <button
+                onClick={() => selectTab('settings')}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors w-full text-left ${
+                  tab === 'settings'
+                    ? 'bg-muted/80 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                }`}
+              >
+                <SettingsIcon className={`shrink-0 w-[15px] h-[15px] ${tab === 'settings' ? 'opacity-100' : 'opacity-55'}`} />
+                Settings
+              </button>
             </div>
           </div>
         </div>

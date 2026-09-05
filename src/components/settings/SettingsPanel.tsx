@@ -79,32 +79,27 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
           <div className="space-y-1">
             {allTabs.map((t) => {
               const isHidden = hidden.has(t.id)
-              const isSettings = t.id === 'settings'
               return (
                 <div key={t.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20">
                   <span className={`text-[13px] font-serif flex-1 ${isHidden ? 'text-muted-foreground/50' : 'text-foreground/85'}`}>
                     {t.label}
                   </span>
-                  {isSettings ? (
-                    <span className="text-[10px] font-mono text-muted-foreground/45">always shown</span>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        const next = isHidden
-                          ? settings.hiddenTabs.filter((x) => x !== t.id)
-                          : [...settings.hiddenTabs, t.id]
-                        save({ hiddenTabs: next })
-                      }}
-                      className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-full border transition-colors ${
-                        isHidden
-                          ? 'border-border/50 text-muted-foreground/60 hover:text-foreground hover:bg-muted/40'
-                          : 'bg-primary/15 border-primary/40 text-primary'
-                      }`}
-                    >
-                      {isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      {isHidden ? 'hidden' : 'shown'}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      const next = isHidden
+                        ? settings.hiddenTabs.filter((x) => x !== t.id)
+                        : [...settings.hiddenTabs, t.id]
+                      save({ hiddenTabs: next })
+                    }}
+                    className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-full border transition-colors ${
+                      isHidden
+                        ? 'border-border/50 text-muted-foreground/60 hover:text-foreground hover:bg-muted/40'
+                        : 'bg-primary/15 border-primary/40 text-primary'
+                    }`}
+                  >
+                    {isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {isHidden ? 'hidden' : 'shown'}
+                  </button>
                 </div>
               )
             })}
