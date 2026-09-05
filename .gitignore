@@ -47,3 +47,13 @@ next-env.d.ts
 /data/*.db-wal
 /data/*.db-shm
 /data/backups/
+
+# alternate dist dir for production test builds
+.next-prod
+
+# local tooling output
+.playwright-mcp/
+.mcp.json
+
+# debug screenshots from mobile testing
+mobile-*.png
