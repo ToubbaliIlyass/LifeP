@@ -20,14 +20,14 @@ function addMinutes(time: string, minutes: number): string {
  * Scoped to today-or-later only (the caller enforces this) — a past day
  * is never rewritten with a fabricated entry it didn't actually get.
  */
-function autoFillHabitsForDate(userId: number, date: string) {
+async function autoFillHabitsForDate(userId: number, date: string) {
   const dow = new Date(date + 'T00:00:00').getDay()
-  const habits = getNodes(userId, { type: 'Habit' })
+  const habits = await getNodes(userId, { type: 'Habit' })
   if (habits.length === 0) return
 
-  const habitLogs = getNodes(userId, { type: 'HabitLog' })
-  const scheduledForEdges = getEdges(userId, { type: 'scheduled-for' })
-  const timeBlocks = getNodes(userId, { type: 'TimeBlock' })
+  const habitLogs = await getNodes(userId, { type: 'HabitLog' })
+  const scheduledForEdges = await getEdges(userId, { type: 'scheduled-for' })
+  const timeBlocks = await getNodes(userId, { type: 'TimeBlock' })
   const blockById = new Map(timeBlocks.map((b) => [b.id, b]))
 
   for (const habit of habits) {
@@ -66,8 +66,8 @@ function autoFillHabitsForDate(userId: number, date: string) {
     const startTime = typeof mostRecent?.startTime === 'string' ? mostRecent.startTime : '08:00'
     const endTime = typeof mostRecent?.endTime === 'string' ? mostRecent.endTime : addMinutes(startTime, durationMinutes)
 
-    const block = createNode(userId, 'TimeBlock', { date, startTime, endTime })
-    createEdge(userId, block.id, habit.id, 'scheduled-for', {})
+    const block = await createNode(userId, 'TimeBlock', { date, startTime, endTime })
+    await createEdge(userId, block.id, habit.id, 'scheduled-for', {})
   }
 }
 
@@ -79,18 +79,18 @@ export async function GET(request: Request) {
   // Today or any future day — never a past one, so browsing history never
   // fabricates an entry that wasn't actually there.
   if (date >= todayStr()) {
-    autoFillHabitsForDate(user.id, date)
+    await autoFillHabitsForDate(user.id, date)
   }
 
   // TimeBlocks for the requested date
-  const allBlocks = getNodes(user.id, { type: 'TimeBlock' }).filter((n) => {
+  const allBlocks = (await getNodes(user.id, { type: 'TimeBlock' })).filter((n) => {
     const p = n.properties as Record<string, unknown>
     return p.date === date
   })
 
   // Find scheduled-for edges where source is one of our blocks
   const blockIds = new Set(allBlocks.map((b) => b.id))
-  const scheduledEdges = getEdges(user.id, { type: 'scheduled-for' }).filter((e) =>
+  const scheduledEdges = (await getEdges(user.id, { type: 'scheduled-for' })).filter((e) =>
     blockIds.has(e.sourceId),
   )
 
@@ -104,7 +104,7 @@ export async function GET(request: Request) {
   const sourceNodeIds = new Set(sourceByBlock.values())
   const sourceNodes = new Map<number, { id: number; type: string; name: string }>()
   for (const id of sourceNodeIds) {
-    const node = getNodeById(user.id, id)
+    const node = await getNodeById(user.id, id)
     if (node) {
       const p = node.properties as Record<string, unknown>
       sourceNodes.set(id, {
@@ -127,7 +127,7 @@ export async function GET(request: Request) {
   }).sort((a, b) => a.startTime.localeCompare(b.startTime))
 
   // Events for the requested date
-  const events = getNodes(user.id, { type: 'Event' })
+  const events = (await getNodes(user.id, { type: 'Event' }))
     .map((n) => {
       const p = n.properties as Record<string, unknown>
       return {

@@ -18,21 +18,21 @@ export async function POST(request: Request) {
   }
 
   if (body.replaceExisting && body.sourceNodeId) {
-    const existing = getEdges(user.id, { type: 'scheduled-for' })
+    const existing = (await getEdges(user.id, { type: 'scheduled-for' }))
       .filter((e) => e.targetId === body.sourceNodeId)
     for (const edge of existing) {
-      deleteNode(user.id, edge.sourceId) // the TimeBlock; cascades the edge
+      await deleteNode(user.id, edge.sourceId) // the TimeBlock; cascades the edge
     }
   }
 
-  const block = createNode(user.id, 'TimeBlock', {
+  const block = await createNode(user.id, 'TimeBlock', {
     date: body.date,
     startTime: body.startTime,
     endTime: body.endTime,
   })
 
   if (body.sourceNodeId) {
-    createEdge(user.id, block.id, body.sourceNodeId, 'scheduled-for', {})
+    await createEdge(user.id, block.id, body.sourceNodeId, 'scheduled-for', {})
   }
 
   return Response.json({ ok: true, block })

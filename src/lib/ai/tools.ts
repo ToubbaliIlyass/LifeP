@@ -81,10 +81,10 @@ export function buildTools() {
       execute: async ({ filter }) => {
         let typeFilter: string | undefined
         if (filter?.startsWith('type:')) typeFilter = filter.slice(5)
-        const allNodes = getNodes(user.id, typeFilter ? { type: typeFilter } : undefined)
+        const allNodes = await getNodes(user.id, typeFilter ? { type: typeFilter } : undefined)
         const nodes = allNodes.slice(0, READ_GRAPH_NODE_LIMIT)
         const nodeIds = new Set(nodes.map((n) => n.id))
-        const allEdges = getEdges(user.id).filter(
+        const allEdges = (await getEdges(user.id)).filter(
           (e) => nodeIds.has(e.sourceId) && nodeIds.has(e.targetId),
         )
         return {
@@ -105,7 +105,7 @@ export function buildTools() {
         query: z.string().describe('Text to search for in node properties'),
       }),
       execute: async ({ query }) => {
-        const allNodes = getNodes(user.id)
+        const allNodes = await getNodes(user.id)
         const q = query.toLowerCase()
         const matches = allNodes.filter((n) =>
           JSON.stringify(n.properties).toLowerCase().includes(q),
@@ -122,7 +122,7 @@ export function buildTools() {
         'Read the full properties of one node by ID. Use this only when the compact summary is not enough (e.g. you need a Note body or a description).',
       inputSchema: z.object({ nodeId: z.number() }),
       execute: async ({ nodeId }) => {
-        const node = getNodes(user.id).find((n) => n.id === nodeId)
+        const node = (await getNodes(user.id)).find((n) => n.id === nodeId)
         if (!node) return { found: false as const }
         return { found: true as const, id: node.id, type: node.type, properties: node.properties }
       },
@@ -140,12 +140,12 @@ export function buildTools() {
           return { error: `Cannot create ${type} directly. Use batchPropose with a createNode operation instead.` }
         }
         if (properties.name) {
-          const existing = getNodes(user.id, { type }).find(
+          const existing = (await getNodes(user.id, { type })).find(
             (n) => (n.properties as Record<string, unknown>).name === properties.name,
           )
           if (existing) return { created: false, node: compactNode(existing), deduplicated: true }
         }
-        const node = createNode(user.id, type, properties)
+        const node = await createNode(user.id, type, properties)
         return { created: true, node: compactNode(node) }
       },
     }),
@@ -160,11 +160,11 @@ export function buildTools() {
         properties: z.record(z.string(), z.unknown()).optional(),
       }),
       execute: async ({ sourceId, targetId, type, properties }) => {
-        const existing = findExistingEdge(user.id, sourceId, targetId, type)
+        const existing = await findExistingEdge(user.id, sourceId, targetId, type)
         if (existing) {
           return { created: false, edge: compactEdge(existing), duplicate: true }
         }
-        const edge = createEdge(user.id, sourceId, targetId, type, properties ?? {})
+        const edge = await createEdge(user.id, sourceId, targetId, type, properties ?? {})
         return { created: true, edge: compactEdge(edge) }
       },
     }),
@@ -177,10 +177,10 @@ export function buildTools() {
         properties: z.record(z.string(), z.unknown()),
       }),
       execute: async ({ nodeId, properties }) => {
-        const existing = getNodes(user.id).find((n) => n.id === nodeId)
+        const existing = (await getNodes(user.id)).find((n) => n.id === nodeId)
         if (!existing) return { updated: false, error: 'Node not found' }
         const merged = { ...(existing.properties as Record<string, unknown>), ...properties }
-        const node = updateNode(user.id, nodeId, merged)
+        const node = await updateNode(user.id, nodeId, merged)
         return node
           ? { updated: true, node: compactNode(node), changed: Object.keys(properties) }
           : { updated: false, error: 'Node not found' }
@@ -194,7 +194,7 @@ export function buildTools() {
         reason: z.string().describe('Why this node should be deleted'),
       }),
       execute: async ({ nodeId, reason }) => {
-        const proposal = createProposal(
+        const proposal = await createProposal(
           user.id,
           `Delete node ${nodeId}: ${reason}`,
           [{ kind: 'deleteNode', nodeId }],
@@ -212,9 +212,9 @@ export function buildTools() {
         operations: z.array(BatchOperationSchema),
       }),
       execute: async ({ summary, reasoning, operations }) => {
-        const schemaVersion = getSchemaVersion(user.id)
+        const schemaVersion = await getSchemaVersion(user.id)
         const fullSummary = reasoning.trim() ? `${summary}\n\n${reasoning}` : summary
-        const proposal = createProposal(user.id, fullSummary, operations, schemaVersion)
+        const proposal = await createProposal(user.id, fullSummary, operations, schemaVersion)
         return { proposed: true, proposalId: proposal.id, summary }
       },
     }),
@@ -229,8 +229,8 @@ export function buildTools() {
         reason: z.string().describe('Why this pattern deserves its own type'),
       }),
       execute: async ({ name, typeSchema, examples, reason }) => {
-        const schemaVersion = getSchemaVersion(user.id)
-        const proposal = createProposal(
+        const schemaVersion = await getSchemaVersion(user.id)
+        const proposal = await createProposal(
           user.id,
           `Promote pattern to new type: ${name}`,
           [{ kind: 'proposeNodeType', name, typeSchema, examples, reason }],

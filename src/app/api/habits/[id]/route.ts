@@ -15,21 +15,21 @@ export async function PATCH(
   const date = body.date ?? todayStr()
 
   // Find existing HabitLog for this habit + date
-  const allLogs = getNodes(user.id, { type: 'HabitLog' })
+  const allLogs = await getNodes(user.id, { type: 'HabitLog' })
   const existing = allLogs.find((n) => {
     const p = n.properties as Record<string, unknown>
     return p.habitNodeId === habitNodeId && p.date === date
   })
 
   if (existing) {
-    const updated = updateNode(user.id, existing.id, {
+    const updated = await updateNode(user.id, existing.id, {
       ...(existing.properties as Record<string, unknown>),
       completed: body.completed,
     })
     return Response.json({ ok: true, log: updated })
   }
 
-  const log = createNode(user.id, 'HabitLog', {
+  const log = await createNode(user.id, 'HabitLog', {
     habitNodeId,
     date,
     completed: body.completed,

@@ -16,17 +16,17 @@ export async function PATCH(
 
   if (body.action === 'approve') {
     // Mark approved first so we have the proposal data, then execute and store result
-    const proposal = approveProposal(id, user.id)
+    const proposal = await approveProposal(id, user.id)
     if (!proposal) return Response.json({ error: 'Proposal not found' }, { status: 404 })
     const ops = proposal.operations as BatchOperation[]
-    const { schemaEvolved, result } = executeBatch(user.id, ops, proposal.schemaVersion)
+    const { schemaEvolved, result } = await executeBatch(user.id, ops, proposal.schemaVersion)
     // Store execution result for undo
-    approveProposal(id, user.id, result)
+    await approveProposal(id, user.id, result)
     return Response.json({ ok: true, proposal, schemaEvolved })
   }
 
   if (body.action === 'reject') {
-    const proposal = rejectProposal(id, user.id, body.reason ?? '')
+    const proposal = await rejectProposal(id, user.id, body.reason ?? '')
     if (!proposal) return Response.json({ error: 'Proposal not found' }, { status: 404 })
     return Response.json({ ok: true, proposal })
   }

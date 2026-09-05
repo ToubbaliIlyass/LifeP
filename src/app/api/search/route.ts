@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   if (overdue) {
     const today = todayStr()
     const candidateTypes = types && types.length > 0 ? types.filter((t) => OVERDUE_TYPES.includes(t)) : OVERDUE_TYPES
-    const nodes = candidateTypes.flatMap((t) => getNodes(user.id, { type: t }))
+    const nodes = (await Promise.all(candidateTypes.map((t) => getNodes(user.id, { type: t })))).flat()
     const qLower = q?.toLowerCase()
     const overdueNodes = nodes.filter((n) => {
       const p = n.properties as Record<string, unknown>
@@ -48,6 +48,6 @@ export async function GET(request: Request) {
 
   if (!q || q.length < 2) return Response.json({ results: [] })
 
-  const nodes = searchNodes(user.id, q, types).slice(0, 20)
+  const nodes = (await searchNodes(user.id, q, types)).slice(0, 20)
   return Response.json({ results: nodes.map(toResult) })
 }

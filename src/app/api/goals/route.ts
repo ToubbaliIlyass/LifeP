@@ -6,16 +6,18 @@ import { todayStr, addDays } from '@/lib/date'
 // can never drift out of sync with what's actually been done.
 export async function GET() {
   const user = getCurrentUser()
-  const goals = getNodes(user.id, { type: 'Goal' }).filter((g) => {
+  const goals = (await getNodes(user.id, { type: 'Goal' })).filter((g) => {
     const p = g.properties as Record<string, unknown>
     return (p.status ?? 'active') === 'active'
   })
-  const habitLogs = getNodes(user.id, { type: 'HabitLog' })
+  const habitLogs = await getNodes(user.id, { type: 'HabitLog' })
   const since = addDays(todayStr(), -7)
 
-  const result = goals.map((g) => {
+  // Each goal needs its own neighbour lookup, so these run concurrently
+  // rather than serially awaiting one round trip per goal.
+  const result = await Promise.all(goals.map(async (g) => {
     const p = g.properties as Record<string, unknown>
-    const detail = getNodeWithNeighbors(user.id, g.id)
+    const detail = await getNodeWithNeighbors(user.id, g.id)
     const linked = (detail?.neighbors ?? []).filter((n) => n.node.type === 'Task' || n.node.type === 'Habit')
     // Milestones are just this goal's linked Tasks, presented as an
     // orderable checklist rather than only folded into the % below —
@@ -57,7 +59,7 @@ export async function GET() {
       progress: linked.length > 0 ? Math.round((done / linked.length) * 100) : null,
       milestones,
     }
-  })
+  }))
 
   return Response.json({ goals: result })
 }

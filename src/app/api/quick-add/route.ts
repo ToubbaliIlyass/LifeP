@@ -31,6 +31,6 @@ export async function POST(request: Request) {
     return Response.json({ error: 'a name/title/label is required' }, { status: 400 })
   }
 
-  const node = createNode(user.id, type, properties)
+  const node = await createNode(user.id, type, properties)
   return Response.json({ ok: true, node })
 }

@@ -4,7 +4,7 @@ import { getNodes } from '@/lib/graph/queries'
 export async function GET() {
   const user = getCurrentUser()
 
-  const notes = getNodes(user.id, { type: 'Note' }).map((n) => {
+  const notes = (await getNodes(user.id, { type: 'Note' })).map((n) => {
     const p = n.properties as Record<string, unknown>
     return {
       id: n.id,
@@ -15,7 +15,7 @@ export async function GET() {
     }
   })
 
-  const journal = getNodes(user.id, { type: 'JournalEntry' }).map((n) => {
+  const journal = (await getNodes(user.id, { type: 'JournalEntry' })).map((n) => {
     const p = n.properties as Record<string, unknown>
     return {
       id: n.id,

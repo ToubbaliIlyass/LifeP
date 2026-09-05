@@ -15,7 +15,7 @@ export async function PATCH(
 
   const body = await request.json() as { status: string }
 
-  const task = getNodes(user.id, { type: 'Task' }).find((n) => n.id === taskId)
+  const task = (await getNodes(user.id, { type: 'Task' })).find((n) => n.id === taskId)
   if (!task) return Response.json({ error: 'Task not found' }, { status: 404 })
 
   const props = { ...(task.properties as Record<string, unknown>) }
@@ -31,7 +31,7 @@ export async function PATCH(
 
   props.status = newStatus
 
-  const updated = updateNode(user.id, taskId, props)
+  const updated = await updateNode(user.id, taskId, props)
 
   // A recurring Task completing shouldn't just vanish — it should hand off
   // to its next occurrence, the same way a recurring Habit is never a
@@ -42,7 +42,7 @@ export async function PATCH(
   if (newStatus === 'done' && prevStatus !== 'done' && recurrence?.frequency) {
     const baseDate = typeof props.dueDate === 'string' ? props.dueDate : todayStr()
     const next = nextDueDate(baseDate, recurrence.frequency, recurrence.daysOfWeek ?? null)
-    createNode(user.id, 'Task', {
+    await createNode(user.id, 'Task', {
       ...props,
       status: 'todo',
       dueDate: next,

@@ -10,7 +10,7 @@ export async function GET() {
   const today = todayStr()
   const dow = new Date(today + 'T00:00:00').getDay()
 
-  const tasks = getNodes(user.id, { type: 'Task' })
+  const tasks = await getNodes(user.id, { type: 'Task' })
   const items: { id: number; type: 'task' | 'habit'; label: string; reason: 'overdue' | 'due-today' | 'not-done-today' }[] = []
 
   for (const t of tasks) {
@@ -23,8 +23,8 @@ export async function GET() {
     else if (dueDate === today) items.push({ id: t.id, type: 'task', label: name, reason: 'due-today' })
   }
 
-  const habits = getNodes(user.id, { type: 'Habit' })
-  const habitLogs = getNodes(user.id, { type: 'HabitLog' })
+  const habits = await getNodes(user.id, { type: 'Habit' })
+  const habitLogs = await getNodes(user.id, { type: 'HabitLog' })
   for (const h of habits) {
     const p = h.properties as Record<string, unknown>
     const frequency = typeof p.frequency === 'string' ? p.frequency : 'daily'

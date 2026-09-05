@@ -8,10 +8,10 @@ function nameOf(p: Record<string, unknown>, id: number, type: string) {
 export async function GET() {
   const user = getCurrentUser()
 
-  const courses     = getNodes(user.id, { type: 'Course' })
-  const assignments = getNodes(user.id, { type: 'Assignment' })
-  const exams       = getNodes(user.id, { type: 'Exam' })
-  const allEdges    = getEdges(user.id)
+  const courses     = await getNodes(user.id, { type: 'Course' })
+  const assignments = await getNodes(user.id, { type: 'Assignment' })
+  const exams       = await getNodes(user.id, { type: 'Exam' })
+  const allEdges    = await getEdges(user.id)
 
   // Build source → target map for quick lookup
   const edgeMap = new Map<number, number[]>()

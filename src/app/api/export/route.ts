@@ -6,9 +6,9 @@ import { todayStr } from '@/lib/date'
 export async function GET() {
   const user = getCurrentUser()
 
-  const nodes = getNodes(user.id)
-  const edges = getEdges(user.id)
-  const nodeTypes = getNodeTypes(user.id)
+  const nodes = await getNodes(user.id)
+  const edges = await getEdges(user.id)
+  const nodeTypes = await getNodeTypes(user.id)
 
   const payload = {
     version: 1,

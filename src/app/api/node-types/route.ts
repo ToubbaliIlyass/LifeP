@@ -3,6 +3,6 @@ import { getNodeTypes } from '@/lib/db/node-types'
 
 export async function GET() {
   const user = getCurrentUser()
-  const types = getNodeTypes(user.id)
+  const types = await getNodeTypes(user.id)
   return Response.json({ nodeTypes: types })
 }

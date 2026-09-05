@@ -1,40 +1,34 @@
-import Database from 'better-sqlite3'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { and, eq } from 'drizzle-orm'
+import { createClient } from '@libsql/client'
+import { drizzle } from 'drizzle-orm/libsql'
 import * as schema from './schema'
 
-const sqlite = new Database('./data/lifep.db')
-sqlite.pragma('journal_mode = WAL')
-sqlite.pragma('foreign_keys = ON')
+/**
+ * libSQL speaks SQLite, so the schema and every query carry over from
+ * better-sqlite3 unchanged — only the driver differs. It also accepts a
+ * local `file:` URL, which means the exact same code path runs against the
+ * local database in development and against Turso in production; the only
+ * thing that changes between them is this URL.
+ *
+ * The one thing that does NOT carry over is synchronousness. better-sqlite3
+ * could read a local file synchronously; anything over a network cannot, so
+ * every query in this app is async — see src/lib/graph/queries.ts.
+ */
+const url = process.env.TURSO_DATABASE_URL ?? 'file:./data/lifep.db'
+const authToken = process.env.TURSO_AUTH_TOKEN
 
-export const db = drizzle(sqlite, { schema })
-
-// Ensure built-in node types exist for user 1 on first load (idempotent)
-const BUILTIN_TYPES = [
-  { name: 'Goal',         typeSchema: { name: 'string', description: 'string', status: 'string', targetDate: 'string' } },
-  { name: 'Habit',        typeSchema: { name: 'string', frequency: 'string', durationMinutes: 'number' } },
-  { name: 'HabitLog',     typeSchema: { habitNodeId: 'number', date: 'string', completed: 'boolean', notes: 'string' } },
-  { name: 'Task',         typeSchema: { name: 'string', status: 'string', dueDate: 'string', projectNodeId: 'number' } },
-  { name: 'Project',      typeSchema: { name: 'string', description: 'string', status: 'string', dueDate: 'string' } },
-  { name: 'Event',        typeSchema: { name: 'string', date: 'string', time: 'string', duration: 'number', recurring: 'string', location: 'string' } },
-  { name: 'Course',       typeSchema: { name: 'string', code: 'string', semester: 'string', credits: 'number' } },
-  { name: 'Assignment',   typeSchema: { name: 'string', courseNodeId: 'number', dueDate: 'string', status: 'string', grade: 'string' } },
-  { name: 'Exam',         typeSchema: { name: 'string', courseNodeId: 'number', date: 'string', time: 'string', location: 'string', status: 'string', grade: 'string' } },
-  { name: 'Note',         typeSchema: { title: 'string', content: 'string' } },
-  { name: 'JournalEntry', typeSchema: { date: 'string', content: 'string', mood: 'string' } },
-  { name: 'Concept',      typeSchema: { name: 'string', description: 'string', pattern: 'string' } },
-  { name: 'TimeBlock',    typeSchema: { date: 'string', startTime: 'string', endTime: 'string' } },
-] as const
-
-for (const { name, typeSchema } of BUILTIN_TYPES) {
-  const exists = db
-    .select({ id: schema.nodeTypes.id })
-    .from(schema.nodeTypes)
-    .where(and(eq(schema.nodeTypes.userId, 1), eq(schema.nodeTypes.name, name)))
-    .get()
-  if (!exists) {
-    db.insert(schema.nodeTypes)
-      .values({ userId: 1, name, schema: typeSchema, isBuiltin: true })
-      .run()
-  }
+if (process.env.TURSO_DATABASE_URL && !authToken) {
+  // Failing loudly here beats a confusing auth error on every single query.
+  console.warn('[db] TURSO_DATABASE_URL is set but TURSO_AUTH_TOKEN is missing')
 }
+
+const client = createClient({ url, ...(authToken ? { authToken } : {}) })
+
+export const db = drizzle(client, { schema })
+
+/*
+ * The built-in node types used to be inserted by a loop that ran at module
+ * scope, on import. That cannot work against an async client, and on
+ * serverless it would run on every cold start of every function. Seeding
+ * belongs in `npm run db:seed`, which is idempotent and already maintains
+ * the same list.
+ */

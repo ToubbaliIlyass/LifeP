@@ -15,8 +15,8 @@ const MAX_PER_TYPE = 20
 const MAX_TOTAL_NODES = 80
 const MAX_EDGES = 30
 
-export function buildContextSnapshot(userId: number, userMessage: string): string {
-  const allNodes = getNodes(userId)
+export async function buildContextSnapshot(userId: number, userMessage: string): Promise<string> {
+  const allNodes = await getNodes(userId)
   if (allNodes.length === 0) return ''
 
   const keywords = userMessage
@@ -93,7 +93,7 @@ export function buildContextSnapshot(userId: number, userMessage: string): strin
   }
 
   // Add existing relationships so the AI knows what's already connected
-  const allEdges = getEdges(userId)
+  const allEdges = await getEdges(userId)
   const relevantEdges = allEdges
     .filter((e) => relevantIds.has(e.sourceId) && relevantIds.has(e.targetId))
     .sort((a, b) => {

@@ -21,12 +21,12 @@ function resolveRef(ref: string, createdNodeIds: number[]): number {
   return id
 }
 
-export function executeBatch(
+export async function executeBatch(
   userId: number,
   operations: BatchOperation[],
   proposalSchemaVersion?: number,
-): { summary: string[]; schemaEvolved: boolean; result: ExecutionResult } {
-  const currentVersion = getSchemaVersion(userId)
+): Promise<{ summary: string[]; schemaEvolved: boolean; result: ExecutionResult }> {
+  const currentVersion = await getSchemaVersion(userId)
   const schemaEvolved =
     proposalSchemaVersion !== undefined && proposalSchemaVersion !== currentVersion
 
@@ -46,7 +46,7 @@ export function executeBatch(
     switch (op.kind) {
       case 'createNode': {
         if (op.properties.name) {
-          const existing = getNodes(userId, { type: op.type }).find(
+          const existing = (await getNodes(userId, { type: op.type })).find(
             (n) => (n.properties as Record<string, unknown>).name === op.properties.name,
           )
           if (existing) {
@@ -55,7 +55,7 @@ export function executeBatch(
             break
           }
         }
-        const node = createNode(userId, op.type, op.properties)
+        const node = await createNode(userId, op.type, op.properties)
         result.createdNodeIds.push(node.id)
         summary.push(`Created ${op.type} node #${node.id}`)
         break
@@ -63,30 +63,30 @@ export function executeBatch(
       case 'createEdge': {
         const sourceId = resolveRef(op.sourceRef, result.createdNodeIds)
         const targetId = resolveRef(op.targetRef, result.createdNodeIds)
-        const duplicate = findExistingEdge(userId, sourceId, targetId, op.type)
+        const duplicate = await findExistingEdge(userId, sourceId, targetId, op.type)
         if (duplicate) {
           summary.push(`"${op.type}" edge ${sourceId} → ${targetId} already exists — skipped`)
           break
         }
-        const edge = createEdge(userId, sourceId, targetId, op.type, op.properties ?? {})
+        const edge = await createEdge(userId, sourceId, targetId, op.type, op.properties ?? {})
         result.createdEdgeIds.push(edge.id)
         summary.push(`Created "${op.type}" edge #${edge.id} (${sourceId} → ${targetId})`)
         break
       }
       case 'updateNode': {
-        const existing = getNodeById(userId, op.nodeId)
+        const existing = await getNodeById(userId, op.nodeId)
         if (existing) {
           result.updatedNodePreviousProps.push({
             nodeId: op.nodeId,
             previousProps: existing.properties as Record<string, unknown>,
           })
         }
-        updateNode(userId, op.nodeId, op.properties)
+        await updateNode(userId, op.nodeId, op.properties)
         summary.push(`Updated node #${op.nodeId}`)
         break
       }
       case 'deleteNode': {
-        const existing = getNodeById(userId, op.nodeId)
+        const existing = await getNodeById(userId, op.nodeId)
         if (existing) {
           result.deletedNodes.push({
             id: existing.id,
@@ -94,16 +94,16 @@ export function executeBatch(
             properties: existing.properties as Record<string, unknown>,
           })
         }
-        deleteNode(userId, op.nodeId)
+        await deleteNode(userId, op.nodeId)
         summary.push(`Deleted node #${op.nodeId}`)
         break
       }
       case 'proposeNodeType': {
-        if (nodeTypeExists(userId, op.name)) {
+        if (await nodeTypeExists(userId, op.name)) {
           summary.push(`Node type "${op.name}" already exists — skipped`)
           break
         }
-        createNodeType(userId, op.name, op.typeSchema)
+        await createNodeType(userId, op.name, op.typeSchema)
         summary.push(`Registered new node type "${op.name}"`)
         break
       }

@@ -13,19 +13,19 @@ export async function POST(
   const goalId = parseInt(idStr, 10)
   if (isNaN(goalId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const goal = getNodeById(user.id, goalId)
+  const goal = await getNodeById(user.id, goalId)
   if (!goal || goal.type !== 'Goal') return Response.json({ error: 'Goal not found' }, { status: 404 })
 
   const body = await request.json() as { name?: string; dueDate?: string | null }
   const name = body.name?.trim()
   if (!name) return Response.json({ error: 'name is required' }, { status: 400 })
 
-  const task = createNode(user.id, 'Task', {
+  const task = await createNode(user.id, 'Task', {
     name,
     status: 'todo',
     dueDate: body.dueDate ?? null,
   })
-  createEdge(user.id, task.id, goalId, 'part-of')
+  await createEdge(user.id, task.id, goalId, 'part-of')
 
   return Response.json({ ok: true, milestone: { id: task.id, name, status: 'todo', dueDate: body.dueDate ?? null } })
 }

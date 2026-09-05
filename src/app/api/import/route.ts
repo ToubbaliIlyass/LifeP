@@ -31,15 +31,15 @@ export async function POST(request: Request) {
 
   // Import custom node types first
   for (const nt of payload.nodeTypes ?? []) {
-    if (!nt.isBuiltin && !nodeTypeExists(user.id, nt.name)) {
-      createNodeType(user.id, nt.name, nt.schema as Record<string, unknown>)
+    if (!nt.isBuiltin && !await nodeTypeExists(user.id, nt.name)) {
+      await createNodeType(user.id, nt.name, nt.schema as Record<string, unknown>)
       importedTypes++
     }
   }
 
   // Import nodes, mapping old IDs to new IDs
   for (const node of payload.nodes) {
-    const created = createNode(user.id, node.type, node.properties as Record<string, unknown>)
+    const created = await createNode(user.id, node.type, node.properties as Record<string, unknown>)
     nodeIdMap.set(node.id, created.id)
     importedNodes++
   }
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const newSource = nodeIdMap.get(edge.sourceId)
     const newTarget = nodeIdMap.get(edge.targetId)
     if (newSource && newTarget) {
-      createEdge(user.id, newSource, newTarget, edge.type, edge.properties as Record<string, unknown>)
+      await createEdge(user.id, newSource, newTarget, edge.type, edge.properties as Record<string, unknown>)
       importedEdges++
     }
   }

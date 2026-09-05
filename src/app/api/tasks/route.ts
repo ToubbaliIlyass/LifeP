@@ -6,7 +6,7 @@ const ARCHIVE_MS = 7 * 24 * 60 * 60 * 1000
 
 export async function GET() {
   const user = getCurrentUser()
-  const tasks = getNodes(user.id, { type: 'Task' })
+  const tasks = await getNodes(user.id, { type: 'Task' })
   const now = Date.now()
 
   const result = tasks

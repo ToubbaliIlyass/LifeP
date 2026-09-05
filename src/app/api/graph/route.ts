@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   // Neighborhood view: return a node and its neighbors up to depth
   if (focusId) {
     const nodeId = parseInt(focusId, 10)
-    const result = getNodeWithNeighbors(user.id, nodeId)
+    const result = await getNodeWithNeighbors(user.id, nodeId)
     if (!result) return Response.json({ nodes: [], edges: [] })
     const nodes = [result.node, ...result.neighbors.map((n) => n.node)]
     const edges = result.neighbors.map((n) => n.edge)
@@ -22,9 +22,9 @@ export async function GET(request: Request) {
     typeFilter = filterParam.slice(5)
   }
 
-  const nodes = getNodes(user.id, typeFilter ? { type: typeFilter } : undefined)
+  const nodes = await getNodes(user.id, typeFilter ? { type: typeFilter } : undefined)
   const nodeIds = new Set(nodes.map((n) => n.id))
-  const allEdges = getEdges(user.id)
+  const allEdges = await getEdges(user.id)
   // Only include edges where both endpoints are in the result set
   const edges = allEdges.filter((e) => nodeIds.has(e.sourceId) && nodeIds.has(e.targetId))
 

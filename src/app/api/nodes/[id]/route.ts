@@ -10,7 +10,7 @@ export async function GET(
   const nodeId = parseInt(idStr, 10)
   if (isNaN(nodeId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const result = getNodeWithNeighbors(user.id, nodeId)
+  const result = await getNodeWithNeighbors(user.id, nodeId)
   if (!result) return Response.json({ error: 'Not found' }, { status: 404 })
 
   // Collect related notes and logs from neighbors
@@ -50,12 +50,12 @@ export async function PATCH(
   const nodeId = parseInt(idStr, 10)
   if (isNaN(nodeId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const existing = getNodeById(user.id, nodeId)
+  const existing = await getNodeById(user.id, nodeId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const body = await request.json() as Record<string, unknown>
 
-  const updated = updateNode(user.id, nodeId, {
+  const updated = await updateNode(user.id, nodeId, {
     ...(existing.properties as Record<string, unknown>),
     ...body,
   })
@@ -72,9 +72,9 @@ export async function DELETE(
   const nodeId = parseInt(idStr, 10)
   if (isNaN(nodeId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const existing = getNodeById(user.id, nodeId)
+  const existing = await getNodeById(user.id, nodeId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  deleteNode(user.id, nodeId)
+  await deleteNode(user.id, nodeId)
   return Response.json({ ok: true })
 }

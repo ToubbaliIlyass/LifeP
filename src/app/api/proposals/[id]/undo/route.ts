@@ -12,7 +12,7 @@ export async function POST(
   const id = parseInt(idStr, 10)
   if (isNaN(id)) return Response.json({ error: 'Invalid proposal ID' }, { status: 400 })
 
-  const proposal = getProposalById(id, user.id)
+  const proposal = await getProposalById(id, user.id)
   if (!proposal) return Response.json({ error: 'Proposal not found' }, { status: 404 })
   if (proposal.status !== 'approved') {
     return Response.json({ error: 'Only approved proposals can be undone' }, { status: 400 })
@@ -39,7 +39,7 @@ export async function POST(
     return Response.json({ error: 'Nothing to undo (deletions and type promotions cannot be reversed)' }, { status: 400 })
   }
 
-  const undoProposal = createProposal(
+  const undoProposal = await createProposal(
     user.id,
     `Undo: ${proposal.summary}`,
     reverseOps,

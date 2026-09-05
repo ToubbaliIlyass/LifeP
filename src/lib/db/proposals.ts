@@ -4,12 +4,12 @@ import { proposals } from '@/lib/db/schema'
 import type { NewProposal, Proposal } from '@/lib/db/schema'
 import type { BatchOperation } from '@/lib/ai/tools'
 
-export function createProposal(
+export async function createProposal(
   userId: number,
   summary: string,
   operations: BatchOperation[],
   schemaVersion = 0,
-): Proposal {
+): Promise<Proposal> {
   return db
     .insert(proposals)
     .values({
@@ -22,7 +22,7 @@ export function createProposal(
     .get()
 }
 
-export function getPendingProposals(userId: number): Proposal[] {
+export async function getPendingProposals(userId: number): Promise<Proposal[]> {
   return db
     .select()
     .from(proposals)
@@ -31,7 +31,7 @@ export function getPendingProposals(userId: number): Proposal[] {
     .all()
 }
 
-export function getRecentRejections(userId: number, limit = 5): Proposal[] {
+export async function getRecentRejections(userId: number, limit = 5): Promise<Proposal[]> {
   return db
     .select()
     .from(proposals)
@@ -41,11 +41,11 @@ export function getRecentRejections(userId: number, limit = 5): Proposal[] {
     .all()
 }
 
-export function approveProposal(
+export async function approveProposal(
   id: number,
   userId: number,
   executionResult?: unknown,
-): Proposal | undefined {
+): Promise<Proposal | undefined> {
   return db
     .update(proposals)
     .set({
@@ -58,7 +58,7 @@ export function approveProposal(
     .get()
 }
 
-export function getProposalById(id: number, userId: number): Proposal | undefined {
+export async function getProposalById(id: number, userId: number): Promise<Proposal | undefined> {
   return db
     .select()
     .from(proposals)
@@ -66,11 +66,11 @@ export function getProposalById(id: number, userId: number): Proposal | undefine
     .get()
 }
 
-export function rejectProposal(
+export async function rejectProposal(
   id: number,
   userId: number,
   reason: string,
-): Proposal | undefined {
+): Promise<Proposal | undefined> {
   return db
     .update(proposals)
     .set({ status: 'rejected', rejectionReason: reason, resolvedAt: new Date().toISOString() })

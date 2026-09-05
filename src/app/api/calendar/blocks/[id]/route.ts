@@ -10,11 +10,11 @@ export async function PATCH(
   const blockId = parseInt(idStr, 10)
   if (isNaN(blockId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const existing = getNodeById(user.id, blockId)
+  const existing = await getNodeById(user.id, blockId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const body = await request.json() as { startTime?: string; endTime?: string; date?: string }
-  const updated = updateNode(user.id, blockId, {
+  const updated = await updateNode(user.id, blockId, {
     ...(existing.properties as Record<string, unknown>),
     ...body,
   })
@@ -31,9 +31,9 @@ export async function DELETE(
   const blockId = parseInt(idStr, 10)
   if (isNaN(blockId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const existing = getNodeById(user.id, blockId)
+  const existing = await getNodeById(user.id, blockId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  deleteNode(user.id, blockId)
+  await deleteNode(user.id, blockId)
   return Response.json({ ok: true })
 }

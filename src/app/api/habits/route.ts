@@ -19,8 +19,8 @@ export async function GET() {
   const user = getCurrentUser()
   const today = todayStr()
 
-  const habits = getNodes(user.id, { type: 'Habit' })
-  const allLogs = getNodes(user.id, { type: 'HabitLog' })
+  const habits = await getNodes(user.id, { type: 'Habit' })
+  const allLogs = await getNodes(user.id, { type: 'HabitLog' })
 
   const result = habits.map((habit) => {
     const props = habit.properties as Record<string, unknown>

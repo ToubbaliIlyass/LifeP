@@ -14,8 +14,8 @@ export async function GET(request: Request) {
   const weekEnd = addDays(weekStart, 6)
 
   // ── Habits: completion rate over days each habit was actually due ──
-  const habits = getNodes(user.id, { type: 'Habit' })
-  const habitLogs = getNodes(user.id, { type: 'HabitLog' })
+  const habits = await getNodes(user.id, { type: 'Habit' })
+  const habitLogs = await getNodes(user.id, { type: 'HabitLog' })
 
   let habitDueCount = 0
   let habitDoneCount = 0
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   }).filter((h) => h.due > 0)
 
   // ── Tasks: completed vs. created vs. still-overdue, within the week ──
-  const tasks = getNodes(user.id, { type: 'Task' })
+  const tasks = await getNodes(user.id, { type: 'Task' })
   let tasksCompleted = 0
   let tasksCreated = 0
   let tasksOverdue = 0
@@ -62,15 +62,15 @@ export async function GET(request: Request) {
   }
 
   // ── Goals: flag any active goal with no linked-node activity recently ──
-  const goals = getNodes(user.id, { type: 'Goal' }).filter((g) => {
+  const goals = (await getNodes(user.id, { type: 'Goal' })).filter((g) => {
     const p = g.properties as Record<string, unknown>
     return (p.status ?? 'active') === 'active'
   })
   const staleCutoff = addDays(todayStr(), -STALE_GOAL_DAYS)
-  const staleGoals = goals
-    .map((g) => {
+  const staleGoals = (await Promise.all(goals
+    .map(async (g) => {
       const p = g.properties as Record<string, unknown>
-      const detail = getNodeWithNeighbors(user.id, g.id)
+      const detail = await getNodeWithNeighbors(user.id, g.id)
       const linked = (detail?.neighbors ?? []).filter((n) => n.node.type === 'Task' || n.node.type === 'Habit')
       const mostRecentActivity = linked.reduce<string | null>((latest, { node }) => {
         const updated = node.updatedAt.slice(0, 10)
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
         name: typeof p.name === 'string' ? p.name : `Goal #${g.id}`,
         lastActivity: mostRecentActivity,
       }
-    })
+    })))
     .filter((g) => !g.lastActivity || g.lastActivity < staleCutoff)
 
   return Response.json({

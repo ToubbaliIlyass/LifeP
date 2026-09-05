@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const cutoff = new Date(today)
   cutoff.setDate(cutoff.getDate() + days)
 
-  const events = getNodes(user.id, { type: 'Event' })
+  const events = (await getNodes(user.id, { type: 'Event' }))
     .map((n) => {
       const p = n.properties as Record<string, unknown>
       return {

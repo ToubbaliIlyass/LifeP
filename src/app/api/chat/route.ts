@@ -35,11 +35,11 @@ export async function POST(request: Request) {
             .join(' ')
         : ''
 
-  const graphContext = buildContextSnapshot(user.id, userText)
+  const graphContext = await buildContextSnapshot(user.id, userText)
 
   // Append recent rejection context so the AI learns from them. Only the
   // headline of each rejected proposal — the reasoning body is not worth resending.
-  const rejections = getRecentRejections(user.id, 3)
+  const rejections = await getRecentRejections(user.id, 3)
   const rejectionContext =
     rejections.length > 0
       ? '\n\n## Recently rejected (do not repeat)\n' +
