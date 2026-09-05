@@ -23,6 +23,7 @@ import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { QuickAddButton } from '@/components/quickadd/QuickAddButton'
 import { SettingsPanel, type Settings } from '@/components/settings/SettingsPanel'
 import { safeGet, safeSet } from '@/lib/storage'
+import { applyTheme, storedTheme } from '@/lib/themes'
 
 // Both pull in heavy libraries (@xyflow/react, the `ai` SDK) that mobile's
 // first paint shouldn't have to pay for — split into their own chunks,
@@ -141,6 +142,12 @@ export default function Home() {
       .then((d: { settings: Settings } | null) => {
         if (!d) return
         setSettings(d.settings)
+        // The palette is already on the page from the pre-paint script; this
+        // only corrects it when the database disagrees, which happens the
+        // first time a device loads a theme chosen somewhere else.
+        if (d.settings.theme && d.settings.theme !== storedTheme()) {
+          applyTheme(d.settings.theme)
+        }
         // Startup preferences apply on first load only — re-applying them on
         // every settings save would yank the user out of the tab they are in.
         if (!settingsAppliedRef.current) {

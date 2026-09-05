@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Download, Upload, LogOut, Eye, EyeOff } from 'lucide-react'
+import { Download, Upload, LogOut, Eye, EyeOff, Check, Sun, Moon } from 'lucide-react'
+import { THEMES, applyTheme, storedTheme } from '@/lib/themes'
 
 export interface Settings {
   hiddenTabs: string[]
   defaultTab: string
   defaultCalendarView: 'day' | 'week'
+  theme: string
 }
 
 interface SettingsPanelProps {
@@ -31,11 +33,34 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
   const [settings, setSettings] = useState<Settings | null>(null)
   const [account, setAccount] = useState<{ email: string | null; name: string } | null>(null)
   const [saving, setSaving] = useState(false)
+  // Mode starts false to match the server-rendered markup, then syncs after
+  // mount — the same hydration-safety reason as ThemeToggle.
+  const [dark, setDark] = useState(false)
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'))
+  }, [])
+
+  function setMode(next: boolean) {
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    try { localStorage.setItem('theme', next ? 'dark' : 'light') } catch {}
+  }
+
+  function setTheme(id: string) {
+    applyTheme(id)          // instant, and remembered locally for the next paint
+    save({ theme: id })     // and to the database, so other devices follow
+  }
 
   const load = useCallback(() => {
     fetch('/api/settings')
       .then((r) => r.json())
-      .then(({ settings: s }: { settings: Settings }) => setSettings(s))
+      .then(({ settings: s }: { settings: Settings }) => {
+        setSettings(s)
+        // The database is the source of truth across devices, so a palette
+        // saved elsewhere wins over whatever this browser last stored.
+        if (s.theme && s.theme !== storedTheme()) applyTheme(s.theme)
+      })
       .catch(() => {})
     fetch('/api/me')
       .then((r) => r.json())
@@ -71,6 +96,68 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
   return (
     <ScrollArea className="h-full">
       <div className="px-8 py-8 max-w-2xl">
+
+        <Section
+          title="Appearance"
+          description="Mode and theme are separate choices. Every theme comes with both a light and a dark version, so switching palette keeps whichever mode you're in."
+        >
+          <div className="space-y-5">
+            <div>
+              <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Mode</label>
+              <div className="flex gap-1">
+                {([['light', false], ['dark', true]] as const).map(([label, value]) => (
+                  <button
+                    key={label}
+                    onClick={() => setMode(value)}
+                    className={`flex items-center gap-1.5 text-[12px] font-mono px-3 py-1.5 rounded-lg border transition-colors ${
+                      dark === value
+                        ? 'bg-primary/15 border-primary/40 text-primary'
+                        : 'border-border/50 text-muted-foreground/70 hover:text-foreground hover:bg-muted/40'
+                    }`}
+                  >
+                    {value ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Theme</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {THEMES.map((t) => {
+                  const active = (settings.theme ?? 'default') === t.id
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      className={`text-left rounded-xl border p-2.5 transition-colors ${
+                        active ? 'border-primary/50 bg-primary/[0.07]' : 'border-border/50 hover:bg-muted/30'
+                      }`}
+                    >
+                      {/* Primary, secondary, then the two grounds the palette
+                          uses for light and dark. */}
+                      <div className="flex gap-1 mb-2">
+                        {t.swatch.map((c, i) => (
+                          <span
+                            key={i}
+                            className="h-6 flex-1 rounded first:rounded-l-md last:rounded-r-md border border-black/10"
+                            style={{ background: c }}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[12px] font-medium text-foreground/85">{t.name}</span>
+                        {active && <Check className="w-3 h-3 text-primary" />}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/55 mt-0.5 leading-snug">{t.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </Section>
 
         <Section
           title="Panels"

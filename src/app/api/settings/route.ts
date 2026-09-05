@@ -17,12 +17,15 @@ export interface Settings {
   defaultTab: string
   /** Day or week when the Calendar opens. */
   defaultCalendarView: 'day' | 'week'
+  /** Colour palette, layered on top of light/dark mode. See src/lib/themes.ts. */
+  theme: string
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   hiddenTabs: [],
   defaultTab: 'today',
   defaultCalendarView: 'day',
+  theme: 'default',
 }
 
 async function settingsNode(userId: number) {

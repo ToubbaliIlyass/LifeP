@@ -35,12 +35,29 @@ export const metadata: Metadata = {
   description: "Your life, tracked.",
 };
 
+/*
+  Runs before first paint so neither the mode nor the palette can flash the
+  wrong colours. Two separate things are restored:
+
+  - `theme` (light/dark mode) → the `.dark` class, as before.
+  - `acture-theme` (palette) → the `data-theme` attribute. The palette is also
+    stored in the database so it follows the user across devices, but a fetch
+    cannot be awaited here; localStorage is the copy that is readable
+    synchronously, and the database is what a new device falls back to.
+
+  Storage access is wrapped because it throws outright on iOS Safari with
+  cookies blocked — see src/lib/storage.ts.
+*/
 const themeScript = `
 (function(){
   try {
     var s = localStorage.getItem('theme');
     var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (!s || s === 'dark' || d) document.documentElement.classList.add('dark');
+  } catch(e){}
+  try {
+    var p = localStorage.getItem('acture-theme');
+    if (p && p !== 'default') document.documentElement.setAttribute('data-theme', p);
   } catch(e){}
 })()
 `;

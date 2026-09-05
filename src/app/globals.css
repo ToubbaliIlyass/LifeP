@@ -234,3 +234,266 @@
 @media (prefers-reduced-motion: reduce) {
   .splash-failsafe { animation-delay: 4s; }
 }
+
+/* ─── Themes ──────────────────────────────────────────── */
+/*
+  Themes sit *on top of* light/dark rather than replacing it. `.dark` still
+  decides the mode; `data-theme` decides the palette. Every palette supplies
+  both grounds, which is why they all share two colours: Frosted Mint
+  (#E4FDE1) is the light ground and Jet Black (#13262F) the dark one, with
+  the two chromatic colours becoming primary and secondary accents.
+
+  Foreground pairings come from the palettes themselves — each swatch was
+  specified with either black or white text, and that is what is used here
+  rather than a contrast guess.
+
+  Deliberately NOT themed:
+  - `--destructive`, which must keep meaning "danger" and cannot become the
+    same hue as a theme's accent (two of these palettes are red).
+  - Node-type colours in the graph and calendar. Those encode *what a thing
+    is* — emerald habits, sky tasks, violet goals — so repainting them per
+    theme would destroy meaning the user reads at a glance. They are Tailwind
+    utility classes rather than tokens, so they are untouched automatically.
+
+  The default theme sets no attribute at all and keeps the original tokens.
+*/
+
+/* ── Toffee: brown + bronze ── */
+[data-theme='toffee'] {
+  --background: #e4fde1;
+  --sidebar: #daf6d7;
+  --card: #edfeeb;
+  --popover: #edfeeb;
+  --foreground: #13262f;
+  --card-foreground: #13262f;
+  --popover-foreground: #13262f;
+  --sidebar-foreground: #13262f;
+  --muted: #d3efd0;
+  --muted-foreground: #37505b;
+  --secondary: #dea47e;
+  --secondary-foreground: #13262f;
+  --accent: #f0d8c8;
+  --accent-foreground: #13262f;
+  --primary: #9e6240;
+  --primary-foreground: #ffffff;
+  --sidebar-primary: #9e6240;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0d8c8;
+  --sidebar-accent-foreground: #13262f;
+  --border: rgb(19 38 47 / 14%);
+  --input: rgb(19 38 47 / 18%);
+  --sidebar-border: rgb(19 38 47 / 14%);
+  --ring: #9e6240;
+  --sidebar-ring: #9e6240;
+  --chart-1: #9e6240;
+  --chart-2: #dea47e;
+}
+.dark[data-theme='toffee'] {
+  --background: #13262f;
+  --sidebar: #0e1d24;
+  --card: #1c333d;
+  --popover: #1c333d;
+  --foreground: #e4fde1;
+  --card-foreground: #e4fde1;
+  --popover-foreground: #e4fde1;
+  --sidebar-foreground: #e4fde1;
+  --muted: #1f3a45;
+  --muted-foreground: rgb(228 253 225 / 66%);
+  --secondary: #1f3a45;
+  --secondary-foreground: #e4fde1;
+  --accent: #23414d;
+  --accent-foreground: #e4fde1;
+  --primary: #dea47e;
+  --primary-foreground: #13262f;
+  --sidebar-primary: #dea47e;
+  --sidebar-primary-foreground: #13262f;
+  --sidebar-accent: #23414d;
+  --sidebar-accent-foreground: #e4fde1;
+  --border: rgb(228 253 225 / 14%);
+  --input: rgb(228 253 225 / 17%);
+  --sidebar-border: rgb(228 253 225 / 14%);
+  --ring: #dea47e;
+  --sidebar-ring: #dea47e;
+  --chart-1: #dea47e;
+  --chart-2: #9e6240;
+}
+
+/* ── Grove: orange + forest green ── */
+[data-theme='grove'] {
+  --background: #e4fde1;
+  --sidebar: #daf6d7;
+  --card: #edfeeb;
+  --popover: #edfeeb;
+  --foreground: #13262f;
+  --card-foreground: #13262f;
+  --popover-foreground: #13262f;
+  --sidebar-foreground: #13262f;
+  --muted: #d3efd0;
+  --muted-foreground: #37505b;
+  --secondary: #548c2f;
+  --secondary-foreground: #ffffff;
+  --accent: #d8ecc9;
+  --accent-foreground: #13262f;
+  --primary: #f9a620;
+  --primary-foreground: #13262f;
+  --sidebar-primary: #f9a620;
+  --sidebar-primary-foreground: #13262f;
+  --sidebar-accent: #d8ecc9;
+  --sidebar-accent-foreground: #13262f;
+  --border: rgb(19 38 47 / 14%);
+  --input: rgb(19 38 47 / 18%);
+  --sidebar-border: rgb(19 38 47 / 14%);
+  --ring: #f9a620;
+  --sidebar-ring: #f9a620;
+  --chart-1: #f9a620;
+  --chart-2: #548c2f;
+}
+.dark[data-theme='grove'] {
+  --background: #13262f;
+  --sidebar: #0e1d24;
+  --card: #1c333d;
+  --popover: #1c333d;
+  --foreground: #e4fde1;
+  --card-foreground: #e4fde1;
+  --popover-foreground: #e4fde1;
+  --sidebar-foreground: #e4fde1;
+  --muted: #1f3a45;
+  --muted-foreground: rgb(228 253 225 / 66%);
+  --secondary: #1f3a45;
+  --secondary-foreground: #e4fde1;
+  --accent: #23414d;
+  --accent-foreground: #e4fde1;
+  --primary: #f9a620;
+  --primary-foreground: #13262f;
+  --sidebar-primary: #f9a620;
+  --sidebar-primary-foreground: #13262f;
+  --sidebar-accent: #23414d;
+  --sidebar-accent-foreground: #e4fde1;
+  --border: rgb(228 253 225 / 14%);
+  --input: rgb(228 253 225 / 17%);
+  --sidebar-border: rgb(228 253 225 / 14%);
+  --ring: #f9a620;
+  --sidebar-ring: #f9a620;
+  --chart-1: #f9a620;
+  --chart-2: #7ab84a;
+}
+
+/* ── Coral: coral + ruby ── */
+[data-theme='coral'] {
+  --background: #e4fde1;
+  --sidebar: #daf6d7;
+  --card: #edfeeb;
+  --popover: #edfeeb;
+  --foreground: #13262f;
+  --card-foreground: #13262f;
+  --popover-foreground: #13262f;
+  --sidebar-foreground: #13262f;
+  --muted: #d3efd0;
+  --muted-foreground: #37505b;
+  --secondary: #a31621;
+  --secondary-foreground: #ffffff;
+  --accent: #f6d8cd;
+  --accent-foreground: #13262f;
+  --primary: #ff8552;
+  --primary-foreground: #ffffff;
+  --sidebar-primary: #ff8552;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f6d8cd;
+  --sidebar-accent-foreground: #13262f;
+  --border: rgb(19 38 47 / 14%);
+  --input: rgb(19 38 47 / 18%);
+  --sidebar-border: rgb(19 38 47 / 14%);
+  --ring: #ff8552;
+  --sidebar-ring: #ff8552;
+  --chart-1: #ff8552;
+  --chart-2: #a31621;
+}
+.dark[data-theme='coral'] {
+  --background: #13262f;
+  --sidebar: #0e1d24;
+  --card: #1c333d;
+  --popover: #1c333d;
+  --foreground: #e4fde1;
+  --card-foreground: #e4fde1;
+  --popover-foreground: #e4fde1;
+  --sidebar-foreground: #e4fde1;
+  --muted: #1f3a45;
+  --muted-foreground: rgb(228 253 225 / 66%);
+  --secondary: #1f3a45;
+  --secondary-foreground: #e4fde1;
+  --accent: #23414d;
+  --accent-foreground: #e4fde1;
+  --primary: #ff8552;
+  --primary-foreground: #13262f;
+  --sidebar-primary: #ff8552;
+  --sidebar-primary-foreground: #13262f;
+  --sidebar-accent: #23414d;
+  --sidebar-accent-foreground: #e4fde1;
+  --border: rgb(228 253 225 / 14%);
+  --input: rgb(228 253 225 / 17%);
+  --sidebar-border: rgb(228 253 225 / 14%);
+  --ring: #ff8552;
+  --sidebar-ring: #ff8552;
+  --chart-1: #ff8552;
+  --chart-2: #d94452;
+}
+
+/* ── Ember: amber + deep crimson ── */
+[data-theme='ember'] {
+  --background: #e4fde1;
+  --sidebar: #daf6d7;
+  --card: #edfeeb;
+  --popover: #edfeeb;
+  --foreground: #13262f;
+  --card-foreground: #13262f;
+  --popover-foreground: #13262f;
+  --sidebar-foreground: #13262f;
+  --muted: #d3efd0;
+  --muted-foreground: #37505b;
+  --secondary: #96031a;
+  --secondary-foreground: #ffffff;
+  --accent: #f7e2c4;
+  --accent-foreground: #13262f;
+  --primary: #faa916;
+  --primary-foreground: #13262f;
+  --sidebar-primary: #faa916;
+  --sidebar-primary-foreground: #13262f;
+  --sidebar-accent: #f7e2c4;
+  --sidebar-accent-foreground: #13262f;
+  --border: rgb(19 38 47 / 14%);
+  --input: rgb(19 38 47 / 18%);
+  --sidebar-border: rgb(19 38 47 / 14%);
+  --ring: #faa916;
+  --sidebar-ring: #faa916;
+  --chart-1: #faa916;
+  --chart-2: #96031a;
+}
+.dark[data-theme='ember'] {
+  --background: #13262f;
+  --sidebar: #0e1d24;
+  --card: #1c333d;
+  --popover: #1c333d;
+  --foreground: #e4fde1;
+  --card-foreground: #e4fde1;
+  --popover-foreground: #e4fde1;
+  --sidebar-foreground: #e4fde1;
+  --muted: #1f3a45;
+  --muted-foreground: rgb(228 253 225 / 66%);
+  --secondary: #1f3a45;
+  --secondary-foreground: #e4fde1;
+  --accent: #23414d;
+  --accent-foreground: #e4fde1;
+  --primary: #faa916;
+  --primary-foreground: #13262f;
+  --sidebar-primary: #faa916;
+  --sidebar-primary-foreground: #13262f;
+  --sidebar-accent: #23414d;
+  --sidebar-accent-foreground: #e4fde1;
+  --border: rgb(228 253 225 / 14%);
+  --input: rgb(228 253 225 / 17%);
+  --sidebar-border: rgb(228 253 225 / 14%);
+  --ring: #faa916;
+  --sidebar-ring: #faa916;
+  --chart-1: #faa916;
+  --chart-2: #c9424f;
+}
