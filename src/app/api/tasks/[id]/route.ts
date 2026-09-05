@@ -1,5 +1,8 @@
 import { getCurrentUser } from '@/lib/auth/getCurrentUser'
-import { getNodes, updateNode } from '@/lib/graph/queries'
+import { getNodes, updateNode, createNode } from '@/lib/graph/queries'
+import { todayStr, nextDueDate } from '@/lib/date'
+
+interface Recurrence { frequency: 'daily' | 'weekly' | 'weekdays'; daysOfWeek?: number[] }
 
 export async function PATCH(
   request: Request,
@@ -29,5 +32,23 @@ export async function PATCH(
   props.status = newStatus
 
   const updated = updateNode(user.id, taskId, props)
+
+  // A recurring Task completing shouldn't just vanish — it should hand off
+  // to its next occurrence, the same way a recurring Habit is never a
+  // one-shot. Only fires on the todo/in-progress -> done transition, never
+  // on undo (status !== 'done'), so toggling done/undone repeatedly can't
+  // spawn duplicates.
+  const recurrence = props.recurrence as Recurrence | undefined
+  if (newStatus === 'done' && prevStatus !== 'done' && recurrence?.frequency) {
+    const baseDate = typeof props.dueDate === 'string' ? props.dueDate : todayStr()
+    const next = nextDueDate(baseDate, recurrence.frequency, recurrence.daysOfWeek ?? null)
+    createNode(user.id, 'Task', {
+      ...props,
+      status: 'todo',
+      dueDate: next,
+      completedAt: undefined,
+    })
+  }
+
   return Response.json({ ok: true, task: updated })
 }

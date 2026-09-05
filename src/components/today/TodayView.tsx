@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { CheckCircle2, Circle, Clock, MapPin } from 'lucide-react'
+import { Clock, MapPin } from 'lucide-react'
+import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
+import { GoalMilestones } from './GoalMilestones'
+import { todayStr } from '@/lib/date'
 
 interface HabitRow {
   id: number
@@ -29,8 +32,25 @@ interface EventRow {
   location: string | null
 }
 
+interface Milestone {
+  id: number
+  name: string
+  status: 'todo' | 'in-progress' | 'done'
+  dueDate: string | null
+}
+
+interface GoalRow {
+  id: number
+  name: string
+  targetDate: string | null
+  linkedCount: number
+  progress: number | null
+  milestones: Milestone[]
+}
+
 interface TodayViewProps {
   onNavigate?: (tab: string) => void
+  refreshKey?: number
 }
 
 function formatDay(date: Date) {
@@ -41,12 +61,12 @@ function formatDay(date: Date) {
 
 function isOverdue(dueDate: string | null, status: string) {
   if (!dueDate || status === 'done') return false
-  return dueDate < new Date().toISOString().split('T')[0]
+  return dueDate < todayStr()
 }
 
 function isDueToday(dueDate: string | null) {
   if (!dueDate) return false
-  return dueDate === new Date().toISOString().split('T')[0]
+  return dueDate === todayStr()
 }
 
 function isHabitForToday(habit: HabitRow): boolean {
@@ -64,32 +84,36 @@ function isHabitForToday(habit: HabitRow): boolean {
   return true
 }
 
-export function TodayView({ onNavigate }: TodayViewProps) {
+export function TodayView({ onNavigate, refreshKey }: TodayViewProps) {
   const [habits, setHabits] = useState<HabitRow[]>([])
   const [tasks, setTasks] = useState<TaskRow[]>([])
   const [events, setEvents] = useState<EventRow[]>([])
+  const [goals, setGoals] = useState<GoalRow[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<number | null>(null)
+  const [viewingGoalId, setViewingGoalId] = useState<number | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayStr()
 
   const load = useCallback(() => {
     Promise.all([
       fetch('/api/habits').then((r) => r.json()),
       fetch('/api/tasks').then((r) => r.json()),
       fetch('/api/events').then((r) => r.json()),
+      fetch('/api/goals').then((r) => r.json()),
     ])
-      .then(([habitsData, tasksData, eventsData]) => {
+      .then(([habitsData, tasksData, eventsData, goalsData]) => {
         const allHabits = (habitsData as { habits: HabitRow[] }).habits ?? []
         setHabits(allHabits.filter(isHabitForToday))
         setTasks((tasksData as { tasks: TaskRow[] }).tasks ?? [])
         setEvents((eventsData as { events: EventRow[] }).events?.filter((e: EventRow) => e.date === today) ?? [])
+        setGoals((goalsData as { goals: GoalRow[] }).goals ?? [])
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [today])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, refreshKey])
 
   async function toggleHabit(habit: HabitRow) {
     setToggling(habit.id)
@@ -116,12 +140,12 @@ export function TodayView({ onNavigate }: TodayViewProps) {
     (t) => !t.archived && t.status !== 'done' && (isOverdue(t.dueDate, t.status) || isDueToday(t.dueDate))
   )
   const completedHabits = habits.filter((h) => h.todayCompleted).length
-  const isEmpty = !loading && habits.length === 0 && urgentTasks.length === 0 && events.length === 0
+  const isEmpty = !loading && habits.length === 0 && urgentTasks.length === 0 && events.length === 0 && goals.length === 0
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-[12px] font-mono text-muted-foreground/40">loading…</p>
+        <p className="text-[12px] font-mono text-muted-foreground/65">loading…</p>
       </div>
     )
   }
@@ -142,12 +166,12 @@ export function TodayView({ onNavigate }: TodayViewProps) {
         {habits.length > 0 && (
           <section className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
                 Habits · {completedHabits}/{habits.length}
               </h2>
               <button
                 onClick={() => onNavigate?.('habits')}
-                className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors font-mono"
+                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
               >
                 view all →
               </button>
@@ -170,15 +194,12 @@ export function TodayView({ onNavigate }: TodayViewProps) {
                     h.todayCompleted ? 'bg-muted/20' : 'bg-muted/20 hover:bg-muted/40'
                   }`}
                 >
-                  {h.todayCompleted
-                    ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    : <Circle className="w-4 h-4 text-muted-foreground/30 shrink-0 group-hover:text-muted-foreground/60 transition-colors" />
-                  }
-                  <span className={`text-[13px] font-serif flex-1 ${h.todayCompleted ? 'line-through text-muted-foreground/40' : 'text-foreground/85'}`}>
+                  <CompletionCheckbox checked={h.todayCompleted} />
+                  <span className={`text-[13px] font-serif flex-1 ${h.todayCompleted ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
                     {h.name}
                   </span>
                   {h.streak > 1 && (
-                    <span className="text-[10px] font-mono text-muted-foreground/30 shrink-0">
+                    <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">
                       {h.streak}d
                     </span>
                   )}
@@ -192,12 +213,12 @@ export function TodayView({ onNavigate }: TodayViewProps) {
         {urgentTasks.length > 0 && (
           <section className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
                 Tasks · {urgentTasks.length}
               </h2>
               <button
                 onClick={() => onNavigate?.('tasks')}
-                className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors font-mono"
+                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
               >
                 view all →
               </button>
@@ -217,7 +238,7 @@ export function TodayView({ onNavigate }: TodayViewProps) {
                     <span className="text-[10px] font-mono text-red-400/60 shrink-0">overdue</span>
                   )}
                   {isDueToday(t.dueDate) && !isOverdue(t.dueDate, t.status) && (
-                    <span className="text-[10px] font-mono text-muted-foreground/40 shrink-0 flex items-center gap-0.5">
+                    <span className="text-[10px] font-mono text-muted-foreground/65 shrink-0 flex items-center gap-0.5">
                       <Clock className="w-2.5 h-2.5" /> today
                     </span>
                   )}
@@ -231,12 +252,12 @@ export function TodayView({ onNavigate }: TodayViewProps) {
         {events.length > 0 && (
           <section className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
                 Events today · {events.length}
               </h2>
               <button
                 onClick={() => onNavigate?.('events')}
-                className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors font-mono"
+                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
               >
                 view all →
               </button>
@@ -252,7 +273,7 @@ export function TodayView({ onNavigate }: TodayViewProps) {
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-serif text-foreground/85">{e.name}</p>
                     {e.location && (
-                      <p className="text-[10px] text-muted-foreground/40 mt-0.5 flex items-center gap-1">
+                      <p className="text-[10px] text-muted-foreground/65 mt-0.5 flex items-center gap-1">
                         <MapPin className="w-2.5 h-2.5" />{e.location}
                       </p>
                     )}
@@ -262,6 +283,61 @@ export function TodayView({ onNavigate }: TodayViewProps) {
             </div>
           </section>
         )}
+
+        {/* Goals — progress derived from linked Habits/Tasks, never stored */}
+        {goals.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
+                Goals · {goals.length}
+              </h2>
+              <button
+                onClick={() => onNavigate?.('graph')}
+                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
+              >
+                view all →
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              {goals.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setViewingGoalId(g.id)}
+                  className="block w-full text-left px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-[13px] font-serif text-foreground/85 truncate">{g.name}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">
+                      {g.progress === null ? 'no linked activity' : `${g.progress}%`}
+                    </span>
+                  </div>
+                  <div className="h-0.5 bg-border/40 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${g.progress ?? 0}%` }}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {viewingGoalId !== null && (() => {
+          const g = goals.find((x) => x.id === viewingGoalId)
+          if (!g) return null
+          return (
+            <GoalMilestones
+              goalId={g.id}
+              goalName={g.name}
+              targetDate={g.targetDate}
+              progress={g.progress}
+              milestones={g.milestones}
+              onClose={() => setViewingGoalId(null)}
+              onChanged={load}
+            />
+          )
+        })()}
 
       </div>
     </ScrollArea>

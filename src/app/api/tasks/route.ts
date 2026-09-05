@@ -19,6 +19,8 @@ export async function GET() {
         completedAt !== null &&
         now - new Date(completedAt).getTime() > ARCHIVE_MS
 
+      const priority = typeof p.priority === 'string' ? p.priority : 'medium'
+
       return {
         id: t.id,
         name: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `Task #${t.id}`,
@@ -26,6 +28,7 @@ export async function GET() {
         dueDate: typeof p.dueDate === 'string' ? p.dueDate : null,
         completedAt,
         archived,
+        priority,
       }
     })
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))

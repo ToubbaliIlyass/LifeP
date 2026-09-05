@@ -1,0 +1,63 @@
+import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getNodes, getNodeWithNeighbors } from '@/lib/graph/queries'
+import { todayStr, addDays } from '@/lib/date'
+
+// Progress is always derived from linked Habits/Tasks, never stored — so it
+// can never drift out of sync with what's actually been done.
+export async function GET() {
+  const user = getCurrentUser()
+  const goals = getNodes(user.id, { type: 'Goal' }).filter((g) => {
+    const p = g.properties as Record<string, unknown>
+    return (p.status ?? 'active') === 'active'
+  })
+  const habitLogs = getNodes(user.id, { type: 'HabitLog' })
+  const since = addDays(todayStr(), -7)
+
+  const result = goals.map((g) => {
+    const p = g.properties as Record<string, unknown>
+    const detail = getNodeWithNeighbors(user.id, g.id)
+    const linked = (detail?.neighbors ?? []).filter((n) => n.node.type === 'Task' || n.node.type === 'Habit')
+    // Milestones are just this goal's linked Tasks, presented as an
+    // orderable checklist rather than only folded into the % below —
+    // there's no separate "Milestone" node type.
+    const milestones = linked
+      .filter((n) => n.node.type === 'Task')
+      .map(({ node }) => {
+        const tp = node.properties as Record<string, unknown>
+        return {
+          id: node.id,
+          name: typeof tp.name === 'string' ? tp.name : typeof tp.title === 'string' ? tp.title : `Task #${node.id}`,
+          status: typeof tp.status === 'string' ? tp.status : 'todo',
+          dueDate: typeof tp.dueDate === 'string' ? tp.dueDate : null,
+        }
+      })
+
+    let done = 0
+    for (const { node } of linked) {
+      if (node.type === 'Task') {
+        const tp = node.properties as Record<string, unknown>
+        if (tp.status === 'done') done++
+      } else {
+        // A Habit counts as "on track" if it's been logged completed at
+        // least once in the last week — a single stored `progress` number
+        // would go stale the moment a habit was logged; this can't.
+        const recentlyDone = habitLogs.some((l) => {
+          const lp = l.properties as Record<string, unknown>
+          return lp.habitNodeId === node.id && typeof lp.date === 'string' && lp.date >= since && lp.completed === true
+        })
+        if (recentlyDone) done++
+      }
+    }
+
+    return {
+      id: g.id,
+      name: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `Goal #${g.id}`,
+      targetDate: typeof p.targetDate === 'string' ? p.targetDate : null,
+      linkedCount: linked.length,
+      progress: linked.length > 0 ? Math.round((done / linked.length) * 100) : null,
+      milestones,
+    }
+  })
+
+  return Response.json({ goals: result })
+}

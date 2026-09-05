@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ChevronDown, Pencil } from 'lucide-react'
+import { CalendarClock, ChevronDown, Pencil } from 'lucide-react'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
+import { StatusCheckbox } from '@/components/ui/completion-checkbox'
+import { ScheduleDialog } from './ScheduleDialog'
+import { todayStr, addDays } from '@/lib/date'
 
 interface Task {
   id: number
@@ -12,6 +15,14 @@ interface Task {
   dueDate: string | null
   completedAt: string | null
   archived: boolean
+  priority: 'low' | 'medium' | 'high'
+}
+
+const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 }
+const PRIORITY_DOT: Record<string, string> = {
+  high: 'bg-red-400/80',
+  medium: 'bg-amber-400/60',
+  low: 'bg-muted-foreground/30',
 }
 
 const STATUS_CYCLE: Record<string, string> = {
@@ -20,30 +31,14 @@ const STATUS_CYCLE: Record<string, string> = {
   'done': 'todo',
 }
 
-const STATUS_DOT: Record<string, string> = {
-  'todo': 'bg-muted-foreground/30',
-  'in-progress': 'bg-sky-400',
-  'done': 'bg-emerald-400',
-}
-
-function getTodayStr() {
-  return new Date().toISOString().split('T')[0]
-}
-
-function offsetDate(base: string, days: number): string {
-  const d = new Date(base + 'T00:00:00')
-  d.setDate(d.getDate() + days)
-  return d.toISOString().split('T')[0]
-}
-
 function getBucket(dueDate: string | null, status: Task['status']): string {
   if (status === 'done') return 'done'
   if (!dueDate) return 'undated'
-  const today = getTodayStr()
+  const today = todayStr()
   if (dueDate < today) return 'overdue'
-  if (dueDate < offsetDate(today, 3)) return 'next3'
-  if (dueDate < offsetDate(today, 7)) return 'nextWeek'
-  if (dueDate <= offsetDate(today, 14)) return 'twoWeeks'
+  if (dueDate < addDays(today, 3)) return 'next3'
+  if (dueDate < addDays(today, 7)) return 'nextWeek'
+  if (dueDate <= addDays(today, 14)) return 'twoWeeks'
   return 'beyond'
 }
 
@@ -52,23 +47,27 @@ const BUCKETS = [
   { key: 'next3',     label: 'Next 3 days', labelClass: 'text-amber-400/80',          borderClass: 'border-amber-400/40' },
   { key: 'nextWeek',  label: 'Next week',   labelClass: 'text-muted-foreground/60',   borderClass: 'border-yellow-400/25' },
   { key: 'twoWeeks',  label: 'Two weeks',   labelClass: 'text-muted-foreground/50',   borderClass: 'border-border/30' },
-  { key: 'undated',   label: 'No date',     labelClass: 'text-muted-foreground/40',   borderClass: 'border-border/20' },
+  { key: 'undated',   label: 'No date',     labelClass: 'text-muted-foreground/65',   borderClass: 'border-border/20' },
 ]
 
-function sortByDate(a: Task, b: Task): number {
+// Higher priority first; within the same priority, earlier due date first.
+function sortByPriorityThenDate(a: Task, b: Task): number {
+  const pDiff = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1)
+  if (pDiff !== 0) return pDiff
   if (!a.dueDate && !b.dueDate) return 0
   if (!a.dueDate) return 1
   if (!b.dueDate) return -1
   return a.dueDate.localeCompare(b.dueDate)
 }
 
-export function TasksPanel() {
+export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [cycling, setCycling] = useState<number | null>(null)
   const [doneOpen, setDoneOpen] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [schedulingTask, setSchedulingTask] = useState<Task | null>(null)
 
   const load = useCallback(() => {
     fetch('/api/tasks')
@@ -77,7 +76,9 @@ export function TasksPanel() {
       .catch(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Quick-add (outside this panel) bumps refreshKey so an already-open Tasks
+  // tab picks up the new task without waiting for the next tab switch.
+  useEffect(() => { load() }, [load, refreshKey])
 
   async function cycleStatus(task: Task) {
     const next = STATUS_CYCLE[task.status] ?? 'todo'
@@ -107,7 +108,7 @@ export function TasksPanel() {
   }
 
   for (const key of Object.keys(bucketed)) {
-    bucketed[key].sort(sortByDate)
+    bucketed[key].sort(sortByPriorityThenDate)
   }
 
   const activeBuckets = BUCKETS.filter(({ key }) => bucketed[key]?.length > 0)
@@ -119,6 +120,15 @@ export function TasksPanel() {
           nodeId={selectedId}
           onClose={() => setSelectedId(null)}
           onMutated={() => { load(); setSelectedId(null) }}
+        />
+      )}
+      {schedulingTask && (
+        <ScheduleDialog
+          nodeId={schedulingTask.id}
+          nodeName={schedulingTask.name}
+          defaultDate={schedulingTask.dueDate}
+          onClose={() => setSchedulingTask(null)}
+          onScheduled={() => setSchedulingTask(null)}
         />
       )}
       <ScrollArea className="flex-1">
@@ -151,6 +161,7 @@ export function TasksPanel() {
                           overdue={key === 'overdue'}
                           onCycle={cycleStatus}
                           onEdit={() => setSelectedId(task.id)}
+                          onSchedule={() => setSchedulingTask(task)}
                         />
                       ))}
                     </div>
@@ -172,7 +183,7 @@ export function TasksPanel() {
                       <span className="font-mono font-normal ml-1.5 opacity-60 text-[10px]">· {doneTasks.length}</span>
                     </p>
                     <ChevronDown
-                      className={`w-3 h-3 text-muted-foreground/30 transition-transform ml-auto ${doneOpen ? 'rotate-180' : ''}`}
+                      className={`w-3 h-3 text-muted-foreground/55 transition-transform ml-auto ${doneOpen ? 'rotate-180' : ''}`}
                     />
                   </button>
                   {doneOpen && (
@@ -185,6 +196,7 @@ export function TasksPanel() {
                           overdue={false}
                           onCycle={cycleStatus}
                           onEdit={() => setSelectedId(task.id)}
+                          onSchedule={() => setSchedulingTask(task)}
                         />
                       ))}
                     </div>
@@ -197,7 +209,7 @@ export function TasksPanel() {
               <div className="pt-2">
                 <button
                   onClick={() => setArchivedOpen((o) => !o)}
-                  className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors px-3"
+                  className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/55 hover:text-muted-foreground/60 transition-colors px-3"
                 >
                   <ChevronDown className={`w-3 h-3 transition-transform ${archivedOpen ? 'rotate-180' : ''}`} />
                   Archived · {archivedTasks.length}
@@ -212,6 +224,7 @@ export function TasksPanel() {
                         overdue={false}
                         onCycle={cycleStatus}
                         onEdit={() => setSelectedId(task.id)}
+                        onSchedule={() => setSchedulingTask(task)}
                       />
                     ))}
                   </div>
@@ -231,12 +244,14 @@ function TaskItem({
   overdue,
   onCycle,
   onEdit,
+  onSchedule,
 }: {
   task: Task
   cycling: number | null
   overdue: boolean
   onCycle: (task: Task) => void
   onEdit: () => void
+  onSchedule: () => void
 }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors group">
@@ -246,20 +261,33 @@ function TaskItem({
         className="shrink-0"
         title={`Advance to: ${STATUS_CYCLE[task.status]}`}
       >
-        <div className={`w-2 h-2 rounded-full transition-all group-hover:scale-125 ${STATUS_DOT[task.status]}`} />
+        <StatusCheckbox status={task.status} />
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-[13px] font-serif truncate ${task.status === 'done' ? 'line-through text-muted-foreground/40' : 'text-foreground/85'}`}>
-          {task.name}
+        <p className={`flex items-center gap-1.5 text-[13px] font-serif truncate ${task.status === 'done' ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
+          {task.priority !== 'medium' && task.status !== 'done' && (
+            <span
+              className={`shrink-0 w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[task.priority]}`}
+              title={`${task.priority} priority`}
+            />
+          )}
+          <span className="truncate">{task.name}</span>
         </p>
         {task.dueDate && (
-          <p className={`text-[10px] font-mono mt-0.5 ${overdue ? 'text-red-400/70' : 'text-muted-foreground/40'}`}>
+          <p className={`text-[10px] font-mono mt-0.5 ${overdue ? 'text-red-400/70' : 'text-muted-foreground/65'}`}>
             {overdue ? 'overdue · ' : ''}{task.dueDate}
           </p>
         )}
       </div>
 
+      <button
+        onClick={onSchedule}
+        className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground hover:text-foreground transition-all"
+        title="Add to calendar"
+      >
+        <CalendarClock className="w-3 h-3" />
+      </button>
       <button
         onClick={onEdit}
         className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground hover:text-foreground transition-all"
