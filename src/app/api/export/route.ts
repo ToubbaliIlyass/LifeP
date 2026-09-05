@@ -1,10 +1,11 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges } from '@/lib/graph/queries'
 import { getNodeTypes } from '@/lib/db/node-types'
 import { todayStr } from '@/lib/date'
 
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
 
   const nodes = await getNodes(user.id)
   const edges = await getEdges(user.id)

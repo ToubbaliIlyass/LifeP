@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode } from '@/lib/graph/queries'
 
 // The user's own direct capture — never gated by the AI proposal queue,
@@ -15,7 +15,8 @@ const ALLOWED_TYPES = new Set([
 ])
 
 export async function POST(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const body = await request.json() as { type?: string; properties?: Record<string, unknown> }
 
   const type = body.type

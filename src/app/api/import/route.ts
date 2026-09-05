@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, createEdge } from '@/lib/graph/queries'
 import { createNodeType, nodeTypeExists } from '@/lib/db/node-types'
 import type { Node, Edge, NodeType } from '@/lib/db/schema'
@@ -11,7 +11,8 @@ interface ImportPayload {
 }
 
 export async function POST(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
 
   let payload: ImportPayload
   try {

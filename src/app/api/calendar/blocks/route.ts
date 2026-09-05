@@ -1,8 +1,9 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, createEdge, getEdges, deleteNode } from '@/lib/graph/queries'
 
 export async function POST(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const body = await request.json() as {
     date: string
     startTime: string

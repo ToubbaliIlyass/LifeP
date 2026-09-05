@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, searchNodes } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
 import type { Node } from '@/lib/db/schema'
@@ -24,7 +24,9 @@ export async function GET(request: Request) {
   const types = typeParam ? typeParam.split(',').filter(Boolean) : undefined
   const overdue = searchParams.get('overdue') === 'true'
 
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+
+  if (!user) return unauthorized()
 
   // "Overdue" is a computed boolean (dueDate < today && not done), not text
   // — full-text search can't express it, so it's a separate mode. It can

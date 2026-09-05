@@ -1,11 +1,12 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 
 const STATUS_ORDER = ['todo', 'in-progress', 'done']
 const ARCHIVE_MS = 7 * 24 * 60 * 60 * 1000
 
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const tasks = await getNodes(user.id, { type: 'Task' })
   const now = Date.now()
 

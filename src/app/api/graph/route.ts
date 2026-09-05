@@ -1,8 +1,9 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getEdges, getNodeWithNeighbors, getNodes } from '@/lib/graph/queries'
 
 export async function GET(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { searchParams } = new URL(request.url)
   const filterParam = searchParams.get('filter') // e.g. "type:Habit"
   const focusId = searchParams.get('focus')

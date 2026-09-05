@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, createNode, deleteNode } from '@/lib/graph/queries'
 
 interface SavedQuery {
@@ -11,7 +11,8 @@ interface SavedQuery {
 // Graph (see HIDDEN_TYPES in src/lib/graph/layout.ts), just a place to
 // park a named filter for one-tap reuse from the search bar.
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const nodes = await getNodes(user.id, { type: 'SavedView' })
   const views = nodes.map((n) => {
     const p = n.properties as { name?: string; query?: SavedQuery }
@@ -21,7 +22,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const body = await request.json() as { name?: string; query?: SavedQuery }
   const name = body.name?.trim()
   if (!name) return Response.json({ error: 'name is required' }, { status: 400 })
@@ -31,7 +33,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { searchParams } = new URL(request.url)
   const id = parseInt(searchParams.get('id') ?? '', 10)
   if (isNaN(id)) return Response.json({ error: 'Invalid id' }, { status: 400 })

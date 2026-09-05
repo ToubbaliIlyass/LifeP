@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges, getNodeById, createNode, createEdge } from '@/lib/graph/queries'
 import type { Node } from '@/lib/db/schema'
 import { todayStr, isDueOn } from '@/lib/date'
@@ -72,7 +72,8 @@ async function autoFillHabitsForDate(userId: number, date: string) {
 }
 
 export async function GET(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { searchParams } = new URL(request.url)
   const date = searchParams.get('date') ?? todayStr()
 

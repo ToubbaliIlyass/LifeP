@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, updateNode, createNode } from '@/lib/graph/queries'
 import { todayStr, nextDueDate } from '@/lib/date'
 
@@ -8,7 +8,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { id: idStr } = await params
   const taskId = parseInt(idStr, 10)
   if (isNaN(taskId)) return Response.json({ error: 'Invalid id' }, { status: 400 })

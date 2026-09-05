@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 import { todayStr, addDays } from '@/lib/date'
 
@@ -16,7 +16,8 @@ function calculateStreak(logs: Array<{ date: string; completed: boolean }>): num
 }
 
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const today = todayStr()
 
   const habits = await getNodes(user.id, { type: 'Habit' })

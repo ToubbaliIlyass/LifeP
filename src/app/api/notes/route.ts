@@ -1,8 +1,9 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
 
   const notes = (await getNodes(user.id, { type: 'Note' })).map((n) => {
     const p = n.properties as Record<string, unknown>

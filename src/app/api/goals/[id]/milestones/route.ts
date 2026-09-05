@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, createEdge, getNodeById } from '@/lib/graph/queries'
 
 // A "milestone" is just a Task linked to a Goal via a part-of edge — the
@@ -8,7 +8,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { id: idStr } = await params
   const goalId = parseInt(idStr, 10)
   if (isNaN(goalId)) return Response.json({ error: 'Invalid id' }, { status: 400 })

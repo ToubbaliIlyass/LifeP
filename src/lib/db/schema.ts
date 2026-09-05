@@ -9,6 +9,12 @@ import {
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
+  // Supabase issues UUIDs, but every table here keys off an integer userId
+  // and node properties carry integer references of their own. Rather than
+  // re-key the whole graph, a Supabase identity is *linked* to a local user
+  // row: authId is the join, and existing data keeps the id it already has.
+  authId: text('auth_id').unique(),
+  email: text('email'),
   createdAt: text('created_at')
     .notNull()
     .default(sql`(datetime('now'))`),

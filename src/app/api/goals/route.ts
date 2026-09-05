@@ -1,11 +1,12 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getNodeWithNeighbors } from '@/lib/graph/queries'
 import { todayStr, addDays } from '@/lib/date'
 
 // Progress is always derived from linked Habits/Tasks, never stored — so it
 // can never drift out of sync with what's actually been done.
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const goals = (await getNodes(user.id, { type: 'Goal' })).filter((g) => {
     const p = g.properties as Record<string, unknown>
     return (p.status ?? 'active') === 'active'

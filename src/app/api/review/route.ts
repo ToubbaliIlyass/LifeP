@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getNodeWithNeighbors } from '@/lib/graph/queries'
 import { todayStr, addDays, isDueOn } from '@/lib/date'
 
@@ -8,7 +8,8 @@ const STALE_GOAL_DAYS = 14
 // nothing new is stored, so a review for any past week is always computable
 // after the fact, and can't drift from what actually happened.
 export async function GET(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { searchParams } = new URL(request.url)
   const weekStart = searchParams.get('weekStart') || todayStr()
   const weekEnd = addDays(weekStart, 6)

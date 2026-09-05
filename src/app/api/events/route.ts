@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 import { localDateStr } from '@/lib/date'
 
@@ -7,7 +7,8 @@ function labelOf(p: Record<string, unknown>, id: number, type: string) {
 }
 
 export async function GET(request: Request) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { searchParams } = new URL(request.url)
   const days = parseInt(searchParams.get('days') ?? '30', 10)
 

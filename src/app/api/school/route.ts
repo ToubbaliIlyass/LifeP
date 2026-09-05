@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges } from '@/lib/graph/queries'
 
 function nameOf(p: Record<string, unknown>, id: number, type: string) {
@@ -6,7 +6,8 @@ function nameOf(p: Record<string, unknown>, id: number, type: string) {
 }
 
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
 
   const courses     = await getNodes(user.id, { type: 'Course' })
   const assignments = await getNodes(user.id, { type: 'Assignment' })

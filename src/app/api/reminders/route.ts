@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 import { todayStr, isDueOn } from '@/lib/date'
 
@@ -6,7 +6,8 @@ import { todayStr, isDueOn } from '@/lib/date'
 // storage — just "what needs attention right now", computed fresh from
 // existing Task/Habit/HabitLog nodes each time this is polled.
 export async function GET() {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const today = todayStr()
   const dow = new Date(today + 'T00:00:00').getDay()
 

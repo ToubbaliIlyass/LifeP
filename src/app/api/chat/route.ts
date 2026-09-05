@@ -4,7 +4,7 @@ import { SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 import { buildTools } from '@/lib/ai/tools'
 import { buildContextSnapshot } from '@/lib/ai/context'
 import { getRecentRejections } from '@/lib/db/proposals'
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { logger } from '@/lib/log'
 import { todayStr } from '@/lib/date'
 
@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     )
   }
 
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+
+  if (!user) return unauthorized()
   const { messages } = await request.json()
 
   // Extract the last user message for keyword-based snapshot filtering
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
     // SYSTEM_PROMPT stays first so the static prefix stays cacheable across turns.
     system: SYSTEM_PROMPT + dateContext + graphContext + rejectionContext,
     messages: await convertToModelMessages(history),
-    tools: buildTools(),
+    tools: buildTools(user),
     stopWhen: stepCountIs(5),
     onFinish({ usage }) {
       logger.info('chat_completion', {

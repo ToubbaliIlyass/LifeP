@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import type { CurrentUser } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges, createNode, createEdge, updateNode, findExistingEdge } from '@/lib/graph/queries'
 import { createProposal } from '@/lib/db/proposals'
 import { getSchemaVersion } from '@/lib/db/node-types'
@@ -68,8 +68,10 @@ function compactEdge(edge: { id: number; sourceId: number; targetId: number; typ
   return { id: edge.id, from: edge.sourceId, to: edge.targetId, type: edge.type }
 }
 
-export function buildTools() {
-  const user = getCurrentUser()
+// The authenticated user is passed in rather than resolved here: the caller
+// has already established who this is, and every tool below scopes its
+// writes to that id.
+export function buildTools(user: CurrentUser) {
 
   return {
     readGraph: tool({

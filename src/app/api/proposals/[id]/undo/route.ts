@@ -1,4 +1,4 @@
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getProposalById, createProposal } from '@/lib/db/proposals'
 import type { ExecutionResult } from '@/lib/ai/router'
 import type { BatchOperation } from '@/lib/ai/tools'
@@ -7,7 +7,8 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = getCurrentUser()
+  const user = await getCurrentUser()
+  if (!user) return unauthorized()
   const { id: idStr } = await params
   const id = parseInt(idStr, 10)
   if (isNaN(id)) return Response.json({ error: 'Invalid proposal ID' }, { status: 400 })
