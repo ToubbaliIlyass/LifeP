@@ -55,12 +55,21 @@ export async function PATCH(
   const existing = await getNodeById(user.id, nodeId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  const body = await request.json() as Record<string, unknown>
+  const body = await request.json() as Record<string, unknown> & { __remove?: string[] }
 
-  const updated = await updateNode(user.id, nodeId, {
+  // Properties are merged, so a partial update never has to resend the whole
+  // object. That leaves no way to *delete* a key though — which matters now
+  // that custom fields can be added freely — hence __remove.
+  const { __remove, ...changes } = body
+  const merged: Record<string, unknown> = {
     ...(existing.properties as Record<string, unknown>),
-    ...body,
-  })
+    ...changes,
+  }
+  if (Array.isArray(__remove)) {
+    for (const key of __remove) delete merged[key]
+  }
+
+  const updated = await updateNode(user.id, nodeId, merged)
 
   return Response.json({ ok: true, node: updated })
 }

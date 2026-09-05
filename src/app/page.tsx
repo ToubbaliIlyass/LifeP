@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
   FileText, Search, Download, Upload, Inbox, PanelLeft, PanelLeftClose, ClipboardList, CalendarRange,
-  Menu, X, MessageSquare,
+  Menu, X, MessageSquare, Settings as SettingsIcon,
 } from 'lucide-react'
 import { HabitsPanel } from '@/components/habits/HabitsPanel'
 import { TasksPanel } from '@/components/tasks/TasksPanel'
@@ -21,6 +21,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { SplashScreen } from '@/components/SplashScreen'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { QuickAddButton } from '@/components/quickadd/QuickAddButton'
+import { SettingsPanel, type Settings } from '@/components/settings/SettingsPanel'
 import { safeGet, safeSet } from '@/lib/storage'
 
 // Both pull in heavy libraries (@xyflow/react, the `ai` SDK) that mobile's
@@ -29,7 +30,7 @@ import { safeGet, safeSet } from '@/lib/storage'
 const GraphView = dynamic(() => import('@/components/graph/GraphView').then((m) => m.GraphView), { ssr: false })
 const ChatPanel = dynamic(() => import('@/components/chat/ChatPanel').then((m) => m.ChatPanel), { ssr: false })
 
-type Tab = 'today' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals'
+type Tab = 'today' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals' | 'settings'
 
 const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'today',     label: 'Today',     Icon: House },
@@ -42,6 +43,7 @@ const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: st
   { id: 'notes',     label: 'Notes',     Icon: FileText },
   { id: 'activity',  label: 'Activity',  Icon: ClipboardList },
   { id: 'proposals', label: 'Proposals', Icon: Inbox },
+  { id: 'settings',  label: 'Settings',  Icon: SettingsIcon },
 ]
 
 // Backgrounded tabs (mobile Safari/Chrome switched away, laptop lid closed)
@@ -103,6 +105,10 @@ export default function Home() {
   const [mobileShowChat, setMobileShowChat] = useState(false)
   // The Calendar tab's Week view needs the extra width chat would take, so it's hidden while active.
   const [calendarViewMode, setCalendarViewMode] = useState<'day' | 'week'>('day')
+  // Settings live in the database rather than this device, so hidden panels
+  // and startup preferences follow the user between laptop and phone.
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const settingsAppliedRef = useRef(false)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
   function selectTab(t: Tab) {
@@ -124,6 +130,25 @@ export default function Home() {
     if (safeGet('session', 'acture-intro-seen')) {
       setShowSplash(false)
     }
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { settings: Settings } | null) => {
+        if (!d) return
+        setSettings(d.settings)
+        // Startup preferences apply on first load only — re-applying them on
+        // every settings save would yank the user out of the tab they are in.
+        if (!settingsAppliedRef.current) {
+          settingsAppliedRef.current = true
+          if (d.settings.defaultTab && d.settings.defaultTab !== 'today') {
+            setTab(d.settings.defaultTab as Tab)
+          }
+          setCalendarViewMode(d.settings.defaultCalendarView)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   // ── Resize (chat is now on the right — drag handle on left edge) ──
@@ -214,6 +239,8 @@ export default function Home() {
     e.target.value = ''
   }
 
+  const hiddenTabs = new Set(settings?.hiddenTabs ?? [])
+  const visibleTabs = TABS.filter((t) => t.id === 'settings' || !hiddenTabs.has(t.id))
   const activeTab = TABS.find((t) => t.id === tab)
 
   return (
@@ -270,7 +297,7 @@ export default function Home() {
             (Search/Export/Import/Dark mode) off-screen on short viewports,
             in either the expanded or collapsed sidebar width. */}
         <nav className={`flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto pt-3 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.id}
               onClick={() => selectTab(t.id)}
@@ -382,6 +409,13 @@ export default function Home() {
           {tab === 'notes'     && <NotesPanel refreshKey={dataRefreshKey} />}
           {tab === 'calendar'  && <CalendarView onViewModeChange={setCalendarViewMode} />}
           {tab === 'activity'  && <ActivityPanel />}
+          {tab === 'settings'  && (
+            <SettingsPanel
+              allTabs={TABS.map((t) => ({ id: t.id, label: t.label }))}
+              onSettingsChanged={setSettings}
+              onImport={handleImport}
+            />
+          )}
           {tab === 'proposals' && (
             <ProposalQueue
               onCountChange={(n) => setPendingCount(n)}
@@ -465,7 +499,7 @@ export default function Home() {
               </button>
             </div>
             <nav className="flex flex-col gap-0.5 flex-1 pt-3 px-3 overflow-y-auto">
-              {TABS.map((t) => (
+              {visibleTabs.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => selectTab(t.id)}

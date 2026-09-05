@@ -13,7 +13,7 @@ const userId = 1
 const builtinTypes = [
   'Goal', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
   'HabitLog', 'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
-  'HealthMetric', 'SavedView',
+  'HealthMetric', 'SavedView', 'Settings',
 ]
 
 function ensureUser() {

@@ -122,7 +122,7 @@ export function toFlowGraph(
   // HabitLog and TimeBlock are bookkeeping nodes, not things the user thinks
   // of as part of their graph -- TimeBlock's schedule info surfaces instead
   // via the hover tooltip on whatever it's linked to (see GraphView).
-  const HIDDEN_TYPES = new Set(['habitlog', 'timeblock', 'savedview'])
+  const HIDDEN_TYPES = new Set(['habitlog', 'timeblock', 'savedview', 'settings'])
   const filteredNodes = nodes.filter((n) => !HIDDEN_TYPES.has(n.type.toLowerCase()))
   const filteredNodeIds = new Set(filteredNodes.map((n) => String(n.id)))
 

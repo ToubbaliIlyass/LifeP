@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Clock, MapPin } from 'lucide-react'
 import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
-import { GoalMilestones } from './GoalMilestones'
+import { GoalDetail } from '@/components/goals/GoalDetail'
 import { todayStr } from '@/lib/date'
 
 interface HabitRow {
@@ -327,12 +327,8 @@ export function TodayView({ onNavigate, refreshKey }: TodayViewProps) {
           const g = goals.find((x) => x.id === viewingGoalId)
           if (!g) return null
           return (
-            <GoalMilestones
+            <GoalDetail
               goalId={g.id}
-              goalName={g.name}
-              targetDate={g.targetDate}
-              progress={g.progress}
-              milestones={g.milestones}
               onClose={() => setViewingGoalId(null)}
               onChanged={load}
             />
