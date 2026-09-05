@@ -4,7 +4,7 @@ import { useEffect, useCallback, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
-  FileText, Search, Download, Upload, Inbox, PanelLeft, PanelLeftClose, ClipboardList, CalendarRange,
+  FileText, Search, Inbox, PanelLeft, PanelLeftClose, ClipboardList, CalendarRange,
   Menu, X, MessageSquare, Settings as SettingsIcon,
 } from 'lucide-react'
 import { HabitsPanel } from '@/components/habits/HabitsPanel'
@@ -75,7 +75,6 @@ function useVisiblePolling(callback: () => void, intervalMs: number) {
       stopPolling()
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callback, intervalMs])
 }
 
@@ -356,27 +355,6 @@ export default function Home() {
               </span>
             )}
           </button>
-          {/* Export and Import share a row: they are a matched pair, and
-              stacking them spent two full lines on one idea. Collapsed, there
-              is no room for two, so they stack as icons again. */}
-          <div className={sidebarCollapsed ? 'space-y-0.5' : 'flex gap-1'}>
-            <button
-              onClick={() => window.open('/api/export', '_blank')}
-              title={sidebarCollapsed ? 'Export' : 'Export everything'}
-              className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'flex-1 gap-2 px-3 py-2 text-left'}`}
-            >
-              <Download className={`shrink-0 opacity-55 ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
-              {!sidebarCollapsed && 'Export'}
-            </button>
-            <label
-              title={sidebarCollapsed ? 'Import' : 'Import from a file'}
-              className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer ${sidebarCollapsed ? 'justify-center p-2.5 w-full' : 'flex-1 gap-2 px-3 py-2'}`}
-            >
-              <Upload className={`shrink-0 opacity-55 ${sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
-              {!sidebarCollapsed && 'Import'}
-              <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
-            </label>
-          </div>
           <ThemeToggle sidebar collapsed={sidebarCollapsed} />
           <button
             onClick={() => selectTab('settings')}
@@ -561,20 +539,6 @@ export default function Home() {
                 <Search className="shrink-0 opacity-55 w-[15px] h-[15px]" />
                 Search
               </button>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => window.open('/api/export', '_blank')}
-                  className="flex flex-1 items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-left"
-                >
-                  <Download className="shrink-0 opacity-55 w-[15px] h-[15px]" />
-                  Export
-                </button>
-                <label className="flex flex-1 items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer">
-                  <Upload className="shrink-0 opacity-55 w-[15px] h-[15px]" />
-                  Import
-                  <input type="file" accept=".json" className="sr-only" onChange={handleImport} />
-                </label>
-              </div>
               <ThemeToggle sidebar />
               <button
                 onClick={() => selectTab('settings')}
