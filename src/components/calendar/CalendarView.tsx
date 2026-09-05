@@ -81,13 +81,15 @@ function formatWeekHeader(dates: string[]): string {
 }
 
 interface CalendarViewProps {
+  /** From Settings. Only seeds the initial view — the toggle stays in charge after that. */
+  initialViewMode?: ViewMode
   /** Lets the parent (page.tsx) react to Day/Week — e.g. to hide the chat panel while in Week view, since it needs the extra width. */
   onViewModeChange?: (mode: ViewMode) => void
 }
 
-export function CalendarView({ onViewModeChange }: CalendarViewProps) {
+export function CalendarView({ onViewModeChange, initialViewMode }: CalendarViewProps) {
   const [date, setDate] = useState(todayStr())
-  const [viewMode, setViewMode] = useState<ViewMode>('day')
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode ?? 'day')
   const [dayData, setDayData] = useState<DayData>({ blocks: [], events: [] })
   const [weekData, setWeekData] = useState<Record<string, DayData>>({})
   const [loading, setLoading] = useState(true)

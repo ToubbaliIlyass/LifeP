@@ -1,83 +1,103 @@
-import { and, eq } from 'drizzle-orm'
-import Database from 'better-sqlite3'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
-import * as schema from '../src/lib/db/schema'
-
-const sqlite = new Database('./data/lifep.db')
-sqlite.pragma('journal_mode = WAL')
-sqlite.pragma('foreign_keys = ON')
-const db = drizzle(sqlite, { schema })
+/**
+ * Registers the built-in node types, and optionally a small sample graph.
+ *
+ * Runs against whatever TURSO_DATABASE_URL points at, falling back to the
+ * local file — the same rule the app itself uses, so seeding never silently
+ * targets a different database than the one running.
+ *
+ *   npx tsx scripts/seed.ts            # node types only (safe, idempotent)
+ *   npx tsx scripts/seed.ts --sample   # also insert the example graph
+ */
+import { createClient } from '@libsql/client'
+import 'dotenv/config'
 
 const userId = 1
 
+/**
+ * Every type the app knows about. The registry drives the graph's filter bar,
+ * so a type missing here simply never appears there — which is exactly the
+ * bug that hid Expense and HealthMetric when they were first added.
+ */
 const builtinTypes = [
   'Goal', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
   'HabitLog', 'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
   'HealthMetric', 'SavedView', 'Settings',
 ]
 
-function ensureUser() {
-  const existing = db.select().from(schema.users).where(eq(schema.users.id, userId)).get()
-  if (!existing) {
-    db.insert(schema.users).values({ id: userId, name: 'You' }).run()
-    console.log('Created user 1')
+const url = process.env.TURSO_DATABASE_URL ?? 'file:./data/lifep.db'
+const authToken = process.env.TURSO_AUTH_TOKEN
+const db = createClient({ url, ...(authToken ? { authToken } : {}) })
+
+async function ensureUser() {
+  const existing = await db.execute({ sql: 'select id from users where id = ?', args: [userId] })
+  if (existing.rows.length === 0) {
+    await db.execute({ sql: "insert into users (id, name) values (?, 'You')", args: [userId] })
+    console.log(`Created user ${userId}`)
   } else {
-    console.log('User 1 already exists')
+    console.log(`User ${userId} already exists`)
   }
 }
 
-function ensureNodeTypes() {
+async function ensureNodeTypes() {
+  let added = 0
   for (const name of builtinTypes) {
-    const existing = db
-      .select()
-      .from(schema.nodeTypes)
-      .where(and(eq(schema.nodeTypes.userId, userId), eq(schema.nodeTypes.name, name)))
-      .get()
-    if (!existing) {
-      db.insert(schema.nodeTypes).values({ userId, name, isBuiltin: true }).run()
+    const existing = await db.execute({
+      sql: 'select id from node_types where user_id = ? and name = ?',
+      args: [userId, name],
+    })
+    if (existing.rows.length === 0) {
+      await db.execute({
+        sql: "insert into node_types (user_id, name, schema, is_builtin) values (?, ?, '{}', 1)",
+        args: [userId, name],
+      })
+      added++
     }
   }
-  console.log('Seeded built-in node types')
+  console.log(`Built-in node types: ${builtinTypes.length} total, ${added} added`)
 }
 
-function seedSampleGraph() {
-  const goal = db
-    .insert(schema.nodes)
-    .values({
-      userId,
-      type: 'Goal',
-      properties: { name: 'Get fit', description: 'Build a consistent workout routine.' },
+async function seedSampleGraph() {
+  const node = async (type: string, properties: Record<string, unknown>) => {
+    const r = await db.execute({
+      sql: 'insert into nodes (user_id, type, properties) values (?, ?, ?) returning id',
+      args: [userId, type, JSON.stringify(properties)],
     })
-    .returning()
-    .get()
+    return Number(r.rows[0].id)
+  }
+  const edge = (sourceId: number, targetId: number, type: string) =>
+    db.execute({
+      sql: "insert into edges (user_id, source_id, target_id, type, properties) values (?, ?, ?, ?, '{}')",
+      args: [userId, sourceId, targetId, type],
+    })
 
-  const habit1 = db
-    .insert(schema.nodes)
-    .values({ userId, type: 'Habit', properties: { name: 'Morning run', frequency: 'daily', durationMinutes: 30 } })
-    .returning()
-    .get()
+  // `name` throughout — the app reads `name` and only falls back to `title`,
+  // and seeding the wrong key is what once made a goal render as "Goal #1".
+  const goal = await node('Goal', { name: 'Get fit', description: 'Build a consistent workout routine.', status: 'active' })
+  const habit1 = await node('Habit', { name: 'Morning run', frequency: 'daily', durationMinutes: 30 })
+  const habit2 = await node('Habit', { name: 'Drink 2L water', frequency: 'daily' })
+  const task = await node('Task', { name: 'Buy running shoes', status: 'todo', priority: 'medium' })
 
-  const habit2 = db
-    .insert(schema.nodes)
-    .values({ userId, type: 'Habit', properties: { name: 'Drink 2L water', frequency: 'daily' } })
-    .returning()
-    .get()
+  await edge(habit1, goal, 'supports')
+  await edge(habit2, goal, 'supports')
+  await edge(task, habit1, 'enables')
 
-  const task = db
-    .insert(schema.nodes)
-    .values({ userId, type: 'Task', properties: { name: 'Buy running shoes', status: 'todo' } })
-    .returning()
-    .get()
-
-  db.insert(schema.edges).values({ userId, sourceId: habit1.id, targetId: goal.id, type: 'supports' }).run()
-  db.insert(schema.edges).values({ userId, sourceId: habit2.id, targetId: goal.id, type: 'supports' }).run()
-  db.insert(schema.edges).values({ userId, sourceId: task.id, targetId: habit1.id, type: 'enables' }).run()
-
-  console.log(`Created nodes: Goal(${goal.id}), Habit(${habit1.id}), Habit(${habit2.id}), Task(${task.id})`)
-  console.log('Created 3 edges')
+  console.log(`Sample graph: Goal(${goal}), Habit(${habit1}), Habit(${habit2}), Task(${task}) + 3 edges`)
 }
 
-ensureUser()
-ensureNodeTypes()
-seedSampleGraph()
-console.log('Seed complete.')
+async function main() {
+  console.log(`Seeding ${url.startsWith('file:') ? 'local file' : 'Turso'}…`)
+  await ensureUser()
+  await ensureNodeTypes()
+
+  if (process.argv.includes('--sample')) {
+    await seedSampleGraph()
+  } else {
+    console.log('Skipped sample graph (pass --sample to insert it)')
+  }
+  console.log('Done')
+}
+
+main().catch((e) => {
+  console.error('Seed failed:', e.message)
+  process.exit(1)
+})

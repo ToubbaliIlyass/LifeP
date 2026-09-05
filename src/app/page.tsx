@@ -155,8 +155,10 @@ export default function Home() {
         // every settings save would yank the user out of the tab they are in.
         if (!settingsAppliedRef.current) {
           settingsAppliedRef.current = true
-          if (d.settings.defaultTab && d.settings.defaultTab !== 'today') {
-            setTab(d.settings.defaultTab as Tab)
+          const wanted = d.settings.defaultTab
+          const isHidden = (d.settings.hiddenTabs ?? []).includes(wanted)
+          if (wanted && wanted !== 'today' && !isHidden) {
+            setTab(wanted as Tab)
           }
           setCalendarViewMode(d.settings.defaultCalendarView)
         }
@@ -424,7 +426,7 @@ export default function Home() {
           {tab === 'events'    && <EventsPanel />}
           {tab === 'school'    && <SchoolPanel />}
           {tab === 'notes'     && <NotesPanel refreshKey={dataRefreshKey} />}
-          {tab === 'calendar'  && <CalendarView onViewModeChange={setCalendarViewMode} />}
+          {tab === 'calendar'  && <CalendarView onViewModeChange={setCalendarViewMode} initialViewMode={settings?.defaultCalendarView} />}
           {tab === 'activity'  && <ActivityPanel />}
           {tab === 'settings'  && (
             <SettingsPanel

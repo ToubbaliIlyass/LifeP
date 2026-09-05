@@ -45,6 +45,15 @@ export function ThemeToggle({ sidebar = false, collapsed = false }: ThemeToggleP
     const stored = safeGet('local', 'theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     setDark(stored ? stored === 'dark' : prefersDark)
+
+    // Settings can change the mode too, and this button would otherwise keep
+    // showing the old icon until it happened to remount. Watching the class
+    // means whoever changes it, both stay in step.
+    const observer = new MutationObserver(() => {
+      setDark(document.documentElement.classList.contains('dark'))
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
   }, [])
 
   function toggle() {
