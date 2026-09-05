@@ -7,6 +7,7 @@ import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { StatusCheckbox } from '@/components/ui/completion-checkbox'
 import { ScheduleDialog } from './ScheduleDialog'
 import { todayStr, addDays } from '@/lib/date'
+import { useUndo } from '@/components/undo/UndoProvider'
 
 interface Task {
   id: number
@@ -68,6 +69,7 @@ export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [schedulingTask, setSchedulingTask] = useState<Task | null>(null)
+  const { record } = useUndo()
 
   const load = useCallback(() => {
     fetch('/api/tasks')
@@ -82,14 +84,29 @@ export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
 
   async function cycleStatus(task: Task) {
     const next = STATUS_CYCLE[task.status] ?? 'todo'
+    const previous = task.status
     setCycling(task.id)
-    await fetch(`/api/tasks/${task.id}`, {
+    const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: next }),
     })
+    // Completing a recurring task also creates its next occurrence, so undo
+    // has to remove that too — otherwise it would restore the status and
+    // leave a duplicate behind.
+    const { spawned } = ((await res.json().catch(() => ({}))) ?? {}) as { spawned?: { id: number } | null }
     setCycling(null)
     load()
+
+    record(`"${task.name}" → ${next}`, async () => {
+      await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: previous }),
+      })
+      if (spawned?.id) await fetch(`/api/nodes/${spawned.id}`, { method: 'DELETE' })
+      load()
+    })
   }
 
   const bucketed: Record<string, Task[]> = Object.fromEntries(BUCKETS.map((b) => [b.key, []]))

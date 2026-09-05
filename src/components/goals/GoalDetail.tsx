@@ -5,6 +5,7 @@ import { X, Plus, Trash2, Link2, Unlink, Check } from 'lucide-react'
 import { StatusCheckbox } from '@/components/ui/completion-checkbox'
 import { Markdown } from '@/components/notes/Markdown'
 import { LinkNodePicker } from './LinkNodePicker'
+import { useUndo } from '@/components/undo/UndoProvider'
 
 interface Linked {
   id: number
@@ -49,6 +50,7 @@ export function GoalDetail({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
+  const { record } = useUndo()
 
   const load = useCallback(() => {
     fetch(`/api/goals/${goalId}`)
@@ -105,13 +107,43 @@ export function GoalDetail({
 
   /** Removes the relationship, never the node itself. */
   async function unlink(edgeId: number) {
+    const link = [...(data?.milestones ?? []), ...(data?.habits ?? []), ...(data?.notes ?? []), ...(data?.other ?? [])]
+      .find((x) => x.edgeId === edgeId)
     await fetch(`/api/edges?id=${edgeId}`, { method: 'DELETE' })
+    if (link) {
+      record(`Unlinked "${link.label}"`, async () => {
+        await fetch('/api/edges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceId: link.id, targetId: goalId, type: link.edgeType }),
+        })
+        load()
+        onChanged()
+      })
+    }
     load()
     onChanged()
   }
 
   async function deleteGoal() {
-    await fetch(`/api/nodes/${goalId}`, { method: 'DELETE' })
+    const name = typeof props.name === 'string' ? props.name : 'Goal'
+    const res = await fetch(`/api/nodes/${goalId}`, { method: 'DELETE' })
+    // Named `removed`, not `data` — `data` is this component's state, and
+    // shadowing it here would be a trap for the next person to edit this.
+    const removed = (await res.json().catch(() => null)) as
+      | { deleted?: { type: string; properties: Record<string, unknown>; edges: unknown[] } }
+      | null
+
+    if (removed?.deleted) {
+      record(`Deleted "${name}"`, async () => {
+        await fetch('/api/nodes/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...removed.deleted, previousId: goalId }),
+        })
+        onChanged()
+      })
+    }
     onChanged()
     onClose()
   }
@@ -243,7 +275,11 @@ export function GoalDetail({
                     className="flex-1 bg-muted/40 border border-border/40 rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-primary/50"
                   />
                   <button
-                    onClick={() => patch({}, [key])}
+                    onClick={() => {
+                      const previous = props[key]
+                      patch({}, [key])
+                      record(`Removed field "${key}"`, () => patch({ [key]: previous }))
+                    }}
                     title={`Remove ${key}`}
                     className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
                   >

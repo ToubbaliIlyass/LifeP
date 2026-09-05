@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUndo } from '@/components/undo/UndoProvider'
 import { Plus, X, CheckSquare, FileText, Calendar, HeartPulse, Target, Repeat, FolderKanban, BookOpen, GraduationCap, ClipboardList } from 'lucide-react'
 
 type QuickType = 'Task' | 'Note' | 'Event' | 'HealthMetric' | 'Goal' | 'Habit' | 'Project' | 'Course' | 'Exam' | 'Assignment'
@@ -35,6 +36,7 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
   const [name, setName] = useState('')
   const [secondary, setSecondary] = useState('') // dueDate / value / frequency / code, depending on type
   const [submitting, setSubmitting] = useState(false)
+  const { record } = useUndo()
 
   function reset() {
     setName('')
@@ -72,12 +74,22 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
     e.preventDefault()
     if (!name.trim() || submitting) return
     setSubmitting(true)
-    await fetch('/api/quick-add', {
+    const res = await fetch('/api/quick-add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, properties: propertiesFor() }),
     })
+    const created = (await res.json().catch(() => null)) as { node?: { id: number } } | null
     setSubmitting(false)
+
+    if (created?.node?.id) {
+      const id = created.node.id
+      const added = name
+      record(`Added "${added}"`, async () => {
+        await fetch(`/api/nodes/${id}`, { method: 'DELETE' })
+        onAdded?.()
+      })
+    }
     reset()
     setOpen(false)
     onAdded?.()

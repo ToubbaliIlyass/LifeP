@@ -44,6 +44,7 @@ interface GoalRow {
   id: number
   name: string
   targetDate: string | null
+  status: string
   linkedCount: number
   progress: number | null
   milestones: Milestone[]
@@ -110,7 +111,7 @@ export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
         setHabits(allHabits.filter(isHabitForToday))
         setTasks((tasksData as { tasks: TaskRow[] }).tasks ?? [])
         setEvents((eventsData as { events: EventRow[] }).events?.filter((e: EventRow) => e.date === today) ?? [])
-        setGoals((goalsData as { goals: GoalRow[] }).goals ?? [])
+        setGoals(((goalsData as { goals: GoalRow[] }).goals ?? []).filter((g) => g.status === 'active'))
         setLoading(false)
       })
       .catch(() => setLoading(false))

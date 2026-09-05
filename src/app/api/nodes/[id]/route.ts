@@ -1,5 +1,5 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
-import { getNodeById, getNodeWithNeighbors, updateNode, deleteNode } from '@/lib/graph/queries'
+import { getNodeById, getNodeWithNeighbors, updateNode, deleteNode, getEdges } from '@/lib/graph/queries'
 
 export async function GET(
   _request: Request,
@@ -87,6 +87,27 @@ export async function DELETE(
   const existing = await getNodeById(user.id, nodeId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
+  // The deleted node and its edges come back in the response so the caller
+  // can offer an undo. Deleting cascades the edges away, so if they are not
+  // captured here they are gone for good and "undo" could only ever restore
+  // an orphan.
+  const attached = (await getEdges(user.id)).filter(
+    (e) => e.sourceId === nodeId || e.targetId === nodeId,
+  )
+
   await deleteNode(user.id, nodeId)
-  return Response.json({ ok: true })
+
+  return Response.json({
+    ok: true,
+    deleted: {
+      type: existing.type,
+      properties: existing.properties,
+      edges: attached.map((e) => ({
+        sourceId: e.sourceId,
+        targetId: e.targetId,
+        type: e.type,
+        properties: e.properties,
+      })),
+    },
+  })
 }

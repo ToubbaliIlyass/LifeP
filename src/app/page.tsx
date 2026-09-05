@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
   FileText, Search, Inbox, PanelLeft, PanelLeftClose, ClipboardList, CalendarRange,
-  Menu, X, MessageSquare, Settings as SettingsIcon,
+  Menu, X, MessageSquare, Settings as SettingsIcon, Target,
 } from 'lucide-react'
 import { HabitsPanel } from '@/components/habits/HabitsPanel'
 import { TasksPanel } from '@/components/tasks/TasksPanel'
@@ -13,6 +13,7 @@ import { EventsPanel } from '@/components/events/EventsPanel'
 import { SchoolPanel } from '@/components/school/SchoolPanel'
 import { NotesPanel } from '@/components/notes/NotesPanel'
 import { TodayView } from '@/components/today/TodayView'
+import { GoalsPanel } from '@/components/goals/GoalsPanel'
 import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { ActivityPanel } from '@/components/activity/ActivityPanel'
 import { CalendarView } from '@/components/calendar/CalendarView'
@@ -22,6 +23,7 @@ import { SplashScreen } from '@/components/SplashScreen'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { QuickAddButton } from '@/components/quickadd/QuickAddButton'
 import { SettingsPanel, type Settings } from '@/components/settings/SettingsPanel'
+import { UndoProvider } from '@/components/undo/UndoProvider'
 import { safeGet, safeSet } from '@/lib/storage'
 import { applyTheme, storedTheme } from '@/lib/themes'
 
@@ -31,10 +33,11 @@ import { applyTheme, storedTheme } from '@/lib/themes'
 const GraphView = dynamic(() => import('@/components/graph/GraphView').then((m) => m.GraphView), { ssr: false })
 const ChatPanel = dynamic(() => import('@/components/chat/ChatPanel').then((m) => m.ChatPanel), { ssr: false })
 
-type Tab = 'today' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals' | 'settings'
+type Tab = 'today' | 'goals' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals' | 'settings'
 
 const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'today',     label: 'Today',     Icon: House },
+  { id: 'goals',     label: 'Goals',     Icon: Target },
   { id: 'calendar',  label: 'Calendar',  Icon: CalendarRange },
   { id: 'graph',     label: 'Graph',     Icon: Share2 },
   { id: 'habits',    label: 'Habits',    Icon: Activity },
@@ -254,6 +257,7 @@ export default function Home() {
   const activeTab = tab === 'settings' ? SETTINGS_TAB : TABS.find((t) => t.id === tab)
 
   return (
+    <UndoProvider>
     <main
       // `fixed inset-0` instead of `h-dvh`: dvh is a *computed value* that
       // some browsers don't correctly re-resolve on real page zoom (as
@@ -413,6 +417,7 @@ export default function Home() {
 
         <div className="flex-1 min-h-0 overflow-hidden">
           {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} refreshKey={dataRefreshKey} weather={settings?.weather} />}
+          {tab === 'goals'     && <GoalsPanel refreshKey={dataRefreshKey} />}
           {tab === 'graph'     && <GraphView refreshKey={graphRefreshKey} />}
           {tab === 'habits'    && <HabitsPanel />}
           {tab === 'tasks'     && <TasksPanel refreshKey={dataRefreshKey} />}
@@ -588,5 +593,6 @@ export default function Home() {
 
       {showSplash && <SplashScreen onDone={handleSplashDone} />}
     </main>
+    </UndoProvider>
   )
 }

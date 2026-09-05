@@ -7,10 +7,10 @@ import { todayStr, addDays } from '@/lib/date'
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return unauthorized()
-  const goals = (await getNodes(user.id, { type: 'Goal' })).filter((g) => {
-    const p = g.properties as Record<string, unknown>
-    return (p.status ?? 'active') === 'active'
-  })
+  // Every goal is returned with its status rather than filtering to active
+  // here: the Goals panel needs paused and completed ones too, and Today
+  // filters for itself.
+  const goals = await getNodes(user.id, { type: 'Goal' })
   const habitLogs = await getNodes(user.id, { type: 'HabitLog' })
   const since = addDays(todayStr(), -7)
 
@@ -56,6 +56,8 @@ export async function GET() {
       id: g.id,
       name: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `Goal #${g.id}`,
       targetDate: typeof p.targetDate === 'string' ? p.targetDate : null,
+      status: typeof p.status === 'string' ? p.status : 'active',
+      description: typeof p.description === 'string' ? p.description : null,
       linkedCount: linked.length,
       progress: linked.length > 0 ? Math.round((done / linked.length) * 100) : null,
       milestones,

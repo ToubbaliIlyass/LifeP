@@ -40,16 +40,21 @@ export async function PATCH(
   // on undo (status !== 'done'), so toggling done/undone repeatedly can't
   // spawn duplicates.
   const recurrence = props.recurrence as Recurrence | undefined
+  let spawned: { id: number } | null = null
   if (newStatus === 'done' && prevStatus !== 'done' && recurrence?.frequency) {
     const baseDate = typeof props.dueDate === 'string' ? props.dueDate : todayStr()
     const next = nextDueDate(baseDate, recurrence.frequency, recurrence.daysOfWeek ?? null)
-    await createNode(user.id, 'Task', {
+    const created = await createNode(user.id, 'Task', {
       ...props,
       status: 'todo',
       dueDate: next,
       completedAt: undefined,
     })
+    // Returned so an undo can remove it again. Without this, undoing a
+    // completion would restore the status but silently leave the next
+    // occurrence behind — an undo that only half works is worse than none.
+    spawned = { id: created.id }
   }
 
-  return Response.json({ ok: true, task: updated })
+  return Response.json({ ok: true, task: updated, spawned })
 }
