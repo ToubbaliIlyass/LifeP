@@ -19,6 +19,8 @@ export interface Settings {
   defaultCalendarView: 'day' | 'week'
   /** Colour palette, layered on top of light/dark mode. See src/lib/themes.ts. */
   theme: string
+  /** Weather on the dashboard. Stored so the location is asked for once, not every visit. */
+  weather: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultTab: 'today',
   defaultCalendarView: 'day',
   theme: 'default',
+  weather: { enabled: false, lat: null, lon: null, place: null },
 }
 
 async function settingsNode(userId: number) {

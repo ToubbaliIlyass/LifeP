@@ -412,7 +412,7 @@ export default function Home() {
         </header>
 
         <div className="flex-1 min-h-0 overflow-hidden">
-          {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} refreshKey={dataRefreshKey} />}
+          {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} refreshKey={dataRefreshKey} weather={settings?.weather} />}
           {tab === 'graph'     && <GraphView refreshKey={graphRefreshKey} />}
           {tab === 'habits'    && <HabitsPanel />}
           {tab === 'tasks'     && <TasksPanel refreshKey={dataRefreshKey} />}

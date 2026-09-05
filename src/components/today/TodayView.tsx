@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Clock, MapPin } from 'lucide-react'
 import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
 import { GoalDetail } from '@/components/goals/GoalDetail'
+import { WeatherStrip } from './WeatherStrip'
 import { todayStr } from '@/lib/date'
 
 interface HabitRow {
@@ -51,6 +52,8 @@ interface GoalRow {
 interface TodayViewProps {
   onNavigate?: (tab: string) => void
   refreshKey?: number
+  /** Set in Settings; the strip is hidden until a location exists. */
+  weather?: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
 }
 
 function formatDay(date: Date) {
@@ -84,7 +87,7 @@ function isHabitForToday(habit: HabitRow): boolean {
   return true
 }
 
-export function TodayView({ onNavigate, refreshKey }: TodayViewProps) {
+export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
   const [habits, setHabits] = useState<HabitRow[]>([])
   const [tasks, setTasks] = useState<TaskRow[]>([])
   const [events, setEvents] = useState<EventRow[]>([])
@@ -153,6 +156,10 @@ export function TodayView({ onNavigate, refreshKey }: TodayViewProps) {
   return (
     <ScrollArea className="h-full">
       <div className="px-8 py-8">
+
+        {weather?.enabled && weather.lat !== null && weather.lon !== null && (
+          <WeatherStrip lat={weather.lat} lon={weather.lon} place={weather.place} />
+        )}
 
         {isEmpty && (
           <div className="py-10 text-center">

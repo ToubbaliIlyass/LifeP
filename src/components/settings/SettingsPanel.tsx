@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Download, Upload, LogOut, Eye, EyeOff, Check, Sun, Moon } from 'lucide-react'
+import { Download, Upload, LogOut, Eye, EyeOff, Check, Sun, Moon, MapPin } from 'lucide-react'
 import { THEMES, applyTheme, storedTheme } from '@/lib/themes'
 
 export interface Settings {
@@ -10,6 +10,7 @@ export interface Settings {
   defaultTab: string
   defaultCalendarView: 'day' | 'week'
   theme: string
+  weather: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
 }
 
 interface SettingsPanelProps {
@@ -36,6 +37,8 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
   // Mode starts false to match the server-rendered markup, then syncs after
   // mount — the same hydration-safety reason as ThemeToggle.
   const [dark, setDark] = useState(false)
+  const [locating, setLocating] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains('dark'))
@@ -50,6 +53,47 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
   function setTheme(id: string) {
     applyTheme(id)          // instant, and remembered locally for the next paint
     save({ theme: id })     // and to the database, so other devices follow
+  }
+
+  /**
+   * Asks the browser once and stores the result, rather than prompting on
+   * every dashboard visit. Reverse-geocoded through Open-Meteo's own free
+   * geocoding endpoint purely to show a recognisable place name.
+   */
+  function requestLocation() {
+    if (!('geolocation' in navigator)) {
+      setLocationError('This browser cannot report a location.')
+      return
+    }
+    setLocating(true)
+    setLocationError(null)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(4))
+        const lon = Number(pos.coords.longitude.toFixed(4))
+        let place: string | null = null
+        try {
+          const r = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?latitude=${lat}&longitude=${lon}&count=1`,
+          )
+          const d = await r.json()
+          place = d?.results?.[0]?.name ?? null
+        } catch {
+          // A missing place name is cosmetic; the forecast still works.
+        }
+        await save({ weather: { enabled: true, lat, lon, place } })
+        setLocating(false)
+      },
+      (err) => {
+        setLocating(false)
+        setLocationError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission was denied. Allow it in your browser settings to show weather.'
+            : 'Could not determine your location.',
+        )
+      },
+      { timeout: 10000, maximumAge: 600000 },
+    )
   }
 
   const load = useCallback(() => {
@@ -225,6 +269,42 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
                 ))}
               </div>
             </div>
+          </div>
+        </Section>
+
+        <Section
+          title="Weather"
+          description="Shows today's forecast on the dashboard. The location is stored once so your browser doesn't ask again on every visit, and it follows you across devices."
+        >
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={requestLocation}
+                disabled={locating}
+                className="flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg border border-border/60 hover:bg-muted/40 transition-colors disabled:opacity-60"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                {locating ? 'Locating…' : settings.weather?.lat !== null && settings.weather?.lat !== undefined ? 'Update location' : 'Use my location'}
+              </button>
+              {settings.weather?.enabled && (
+                <button
+                  onClick={() => save({ weather: { enabled: false, lat: null, lon: null, place: null } })}
+                  className="text-[12px] font-medium px-3 py-2 rounded-lg border border-border/60 hover:bg-muted/40 transition-colors text-muted-foreground"
+                >
+                  Turn off
+                </button>
+              )}
+            </div>
+
+            {settings.weather?.enabled && settings.weather.lat !== null && (
+              <p className="text-[11px] font-mono text-muted-foreground/55">
+                {settings.weather.place ?? 'Location set'} · {settings.weather.lat?.toFixed(2)}, {settings.weather.lon?.toFixed(2)}
+              </p>
+            )}
+            {locationError && <p className="text-[12px] text-destructive">{locationError}</p>}
+            <p className="text-[10px] font-mono text-muted-foreground/40">
+              Forecast by Open-Meteo — free, and needs no account or API key.
+            </p>
           </div>
         </Section>
 
