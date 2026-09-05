@@ -28,26 +28,26 @@ export const THEMES: ThemeDef[] = [
   {
     id: 'toffee',
     name: 'Toffee',
-    swatch: ['#9e6240', '#dea47e', '#e4fde1', '#13262f'],
-    description: 'Toffee brown and light bronze.',
+    swatch: ['#9e6240', '#dea47e', '#faf3ec', '#13262f'],
+    description: 'Toffee brown and bronze, on warm sand.',
   },
   {
     id: 'grove',
     name: 'Grove',
-    swatch: ['#f9a620', '#548c2f', '#e4fde1', '#13262f'],
-    description: 'Orange against forest green.',
+    swatch: ['#f9a620', '#548c2f', '#e9fde6', '#13262f'],
+    description: 'Orange against forest green, on mint.',
   },
   {
     id: 'coral',
     name: 'Coral',
-    swatch: ['#ff8552', '#a31621', '#e4fde1', '#13262f'],
-    description: 'Coral glow with ruby red.',
+    swatch: ['#ff8552', '#a31621', '#fff4ef', '#13262f'],
+    description: 'Coral glow and ruby, on warm blush.',
   },
   {
     id: 'ember',
     name: 'Ember',
-    swatch: ['#faa916', '#96031a', '#e4fde1', '#13262f'],
-    description: 'Amber over deep crimson.',
+    swatch: ['#faa916', '#96031a', '#fef8ea', '#13262f'],
+    description: 'Amber and deep crimson, on cream.',
   },
 ]
 

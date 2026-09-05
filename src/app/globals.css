@@ -237,52 +237,53 @@
 
 /* ─── Themes ──────────────────────────────────────────── */
 /*
-  Themes sit *on top of* light/dark rather than replacing it. `.dark` still
-  decides the mode; `data-theme` decides the palette. Every palette supplies
-  both grounds, which is why they all share two colours: Frosted Mint
-  (#E4FDE1) is the light ground and Jet Black (#13262F) the dark one, with
-  the two chromatic colours becoming primary and secondary accents.
+  Themes sit *on top of* light/dark rather than replacing it: `.dark` still
+  decides the mode, `data-theme` decides the palette, and Default sets no
+  attribute at all so the original look is untouched.
 
-  Foreground pairings come from the palettes themselves — each swatch was
-  specified with either black or white text, and that is what is used here
-  rather than a contrast guess.
+  Each palette's light ground is tinted from its OWN colours. Frosted Mint
+  appears in all four source palettes, but using it as every background put a
+  green page under Toffee's browns and Ember's crimson, where no green exists
+  — so mint is now only the ground for Grove, the one palette that actually
+  contains green. The others get a pale tint of their own primary.
+
+  Jet Black stays the dark ground everywhere: it is genuinely in all four
+  palettes and reads as neutral slate rather than as a hue that clashes.
+  Dark-mode text is likewise tinted per palette instead of being mint.
 
   Deliberately NOT themed:
   - `--destructive`, which must keep meaning "danger" and cannot become the
-    same hue as a theme's accent (two of these palettes are red).
+    same hue as an accent — two of these palettes are built on red.
   - Node-type colours in the graph and calendar. Those encode *what a thing
-    is* — emerald habits, sky tasks, violet goals — so repainting them per
-    theme would destroy meaning the user reads at a glance. They are Tailwind
-    utility classes rather than tokens, so they are untouched automatically.
-
-  The default theme sets no attribute at all and keeps the original tokens.
+    is*, so repainting them per theme would destroy meaning read at a glance.
+    They are Tailwind utilities rather than tokens, so they are untouched.
 */
 
-/* ── Toffee: brown + bronze ── */
+/* ── Toffee: brown + bronze, on warm sand ── */
 [data-theme='toffee'] {
-  --background: #e4fde1;
-  --sidebar: #daf6d7;
-  --card: #edfeeb;
-  --popover: #edfeeb;
-  --foreground: #13262f;
-  --card-foreground: #13262f;
-  --popover-foreground: #13262f;
-  --sidebar-foreground: #13262f;
-  --muted: #d3efd0;
-  --muted-foreground: #37505b;
+  --background: #faf3ec;
+  --sidebar: #f3e8dd;
+  --card: #fdf8f4;
+  --popover: #fdf8f4;
+  --foreground: #2c1d14;
+  --card-foreground: #2c1d14;
+  --popover-foreground: #2c1d14;
+  --sidebar-foreground: #2c1d14;
+  --muted: #efe2d6;
+  --muted-foreground: #6b5545;
   --secondary: #dea47e;
-  --secondary-foreground: #13262f;
-  --accent: #f0d8c8;
-  --accent-foreground: #13262f;
+  --secondary-foreground: #2c1d14;
+  --accent: #f0dccc;
+  --accent-foreground: #2c1d14;
   --primary: #9e6240;
   --primary-foreground: #ffffff;
   --sidebar-primary: #9e6240;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0d8c8;
-  --sidebar-accent-foreground: #13262f;
-  --border: rgb(19 38 47 / 14%);
-  --input: rgb(19 38 47 / 18%);
-  --sidebar-border: rgb(19 38 47 / 14%);
+  --sidebar-accent: #f0dccc;
+  --sidebar-accent-foreground: #2c1d14;
+  --border: rgb(44 29 20 / 14%);
+  --input: rgb(44 29 20 / 18%);
+  --sidebar-border: rgb(44 29 20 / 14%);
   --ring: #9e6240;
   --sidebar-ring: #9e6240;
   --chart-1: #9e6240;
@@ -293,56 +294,57 @@
   --sidebar: #0e1d24;
   --card: #1c333d;
   --popover: #1c333d;
-  --foreground: #e4fde1;
-  --card-foreground: #e4fde1;
-  --popover-foreground: #e4fde1;
-  --sidebar-foreground: #e4fde1;
+  --foreground: #f6ece3;
+  --card-foreground: #f6ece3;
+  --popover-foreground: #f6ece3;
+  --sidebar-foreground: #f6ece3;
   --muted: #1f3a45;
-  --muted-foreground: rgb(228 253 225 / 66%);
+  --muted-foreground: rgb(246 236 227 / 66%);
   --secondary: #1f3a45;
-  --secondary-foreground: #e4fde1;
+  --secondary-foreground: #f6ece3;
   --accent: #23414d;
-  --accent-foreground: #e4fde1;
+  --accent-foreground: #f6ece3;
   --primary: #dea47e;
   --primary-foreground: #13262f;
   --sidebar-primary: #dea47e;
   --sidebar-primary-foreground: #13262f;
   --sidebar-accent: #23414d;
-  --sidebar-accent-foreground: #e4fde1;
-  --border: rgb(228 253 225 / 14%);
-  --input: rgb(228 253 225 / 17%);
-  --sidebar-border: rgb(228 253 225 / 14%);
+  --sidebar-accent-foreground: #f6ece3;
+  --border: rgb(246 236 227 / 14%);
+  --input: rgb(246 236 227 / 17%);
+  --sidebar-border: rgb(246 236 227 / 14%);
   --ring: #dea47e;
   --sidebar-ring: #dea47e;
   --chart-1: #dea47e;
   --chart-2: #9e6240;
 }
 
-/* ── Grove: orange + forest green ── */
+/* ── Grove: orange + forest green. The one palette with green in it, so
+      Frosted Mint is its ground rather than an imposition. ── */
 [data-theme='grove'] {
-  --background: #e4fde1;
-  --sidebar: #daf6d7;
-  --card: #edfeeb;
-  --popover: #edfeeb;
-  --foreground: #13262f;
-  --card-foreground: #13262f;
-  --popover-foreground: #13262f;
-  --sidebar-foreground: #13262f;
-  --muted: #d3efd0;
-  --muted-foreground: #37505b;
+  --background: #e9fde6;
+  --sidebar: #dbf6d7;
+  --card: #f1fef0;
+  --popover: #f1fef0;
+  --foreground: #14261a;
+  --card-foreground: #14261a;
+  --popover-foreground: #14261a;
+  --sidebar-foreground: #14261a;
+  --muted: #d5efd1;
+  --muted-foreground: #3d5a44;
   --secondary: #548c2f;
   --secondary-foreground: #ffffff;
   --accent: #d8ecc9;
-  --accent-foreground: #13262f;
+  --accent-foreground: #14261a;
   --primary: #f9a620;
-  --primary-foreground: #13262f;
+  --primary-foreground: #14261a;
   --sidebar-primary: #f9a620;
-  --sidebar-primary-foreground: #13262f;
+  --sidebar-primary-foreground: #14261a;
   --sidebar-accent: #d8ecc9;
-  --sidebar-accent-foreground: #13262f;
-  --border: rgb(19 38 47 / 14%);
-  --input: rgb(19 38 47 / 18%);
-  --sidebar-border: rgb(19 38 47 / 14%);
+  --sidebar-accent-foreground: #14261a;
+  --border: rgb(20 38 26 / 14%);
+  --input: rgb(20 38 26 / 18%);
+  --sidebar-border: rgb(20 38 26 / 14%);
   --ring: #f9a620;
   --sidebar-ring: #f9a620;
   --chart-1: #f9a620;
@@ -378,31 +380,31 @@
   --chart-2: #7ab84a;
 }
 
-/* ── Coral: coral + ruby ── */
+/* ── Coral: coral + ruby, on warm blush ── */
 [data-theme='coral'] {
-  --background: #e4fde1;
-  --sidebar: #daf6d7;
-  --card: #edfeeb;
-  --popover: #edfeeb;
-  --foreground: #13262f;
-  --card-foreground: #13262f;
-  --popover-foreground: #13262f;
-  --sidebar-foreground: #13262f;
-  --muted: #d3efd0;
-  --muted-foreground: #37505b;
+  --background: #fff4ef;
+  --sidebar: #fbe8e0;
+  --card: #fff9f7;
+  --popover: #fff9f7;
+  --foreground: #2e1613;
+  --card-foreground: #2e1613;
+  --popover-foreground: #2e1613;
+  --sidebar-foreground: #2e1613;
+  --muted: #f7e2d9;
+  --muted-foreground: #6d4a43;
   --secondary: #a31621;
   --secondary-foreground: #ffffff;
-  --accent: #f6d8cd;
-  --accent-foreground: #13262f;
+  --accent: #f8ddd2;
+  --accent-foreground: #2e1613;
   --primary: #ff8552;
   --primary-foreground: #ffffff;
   --sidebar-primary: #ff8552;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f6d8cd;
-  --sidebar-accent-foreground: #13262f;
-  --border: rgb(19 38 47 / 14%);
-  --input: rgb(19 38 47 / 18%);
-  --sidebar-border: rgb(19 38 47 / 14%);
+  --sidebar-accent: #f8ddd2;
+  --sidebar-accent-foreground: #2e1613;
+  --border: rgb(46 22 19 / 14%);
+  --input: rgb(46 22 19 / 18%);
+  --sidebar-border: rgb(46 22 19 / 14%);
   --ring: #ff8552;
   --sidebar-ring: #ff8552;
   --chart-1: #ff8552;
@@ -413,56 +415,56 @@
   --sidebar: #0e1d24;
   --card: #1c333d;
   --popover: #1c333d;
-  --foreground: #e4fde1;
-  --card-foreground: #e4fde1;
-  --popover-foreground: #e4fde1;
-  --sidebar-foreground: #e4fde1;
+  --foreground: #fdeee8;
+  --card-foreground: #fdeee8;
+  --popover-foreground: #fdeee8;
+  --sidebar-foreground: #fdeee8;
   --muted: #1f3a45;
-  --muted-foreground: rgb(228 253 225 / 66%);
+  --muted-foreground: rgb(253 238 232 / 66%);
   --secondary: #1f3a45;
-  --secondary-foreground: #e4fde1;
+  --secondary-foreground: #fdeee8;
   --accent: #23414d;
-  --accent-foreground: #e4fde1;
+  --accent-foreground: #fdeee8;
   --primary: #ff8552;
   --primary-foreground: #13262f;
   --sidebar-primary: #ff8552;
   --sidebar-primary-foreground: #13262f;
   --sidebar-accent: #23414d;
-  --sidebar-accent-foreground: #e4fde1;
-  --border: rgb(228 253 225 / 14%);
-  --input: rgb(228 253 225 / 17%);
-  --sidebar-border: rgb(228 253 225 / 14%);
+  --sidebar-accent-foreground: #fdeee8;
+  --border: rgb(253 238 232 / 14%);
+  --input: rgb(253 238 232 / 17%);
+  --sidebar-border: rgb(253 238 232 / 14%);
   --ring: #ff8552;
   --sidebar-ring: #ff8552;
   --chart-1: #ff8552;
   --chart-2: #d94452;
 }
 
-/* ── Ember: amber + deep crimson ── */
+/* ── Ember: amber + deep crimson, on amber cream ── */
 [data-theme='ember'] {
-  --background: #e4fde1;
-  --sidebar: #daf6d7;
-  --card: #edfeeb;
-  --popover: #edfeeb;
-  --foreground: #13262f;
-  --card-foreground: #13262f;
-  --popover-foreground: #13262f;
-  --sidebar-foreground: #13262f;
-  --muted: #d3efd0;
-  --muted-foreground: #37505b;
+  --background: #fef8ea;
+  --sidebar: #fbefd8;
+  --card: #fffcf4;
+  --popover: #fffcf4;
+  --foreground: #2b1f0d;
+  --card-foreground: #2b1f0d;
+  --popover-foreground: #2b1f0d;
+  --sidebar-foreground: #2b1f0d;
+  --muted: #f6e8cd;
+  --muted-foreground: #6a563a;
   --secondary: #96031a;
   --secondary-foreground: #ffffff;
-  --accent: #f7e2c4;
-  --accent-foreground: #13262f;
+  --accent: #f8e6c6;
+  --accent-foreground: #2b1f0d;
   --primary: #faa916;
-  --primary-foreground: #13262f;
+  --primary-foreground: #2b1f0d;
   --sidebar-primary: #faa916;
-  --sidebar-primary-foreground: #13262f;
-  --sidebar-accent: #f7e2c4;
-  --sidebar-accent-foreground: #13262f;
-  --border: rgb(19 38 47 / 14%);
-  --input: rgb(19 38 47 / 18%);
-  --sidebar-border: rgb(19 38 47 / 14%);
+  --sidebar-primary-foreground: #2b1f0d;
+  --sidebar-accent: #f8e6c6;
+  --sidebar-accent-foreground: #2b1f0d;
+  --border: rgb(43 31 13 / 14%);
+  --input: rgb(43 31 13 / 18%);
+  --sidebar-border: rgb(43 31 13 / 14%);
   --ring: #faa916;
   --sidebar-ring: #faa916;
   --chart-1: #faa916;
@@ -473,25 +475,25 @@
   --sidebar: #0e1d24;
   --card: #1c333d;
   --popover: #1c333d;
-  --foreground: #e4fde1;
-  --card-foreground: #e4fde1;
-  --popover-foreground: #e4fde1;
-  --sidebar-foreground: #e4fde1;
+  --foreground: #fbf2e1;
+  --card-foreground: #fbf2e1;
+  --popover-foreground: #fbf2e1;
+  --sidebar-foreground: #fbf2e1;
   --muted: #1f3a45;
-  --muted-foreground: rgb(228 253 225 / 66%);
+  --muted-foreground: rgb(251 242 225 / 66%);
   --secondary: #1f3a45;
-  --secondary-foreground: #e4fde1;
+  --secondary-foreground: #fbf2e1;
   --accent: #23414d;
-  --accent-foreground: #e4fde1;
+  --accent-foreground: #fbf2e1;
   --primary: #faa916;
   --primary-foreground: #13262f;
   --sidebar-primary: #faa916;
   --sidebar-primary-foreground: #13262f;
   --sidebar-accent: #23414d;
-  --sidebar-accent-foreground: #e4fde1;
-  --border: rgb(228 253 225 / 14%);
-  --input: rgb(228 253 225 / 17%);
-  --sidebar-border: rgb(228 253 225 / 14%);
+  --sidebar-accent-foreground: #fbf2e1;
+  --border: rgb(251 242 225 / 14%);
+  --input: rgb(251 242 225 / 17%);
+  --sidebar-border: rgb(251 242 225 / 14%);
   --ring: #faa916;
   --sidebar-ring: #faa916;
   --chart-1: #faa916;
