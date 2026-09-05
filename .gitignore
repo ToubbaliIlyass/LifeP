@@ -57,3 +57,6 @@ next-env.d.ts
 
 # debug screenshots from mobile testing
 mobile-*.png
+
+# point-in-time database copies from the Turso migration
+data/migration/
