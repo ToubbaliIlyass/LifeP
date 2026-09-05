@@ -5,14 +5,14 @@ import { BaseEdge, getStraightPath, useInternalNode, type EdgeProps } from '@xyf
 function circleCenter(node: ReturnType<typeof useInternalNode>) {
   if (!node) return null
   const pos = node.internals.positionAbsolute
-  const w = node.measured?.width ?? 90
-  const r = (node.data as Record<string, unknown>)?.circleR as number ?? 19
+  const w = node.measured?.width ?? 104
+  const r = (node.data as Record<string, unknown>)?.circleR as number ?? 23
   // Circle is at the top of the node div, centered horizontally
   return { cx: pos.x + w / 2, cy: pos.y + r, r }
 }
 
 export function FloatingEdge({
-  id, source, target,
+  id, source, target, data,
   style, label, labelStyle, labelBgPadding, labelBgBorderRadius, markerEnd,
 }: EdgeProps) {
   const srcNode = useInternalNode(source)
@@ -33,10 +33,16 @@ export function FloatingEdge({
   const tx = tgt.cx - (dx / dist) * tgt.r
   const ty = tgt.cy - (dy / dist) * tgt.r
 
-  const [path, labelX, labelY] = getStraightPath({
+  const [path, midX, midY] = getStraightPath({
     sourceX: sx, sourceY: sy,
     targetX: tx, targetY: ty,
   })
+
+  // Nudge the label off the straight line by the offset computed at layout
+  // time, so it doesn't land on a node circle or on top of another label.
+  const offset = (data as { labelOffset?: { dx: number; dy: number } } | undefined)?.labelOffset
+  const labelX = midX + (offset?.dx ?? 0)
+  const labelY = midY + (offset?.dy ?? 0)
 
   return (
     <BaseEdge

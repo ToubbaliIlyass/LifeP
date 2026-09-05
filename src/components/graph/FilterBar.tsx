@@ -34,7 +34,7 @@ export function FilterBar({ active, onChange }: FilterBarProps) {
   ]
 
   return (
-    <div className="flex items-center gap-0.5 bg-background/80 dark:bg-[oklch(0.125_0.004_255/90%)] backdrop-blur-md border border-border/50 rounded-xl px-1.5 py-1.5 shadow-[0_2px_12px_oklch(0_0_0/0.15)]">
+    <div className="flex items-center gap-0.5 bg-background/80 dark:bg-[oklch(0.125_0.004_255/90%)] backdrop-blur-md border border-border/50 rounded-xl px-1.5 py-1.5 shadow-[0_2px_12px_oklch(0_0_0/0.15)] max-w-[60vw] sm:max-w-[70vw] overflow-x-auto">
       {filters.map((f) => (
         <button
           key={f.value}
