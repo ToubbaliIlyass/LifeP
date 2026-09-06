@@ -79,6 +79,12 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
     const Ctor = getCtor()
     if (!Ctor) { setError('This browser cannot listen.'); return }
 
+    // Starting again without ending the previous session left two live
+    // recognizers transcribing the same microphone into the same buffer, so
+    // every word landed twice. Overwriting the ref does not stop the old one
+    // — only abort() does.
+    recognition.current?.abort()
+
     setError(null)
     const rec = new Ctor()
     // continuous keeps it running through natural pauses; interimResults is
@@ -87,20 +93,34 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
     rec.interimResults = true
     rec.lang = navigator.language || 'en-US'
 
+    /*
+     * Rebuilt from the full result list every time rather than appended to.
+     *
+     * `e.results` is cumulative for the whole session, and `e.resultIndex`
+     * only marks where the browser started changing things — it is not a
+     * promise that everything from there on is new. Chrome re-delivers
+     * already-finalised results routinely, and the old code appended each one
+     * again on every delivery, which is why words piled up repeated.
+     *
+     * Reading the whole list and replacing the transcript makes the handler
+     * idempotent: the same event delivered ten times produces the same text,
+     * so no re-delivery can duplicate anything.
+     */
     rec.onresult = (e: SpeechEvent) => {
+      let final = ''
       let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      for (let i = 0; i < e.results.length; i++) {
         const result = e.results[i]
         const text = result[0].transcript
-        if (result.isFinal) {
-          finalRef.current = (finalRef.current + ' ' + text).trim()
-          setFinalText(finalRef.current)
-          onFinalRef.current?.(finalRef.current)
-        } else {
-          interim += text
-        }
+        if (result.isFinal) final += text
+        else interim += text
       }
-      setInterimText(interim)
+
+      final = final.replace(/\s+/g, ' ').trim()
+      finalRef.current = final
+      setFinalText(final)
+      setInterimText(interim.replace(/\s+/g, ' ').trim())
+      if (final) onFinalRef.current?.(final)
     }
 
     rec.onerror = (e: SpeechErrorEvent) => {
