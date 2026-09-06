@@ -25,7 +25,7 @@ export async function createSupabaseServerClient() {
             }
           } catch {
             // Server components cannot set cookies. That is fine: the
-            // middleware refreshes the session on every request, so the
+            // proxy refreshes the session on every request, so the
             // tokens are already current by the time we get here.
           }
         },

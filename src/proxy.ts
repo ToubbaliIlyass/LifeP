@@ -6,12 +6,16 @@ import { NextResponse, type NextRequest } from 'next/server'
  * traffic out of the app.
  *
  * This is the outer gate. Each API route still checks the session itself —
- * middleware alone is too easy to bypass with a matcher mistake, and the
+ * this gate alone is too easy to bypass with a matcher mistake, and the
  * routes are what actually touch personal data.
+ *
+ * Named `proxy` rather than `middleware`: Next 16 deprecated the middleware
+ * file convention in favour of this one, which always runs on the Node
+ * runtime instead of the edge.
  */
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(

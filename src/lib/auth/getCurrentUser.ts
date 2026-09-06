@@ -80,8 +80,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 /**
  * The 401 every API route returns when there is no valid session.
  *
- * The middleware already turns anonymous /api traffic away, but each route
- * checks too: a single mistake in the middleware matcher should not be
+ * The proxy already turns anonymous /api traffic away, but each route
+ * checks too: a single mistake in the proxy matcher should not be
  * enough to expose personal data.
  */
 export function unauthorized(): Response {
