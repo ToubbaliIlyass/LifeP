@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useUndo } from '@/components/undo/UndoProvider'
+import { useSpeechInput } from '@/lib/useSpeechInput'
+import { MicButton } from '@/components/ui/mic-button'
 import { Plus, X, CheckSquare, FileText, Calendar, HeartPulse, Target, Repeat, FolderKanban, BookOpen, GraduationCap, ClipboardList } from 'lucide-react'
 
 type QuickType = 'Task' | 'Note' | 'Event' | 'HealthMetric' | 'Goal' | 'Habit' | 'Project' | 'Course' | 'Exam' | 'Assignment'
@@ -37,11 +39,15 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
   const [secondary, setSecondary] = useState('') // dueDate / value / frequency / code, depending on type
   const [submitting, setSubmitting] = useState(false)
   const { record } = useUndo()
+  // Dictation writes straight into the name field as the words arrive, so
+  // what is heard is visible and correctable before anything is saved.
+  const speech = useSpeechInput((text) => setName(text))
 
   function reset() {
     setName('')
     setSecondary('')
     setType('Task')
+    speech.reset()
   }
 
   function propertiesFor(): Record<string, unknown> {
@@ -158,13 +164,29 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
         </div>
 
         <form onSubmit={submit} className="p-4 space-y-3">
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={type === 'Note' ? 'Title…' : type === 'HealthMetric' ? 'e.g. Run, Weight…' : 'Name…'}
-            className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2.5 text-[14px] font-serif text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
-          />
+          <div className="flex items-center gap-1.5 bg-muted/40 border border-border/40 rounded-lg pr-1.5 focus-within:ring-1 focus-within:ring-primary/50">
+            <input
+              autoFocus
+              value={speech.listening ? speech.transcript : name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={
+                speech.listening
+                  ? 'Listening…'
+                  : type === 'Note' ? 'Title…'
+                  : type === 'HealthMetric' ? 'e.g. Run, Weight…'
+                  : 'Name…'
+              }
+              className="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-[14px] font-serif text-foreground/85 focus:outline-none"
+            />
+            <MicButton
+              supported={speech.supported}
+              listening={speech.listening}
+              onStart={() => { speech.reset(); speech.start() }}
+              onStop={speech.stop}
+              className="w-9 h-9"
+            />
+          </div>
+          {speech.error && <p className="text-[11px] text-destructive">{speech.error}</p>}
           {sf && (
             <div>
               <label className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest mb-1 block">{sf.label}</label>

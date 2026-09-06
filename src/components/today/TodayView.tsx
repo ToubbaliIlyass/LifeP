@@ -7,6 +7,7 @@ import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
 import { GoalDetail } from '@/components/goals/GoalDetail'
 import { WeatherStrip } from './WeatherStrip'
 import { ScheduleSuggestions } from './ScheduleSuggestions'
+import { NowQueue } from './NowQueue'
 import { todayStr } from '@/lib/date'
 
 interface HabitRow {
@@ -164,6 +165,8 @@ export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
         )}
 
         <ScheduleSuggestions onScheduled={load} />
+
+        <NowQueue onChanged={load} />
 
         {isEmpty && (
           <div className="py-10 text-center">

@@ -4,6 +4,8 @@ import { useChat } from '@ai-sdk/react'
 import { useEffect, useRef, useState } from 'react'
 import { SquarePen } from 'lucide-react'
 import { ToolActivity, isToolPart, type ToolPart } from './ToolActivity'
+import { useSpeechInput } from '@/lib/useSpeechInput'
+import { MicButton } from '@/components/ui/mic-button'
 
 interface ChatPanelProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
@@ -34,6 +36,7 @@ function autoResize(el: HTMLTextAreaElement) {
 export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
   const { messages, setMessages, sendMessage, stop, status, error } = useChat()
   const [input, setInput] = useState('')
+  const speech = useSpeechInput((text) => setInput(text))
   const scrollRef = useRef<HTMLDivElement>(null)
   const localInputRef = useRef<HTMLTextAreaElement>(null)
   const resolvedRef = inputRef ?? localInputRef
@@ -96,7 +99,7 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
             >
               <textarea
                 ref={resolvedRef}
-                value={input}
+                value={speech.listening ? speech.transcript : input}
                 rows={1}
                 onChange={(e) => {
                   setInput(e.target.value)
@@ -113,7 +116,14 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
                 autoFocus
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none resize-none overflow-hidden min-h-[48px] max-h-[200px] overflow-y-auto leading-relaxed"
               />
-              <div className="flex items-center justify-end mt-2 pt-2 border-t border-border/40">
+              <div className="flex items-center gap-2 justify-end mt-2 pt-2 border-t border-border/40">
+                <MicButton
+                  supported={speech.supported}
+                  listening={speech.listening}
+                  onStart={() => { speech.reset(); speech.start() }}
+                  onStop={speech.stop}
+                  className="w-7 h-7 mr-auto"
+                />
                 <button
                   type="submit"
                   disabled={busy || !input.trim()}
@@ -223,7 +233,7 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
         >
           <textarea
             ref={resolvedRef}
-            value={input}
+            value={speech.listening ? speech.transcript : input}
             rows={1}
             onChange={(e) => {
               setInput(e.target.value)
@@ -235,8 +245,15 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
                 handleSubmit(e)
               }
             }}
-            placeholder="Write a message…"
+            placeholder={speech.listening ? "Listening…" : "Write a message…"}
             className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/65 outline-none resize-none overflow-hidden max-h-[160px] overflow-y-auto leading-relaxed"
+          />
+          <MicButton
+            supported={speech.supported}
+            listening={speech.listening}
+            onStart={() => { speech.reset(); speech.start() }}
+            onStop={speech.stop}
+            className="w-7 h-7"
           />
           {busy ? (
             <button
