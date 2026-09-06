@@ -13,7 +13,7 @@
     "db:seed": "npx tsx scripts/seed.ts",
     "phone": "npm run phone:build && node scripts/phone-url.js && npm run phone:serve",
     "phone:build": "NEXT_DIST_DIR=.next-prod next build",
-    "phone:serve": "NEXT_DIST_DIR=.next-prod next start -p 3002 -H 0.0.0.0"
+    "phone:serve": "node scripts/free-port.js 3002 && NEXT_DIST_DIR=.next-prod next start -p 3002 -H 0.0.0.0"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.71",
