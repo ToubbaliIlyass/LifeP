@@ -19,12 +19,14 @@ export async function GET() {
   const result = await Promise.all(goals.map(async (g) => {
     const p = g.properties as Record<string, unknown>
     const detail = await getNodeWithNeighbors(user.id, g.id)
-    const linked = (detail?.neighbors ?? []).filter((n) => n.node.type === 'Task' || n.node.type === 'Habit')
-    // Milestones are just this goal's linked Tasks, presented as an
-    // orderable checklist rather than only folded into the % below —
-    // there's no separate "Milestone" node type.
+    const linked = (detail?.neighbors ?? []).filter(
+      (n) => n.node.type === 'Milestone' || n.node.type === 'Task' || n.node.type === 'Habit',
+    )
+    // Milestones are their own node type — a step towards the goal, not a
+    // task to be scheduled. Linked Tasks and Habits still count towards
+    // progress below; they just aren't listed as milestones.
     const milestones = linked
-      .filter((n) => n.node.type === 'Task')
+      .filter((n) => n.node.type === 'Milestone')
       .map(({ node }) => {
         const tp = node.properties as Record<string, unknown>
         return {
@@ -37,7 +39,7 @@ export async function GET() {
 
     let done = 0
     for (const { node } of linked) {
-      if (node.type === 'Task') {
+      if (node.type === 'Milestone' || node.type === 'Task') {
         const tp = node.properties as Record<string, unknown>
         if (tp.status === 'done') done++
       } else {

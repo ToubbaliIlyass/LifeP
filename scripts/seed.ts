@@ -19,7 +19,7 @@ const userId = 1
  * bug that hid Expense and HealthMetric when they were first added.
  */
 const builtinTypes = [
-  'Goal', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
+  'Goal', 'Milestone', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
   'HabitLog', 'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
   'HealthMetric', 'Settings',
 ]

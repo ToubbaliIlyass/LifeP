@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useUndo } from '@/components/undo/UndoProvider'
 import { useSpeechInput } from '@/lib/useSpeechInput'
+import { todayStr } from '@/lib/date'
 import { MicButton } from '@/components/ui/mic-button'
 import { Plus, X, CheckSquare, FileText, Calendar, HeartPulse, Target, Repeat, FolderKanban, BookOpen, GraduationCap, ClipboardList } from 'lucide-react'
 
@@ -21,6 +22,9 @@ const TYPES: { id: QuickType; label: string; Icon: React.ComponentType<{ classNa
   { id: 'Assignment', label: 'Assignment', Icon: ClipboardList },
 ]
 
+/** Types that can sensibly belong to a Goal, Project or Course. */
+const LINKABLE_TYPES: QuickType[] = ['Task', 'Habit', 'Assignment', 'Exam', 'Event']
+
 interface SecondaryField {
   label: string
   type: 'date' | 'number' | 'text' | 'select'
@@ -38,20 +42,35 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
   const [name, setName] = useState('')
   const [secondary, setSecondary] = useState('') // dueDate / value / frequency / code, depending on type
   const [submitting, setSubmitting] = useState(false)
+  const [linkTo, setLinkTo] = useState<string>('')
+  const [targets, setTargets] = useState<{ id: number; name: string; type: string }[]>([])
   const { record } = useUndo()
   // Dictation writes straight into the name field as the words arrive, so
   // what is heard is visible and correctable before anything is saved.
   const speech = useSpeechInput((text) => setName(text))
 
+  // Loaded once the sheet opens rather than on mount, so the button costs
+  // nothing until it is used.
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/link-targets')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { targets?: typeof targets } | null) => setTargets(d?.targets ?? []))
+      .catch(() => {})
+  }, [open])
+
   function reset() {
     setName('')
     setSecondary('')
     setType('Task')
+    setLinkTo('')
     speech.reset()
   }
 
   function propertiesFor(): Record<string, unknown> {
-    const today = new Date().toISOString().slice(0, 10)
+    // todayStr, not toISOString: the latter is UTC and hands back the
+    // wrong day either side of midnight depending on the offset.
+    const today = todayStr()
     switch (type) {
       case 'Task':
         return { name, status: 'todo', dueDate: secondary || null }
@@ -83,7 +102,7 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
     const res = await fetch('/api/quick-add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, properties: propertiesFor() }),
+      body: JSON.stringify({ type, properties: propertiesFor(), linkTo: linkTo ? Number(linkTo) : null }),
     })
     const created = (await res.json().catch(() => null)) as { node?: { id: number } } | null
     setSubmitting(false)
@@ -119,9 +138,11 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
 
   if (!open) {
     return (
+      // Phones only: on a large screen the chat, the panels and ⌘K are all on
+      // screen already, so a floating button only covers content.
       <button
         onClick={() => setOpen(true)}
-        className="fixed right-4 sm:right-5 z-40 w-14 h-14 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
+        className="md:hidden fixed right-4 sm:right-5 z-40 w-14 h-14 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
         style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
         title="Quick add"
         aria-label="Quick add"
@@ -207,6 +228,28 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
                   className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               )}
+            </div>
+          )}
+          {/*
+            Offered for the types that are genuinely work towards something
+            bigger. A Note or a health reading belongs to nothing in
+            particular, and an empty dropdown on every capture is noise.
+          */}
+          {LINKABLE_TYPES.includes(type) && targets.length > 0 && (
+            <div>
+              <label className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest mb-1 block">
+                Part of
+              </label>
+              <select
+                value={linkTo}
+                onChange={(e) => setLinkTo(e.target.value)}
+                className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+              >
+                <option value="">Nothing in particular</option>
+                {targets.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} · {t.type}</option>
+                ))}
+              </select>
             </div>
           )}
           <button

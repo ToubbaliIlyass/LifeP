@@ -12,6 +12,7 @@ interface SearchResult {
 
 const TYPE_COLORS: Record<string, string> = {
   Goal: 'text-violet-600 dark:text-violet-400',
+  Milestone: 'text-violet-500/80 dark:text-violet-300',
   Habit: 'text-emerald-600 dark:text-emerald-400',
   Task: 'text-sky-600 dark:text-sky-400',
   Event: 'text-amber-600 dark:text-amber-400',

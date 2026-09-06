@@ -1,5 +1,5 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
-import { createNode } from '@/lib/graph/queries'
+import { createNode, createEdge, getNodeById } from '@/lib/graph/queries'
 
 // The user's own direct capture — never gated by the AI proposal queue,
 // same tier as toggling a habit or editing a field in NodeDetailPanel. This
@@ -17,7 +17,12 @@ const ALLOWED_TYPES = new Set([
 export async function POST(request: Request) {
   const user = await getCurrentUser()
   if (!user) return unauthorized()
-  const body = await request.json() as { type?: string; properties?: Record<string, unknown> }
+  const body = await request.json() as {
+    type?: string
+    properties?: Record<string, unknown>
+    /** Optional Goal/Project/Course this belongs to. */
+    linkTo?: number | null
+  }
 
   const type = body.type
   if (!type || !ALLOWED_TYPES.has(type)) {
@@ -33,5 +38,17 @@ export async function POST(request: Request) {
   }
 
   const node = await createNode(user.id, type, properties)
-  return Response.json({ ok: true, node })
+
+  // Linking is best-effort: capture already succeeded, and losing the note
+  // itself because a parent was deleted a moment ago would be a poor trade.
+  let linkedTo: number | null = null
+  if (typeof body.linkTo === 'number') {
+    const parent = await getNodeById(user.id, body.linkTo)
+    if (parent && ['Goal', 'Project', 'Course'].includes(parent.type)) {
+      await createEdge(user.id, node.id, parent.id, 'part-of', {})
+      linkedTo = parent.id
+    }
+  }
+
+  return Response.json({ ok: true, node, linkedTo })
 }

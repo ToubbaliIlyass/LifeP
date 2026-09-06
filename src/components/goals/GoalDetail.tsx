@@ -80,8 +80,10 @@ export function GoalDetail({
     onChanged()
   }
 
+  // A milestone is a Milestone node, not a Task, so it goes through the
+  // generic node endpoint rather than /api/tasks.
   async function toggleMilestone(m: Milestone) {
-    await fetch(`/api/tasks/${m.id}`, {
+    await fetch(`/api/nodes/${m.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: m.status === 'done' ? 'todo' : 'done' }),

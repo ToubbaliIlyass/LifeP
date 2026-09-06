@@ -41,17 +41,24 @@ export async function GET(
   const habits = []
   const notes = []
   const other = []
+  // Linked Tasks still move the progress bar — they are real work towards the
+  // goal — but they are listed among the other linked nodes rather than as
+  // milestones, which are now their own type.
+  const linkedTasks: { done: boolean }[] = []
 
   for (const { node, edge, direction } of detail.neighbors) {
     const base = { id: node.id, label: label(node), edgeId: edge.id, edgeType: edge.type, direction }
     const p = node.properties as Record<string, unknown>
 
-    if (node.type === 'Task') {
+    if (node.type === 'Milestone') {
       milestones.push({
         ...base,
         status: typeof p.status === 'string' ? p.status : 'todo',
         dueDate: typeof p.dueDate === 'string' ? p.dueDate : null,
       })
+    } else if (node.type === 'Task') {
+      linkedTasks.push({ done: p.status === 'done' })
+      other.push({ ...base, type: node.type })
     } else if (node.type === 'Habit') {
       // Same "on track" rule the progress bar uses: logged complete at least
       // once in the last week.
@@ -67,9 +74,10 @@ export async function GET(
     }
   }
 
-  const counted = [...milestones, ...habits]
+  const counted = [...milestones, ...linkedTasks, ...habits]
   const done =
     milestones.filter((m) => m.status === 'done').length +
+    linkedTasks.filter((t) => t.done).length +
     habits.filter((h) => h.recentlyDone).length
 
   return Response.json({
