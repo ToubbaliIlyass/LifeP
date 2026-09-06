@@ -13,9 +13,19 @@ export const BatchOperationSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('createEdge'),
-    // "$N" = Nth createNode result in this batch (0-indexed). Plain number string = existing node ID.
-    sourceRef: z.string().describe('Source node ID ("42") or batch index reference ("$0")'),
-    targetRef: z.string().describe('Target node ID ("42") or batch index reference ("$0")'),
+    // "$N" = Nth createNode result in this batch (0-indexed). Plain number
+    // string = existing node ID. The two are one character apart and mean
+    // entirely different things, so both descriptions spell out the failure
+    // mode — dropping the "$" silently pointed edges at ids 0,1,2… which are
+    // never real rows. router.ts validates every ref before writing anything.
+    sourceRef: z
+      .string()
+      .regex(/^(\$\d+|\d+)$/, 'Must be "$0" (a node this batch creates) or "42" (an existing node id)')
+      .describe('"$0"/"$1" for a node CREATED IN THIS BATCH (0-indexed over createNode ops), or a bare id like "42" for an EXISTING node. The "$" is required for batch references.'),
+    targetRef: z
+      .string()
+      .regex(/^(\$\d+|\d+)$/, 'Must be "$0" (a node this batch creates) or "42" (an existing node id)')
+      .describe('"$0"/"$1" for a node CREATED IN THIS BATCH (0-indexed over createNode ops), or a bare id like "42" for an EXISTING node. The "$" is required for batch references.'),
     type: z.string().describe('Edge type e.g. supports, blocks, part-of'),
     properties: z.record(z.string(), z.unknown()).optional(),
   }),

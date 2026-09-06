@@ -10,14 +10,77 @@ export interface ExecutionResult {
   deletedNodes: Array<{ id: number; type: string; properties: Record<string, unknown> }>
 }
 
-function resolveRef(ref: string, createdNodeIds: number[]): number {
-  if (ref.startsWith('$')) {
-    const idx = parseInt(ref.slice(1), 10)
-    if (idx >= createdNodeIds.length) throw new Error(`Batch ref $${idx} out of range`)
-    return createdNodeIds[idx]
+/** Either "the Nth node this batch creates" or "this existing node". */
+type Ref = { kind: 'index'; index: number } | { kind: 'id'; id: number }
+
+function parseRef(ref: string): Ref | null {
+  const text = ref.trim()
+  const batch = /^\$(\d+)$/.exec(text)
+  if (batch) return { kind: 'index', index: Number(batch[1]) }
+  if (/^\d+$/.test(text)) return { kind: 'id', id: Number(text) }
+  return null
+}
+
+/**
+ * Works out what every edge in a batch points at, before anything is written.
+ *
+ * Edges used to be resolved as they were executed, which meant a bad reference
+ * was only discovered after the batch's nodes had already been created — the
+ * user was left with orphaned nodes and no links, and the failure surfaced as
+ * a raw foreign-key error naming a node id that never existed.
+ *
+ * "$0" means the first node this batch creates; "0" means the node whose id is
+ * 0. One character apart, and nothing checked which was meant. A model that
+ * drops the "$" produced edges pointing at ids 0,1,2… — never real rows, since
+ * ids start at 1 and climb. That exact slip is recovered here rather than
+ * failed on: it is only ever applied when the id does not exist AND is a valid
+ * position in this batch, so a reference to a real node is never overridden.
+ */
+async function planEdgeRefs(
+  userId: number,
+  operations: BatchOperation[],
+): Promise<Map<BatchOperation, { source: Ref; target: Ref }>> {
+  const createNodeCount = operations.filter((o) => o.kind === 'createNode').length
+  const plans = new Map<BatchOperation, { source: Ref; target: Ref }>()
+
+  const resolveOne = async (field: string, raw: string): Promise<Ref> => {
+    const parsed = parseRef(raw)
+    if (!parsed) throw new Error(`${field} "${raw}" is not a node id or a $N batch reference`)
+
+    if (parsed.kind === 'index') {
+      if (parsed.index >= createNodeCount) {
+        throw new Error(
+          `${field} "${raw}" refers to node ${parsed.index} of this batch, but it only creates ${createNodeCount}`,
+        )
+      }
+      return parsed
+    }
+
+    if (await getNodeById(userId, parsed.id)) return parsed
+
+    if (parsed.id < createNodeCount) {
+      logger.warn('batch_ref_missing_sigil', { field, raw, interpretedAs: `$${parsed.id}` })
+      return { kind: 'index', index: parsed.id }
+    }
+
+    throw new Error(`${field} "${raw}" is not an existing node (use "$${'N'}" to reference a node this batch creates)`)
   }
-  const id = parseInt(ref, 10)
-  if (isNaN(id)) throw new Error(`Invalid node ref: ${ref}`)
+
+  for (const op of operations) {
+    if (op.kind !== 'createEdge') continue
+    plans.set(op, {
+      source: await resolveOne('sourceRef', op.sourceRef),
+      target: await resolveOne('targetRef', op.targetRef),
+    })
+  }
+
+  return plans
+}
+
+function resolveRef(ref: Ref, createdNodeIds: number[]): number {
+  if (ref.kind === 'id') return ref.id
+  const id = createdNodeIds[ref.index]
+  if (id === undefined) throw new Error(`Batch ref $${ref.index} was never created`)
   return id
 }
 
@@ -33,6 +96,11 @@ export async function executeBatch(
   if (schemaEvolved) {
     logger.warn('schema_version_mismatch', { proposalVersion: proposalSchemaVersion, currentVersion })
   }
+
+  // Every edge is checked before the first node is written, so a batch with a
+  // bad reference is rejected whole instead of leaving nodes behind with
+  // nothing linking them.
+  const edgePlans = await planEdgeRefs(userId, operations)
 
   const result: ExecutionResult = {
     createdNodeIds: [],
@@ -61,8 +129,10 @@ export async function executeBatch(
         break
       }
       case 'createEdge': {
-        const sourceId = resolveRef(op.sourceRef, result.createdNodeIds)
-        const targetId = resolveRef(op.targetRef, result.createdNodeIds)
+        const plan = edgePlans.get(op)
+        if (!plan) throw new Error('Edge was not planned — this should be unreachable')
+        const sourceId = resolveRef(plan.source, result.createdNodeIds)
+        const targetId = resolveRef(plan.target, result.createdNodeIds)
         const duplicate = await findExistingEdge(userId, sourceId, targetId, op.type)
         if (duplicate) {
           summary.push(`"${op.type}" edge ${sourceId} → ${targetId} already exists — skipped`)
