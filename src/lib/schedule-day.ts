@@ -1,5 +1,5 @@
 import { getNodes, getEdges } from '@/lib/graph/queries'
-import { todayStr } from '@/lib/date'
+import { todayStr, eventOccursOn } from '@/lib/date'
 import {
   planSchedule,
   toMinutes,
@@ -68,7 +68,17 @@ export async function planDay(
   }
   for (const event of await getNodes(userId, { type: 'Event' })) {
     const p = event.properties as Record<string, unknown>
-    if (p.date !== date || typeof p.time !== 'string') continue
+    if (typeof p.time !== 'string') continue
+    const occurs = eventOccursOn(
+      {
+        date: typeof p.date === 'string' ? p.date : null,
+        frequency: typeof p.frequency === 'string' ? p.frequency : null,
+        daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
+        until: typeof p.until === 'string' ? p.until : null,
+      },
+      date,
+    )
+    if (!occurs) continue
     const start = toMinutes(p.time)
     busy.push({ start, end: start + (typeof p.duration === 'number' ? p.duration : 60) })
   }

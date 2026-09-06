@@ -1,14 +1,9 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges, getNodeById, createNode, createEdge } from '@/lib/graph/queries'
 import type { Node } from '@/lib/db/schema'
-import { todayStr, isDueOn } from '@/lib/date'
+import { todayStr, isDueOn, eventOccursOn } from '@/lib/date'
 import { planDay } from '@/lib/schedule-day'
-
-function addMinutes(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number)
-  const total = (h * 60 + m + minutes) % (24 * 60)
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
+import { toMinutes, fromMinutes, type BusyInterval } from '@/lib/schedule'
 
 /**
  * Habits shouldn't need to be dragged onto the calendar by hand every
@@ -21,7 +16,7 @@ function addMinutes(time: string, minutes: number): string {
  * Scoped to today-or-later only (the caller enforces this) — a past day
  * is never rewritten with a fabricated entry it didn't actually get.
  */
-async function autoFillHabitsForDate(userId: number, date: string) {
+async function autoFillHabitsForDate(userId: number, date: string, dayStart: string) {
   const dow = new Date(date + 'T00:00:00').getDay()
   const habits = await getNodes(userId, { type: 'Habit' })
   if (habits.length === 0) return
@@ -30,6 +25,47 @@ async function autoFillHabitsForDate(userId: number, date: string) {
   const scheduledForEdges = await getEdges(userId, { type: 'scheduled-for' })
   const timeBlocks = await getNodes(userId, { type: 'TimeBlock' })
   const blockById = new Map(timeBlocks.map((b) => [b.id, b]))
+
+  // Everything already occupying this day, so auto-filled habits land in gaps
+  // rather than on top of each other. Previously every habit without a
+  // remembered time was given the same hardcoded 08:00, so a person with four
+  // habits got four blocks stacked on one slot.
+  const taken: BusyInterval[] = []
+  for (const block of timeBlocks) {
+    const bp = block.properties as Record<string, unknown>
+    if (bp.date !== date) continue
+    if (typeof bp.startTime === 'string' && typeof bp.endTime === 'string') {
+      taken.push({ start: toMinutes(bp.startTime), end: toMinutes(bp.endTime) })
+    }
+  }
+  for (const event of await getNodes(userId, { type: 'Event' })) {
+    const ep = event.properties as Record<string, unknown>
+    if (typeof ep.time !== 'string') continue
+    const occurs = eventOccursOn(
+      {
+        date: typeof ep.date === 'string' ? ep.date : null,
+        frequency: typeof ep.frequency === 'string' ? ep.frequency : null,
+        daysOfWeek: Array.isArray(ep.daysOfWeek) ? (ep.daysOfWeek as number[]) : null,
+        until: typeof ep.until === 'string' ? ep.until : null,
+      },
+      date,
+    )
+    if (!occurs) continue
+    const start = toMinutes(ep.time)
+    taken.push({ start, end: start + (typeof ep.duration === 'number' ? ep.duration : 60) })
+  }
+
+  // First slot at or after `from` that nothing else already occupies.
+  function firstFreeFrom(from: number, minutes: number): number {
+    let scan = from
+    for (let guard = 0; guard < 200; guard++) {
+      const end = scan + minutes
+      const clash = taken.find((b) => scan < b.end && end > b.start)
+      if (!clash) return scan
+      scan = clash.end
+    }
+    return scan
+  }
 
   for (const habit of habits) {
     const p = habit.properties as Record<string, unknown>
@@ -64,8 +100,22 @@ async function autoFillHabitsForDate(userId: number, date: string) {
       .sort((a, b) => (b.date as string).localeCompare(a.date as string))[0]
 
     const durationMinutes = typeof p.durationMinutes === 'number' ? p.durationMinutes : 30
-    const startTime = typeof mostRecent?.startTime === 'string' ? mostRecent.startTime : '08:00'
-    const endTime = typeof mostRecent?.endTime === 'string' ? mostRecent.endTime : addMinutes(startTime, durationMinutes)
+
+    // A habit keeps the time of day it was last given — that is the habit.
+    // Only when the remembered slot is taken, or there is no remembered slot
+    // at all, does it get moved to the next free gap.
+    const remembered =
+      typeof mostRecent?.startTime === 'string' ? toMinutes(mostRecent.startTime as string) : null
+    const rememberedLength =
+      typeof mostRecent?.startTime === 'string' && typeof mostRecent?.endTime === 'string'
+        ? toMinutes(mostRecent.endTime as string) - toMinutes(mostRecent.startTime as string)
+        : durationMinutes
+    const length = rememberedLength > 0 ? rememberedLength : durationMinutes
+
+    const startMinutes = firstFreeFrom(remembered ?? toMinutes(dayStart), length)
+    const startTime = fromMinutes(startMinutes)
+    const endTime = fromMinutes(startMinutes + length)
+    taken.push({ start: startMinutes, end: startMinutes + length })
 
     const block = await createNode(userId, 'TimeBlock', { date, startTime, endTime })
     await createEdge(userId, block.id, habit.id, 'scheduled-for', {})
@@ -81,23 +131,21 @@ export async function GET(request: Request) {
   // Today or any future day — never a past one, so browsing history never
   // fabricates an entry that wasn't actually there.
   if (date >= todayStr()) {
-    await autoFillHabitsForDate(user.id, date)
-
-    // Only "auto" writes without asking. In "suggest" mode the same plan is
-    // computed on the dashboard instead and waits for approval, which is why
-    // both paths go through planDay rather than each having their own idea of
-    // what a good schedule looks like.
     const settingsNodes = await getNodes(user.id, { type: 'Settings' })
     const settings = (settingsNodes[0]?.properties ?? {}) as {
       scheduleMode?: 'off' | 'suggest' | 'auto'
       workingHours?: { start: string; end: string }
     }
+    const hours = settings.workingHours ?? { start: '09:00', end: '18:00' }
+
+    await autoFillHabitsForDate(user.id, date, hours.start)
+
+    // Only "auto" writes without asking. In "suggest" mode the same plan is
+    // computed on the dashboard instead and waits for approval, which is why
+    // both paths go through planDay rather than each having their own idea of
+    // what a good schedule looks like.
     if (settings.scheduleMode === 'auto') {
-      const placements = await planDay(
-        user.id,
-        date,
-        settings.workingHours ?? { start: '09:00', end: '18:00' },
-      )
+      const placements = await planDay(user.id, date, hours)
       for (const p of placements) {
         const block = await createNode(user.id, 'TimeBlock', {
           date,
@@ -156,18 +204,31 @@ export async function GET(request: Request) {
 
   // Events for the requested date
   const events = (await getNodes(user.id, { type: 'Event' }))
+    .filter((n) => {
+      const p = n.properties as Record<string, unknown>
+      return eventOccursOn(
+        {
+          date: typeof p.date === 'string' ? p.date : null,
+          frequency: typeof p.frequency === 'string' ? p.frequency : null,
+          daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
+          until: typeof p.until === 'string' ? p.until : null,
+        },
+        date,
+      )
+    })
     .map((n) => {
       const p = n.properties as Record<string, unknown>
       return {
         id: n.id,
         name: typeof p.name === 'string' ? p.name : `Event #${n.id}`,
-        date: typeof p.date === 'string' ? p.date : null,
+        // The occurrence, not the rule's start date — this is the day being shown.
+        date,
         time: typeof p.time === 'string' ? p.time : null,
         duration: typeof p.duration === 'number' ? p.duration : null,
         location: typeof p.location === 'string' ? p.location : null,
+        recurring: typeof p.frequency === 'string' && p.frequency !== 'once' && p.frequency !== 'none',
       }
     })
-    .filter((e) => e.date === date)
     .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
 
   return Response.json({ date, blocks, events })

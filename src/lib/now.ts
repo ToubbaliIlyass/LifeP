@@ -1,4 +1,4 @@
-import { isDueOn } from '@/lib/date'
+import { isDueOn, eventOccursOn } from '@/lib/date'
 import { toMinutes, DEFAULT_TASK_MINUTES } from '@/lib/schedule'
 import type { Node, Edge } from '@/lib/db/schema'
 
@@ -48,6 +48,12 @@ export function buildNowQueue({
   const dow = new Date(date + 'T00:00:00').getDay()
   const nodeById = new Map([...tasks, ...habits].map((n) => [n.id, n]))
 
+  const habitDoneToday = (habitId: number) =>
+    habitLogs.some((l) => {
+      const lp = l.properties as Record<string, unknown>
+      return lp.habitNodeId === habitId && lp.date === date && lp.completed === true
+    })
+
   const describe = (id: number) => {
     const n = nodeById.get(id)
     if (!n) return null
@@ -55,7 +61,12 @@ export function buildNowQueue({
     return {
       label: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${n.type} #${n.id}`,
       type: n.type,
-      done: p.status === 'done',
+      // A habit has no status — its completion lives in a HabitLog. Reading
+      // `status` for both is why ticking a habit off the queue used to leave
+      // it sitting there: the check could never be true for a habit, and
+      // habits reach this queue as calendar blocks because they are
+      // auto-filled onto the day.
+      done: n.type === 'Habit' ? habitDoneToday(n.id) : p.status === 'done',
     }
   }
 
@@ -87,7 +98,18 @@ export function buildNowQueue({
 
   for (const event of events) {
     const p = event.properties as Record<string, unknown>
-    if (p.date !== date) continue
+    // Recurring events have one node and many occurrences, so the rule is
+    // asked rather than the stored date compared.
+    const occurs = eventOccursOn(
+      {
+        date: typeof p.date === 'string' ? p.date : null,
+        frequency: typeof p.frequency === 'string' ? p.frequency : null,
+        daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
+        until: typeof p.until === 'string' ? p.until : null,
+      },
+      date,
+    )
+    if (!occurs) continue
     const start = typeof p.time === 'string' ? p.time : null
     const minutes = typeof p.duration === 'number' ? p.duration : 60
     items.push({
