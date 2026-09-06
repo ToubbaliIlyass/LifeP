@@ -8,12 +8,38 @@ import type { CalendarBlock, CalendarEvent } from './CalendarView'
 // Shared by TimeGrid (single day) and WeekGrid (7 columns) so both grids
 // render blocks/events/drop-zones identically instead of drifting apart.
 
-export const SLOT_HEIGHT = 32 // px per 30-min slot
-export const HOUR_HEIGHT = SLOT_HEIGHT * 2
-// A 30-min block (one slot) is too short to fit the title line + time
-// line without them crowding each other — floor non-compact blocks at a
-// height that gives the time line room to breathe regardless of duration.
-export const MIN_BLOCK_HEIGHT = 44
+/*
+ * The grid's unit of time. Was 30 minutes, which meant a five-minute habit
+ * could only ever start on the hour or the half hour — every short thing
+ * landed on the same handful of positions. Ten divides the hour evenly and is
+ * fine enough to place a five-minute routine without turning the day into a
+ * wall of lines.
+ *
+ * Every conversion below derives from this, so the grid, the blocks, the drag
+ * targets and the resize handles cannot disagree about how long a slot is.
+ */
+export const SLOT_MINUTES = 10
+/*
+ * Taller than the old 64px. Ten-minute precision is worthless if ten minutes
+ * is six pixels: the grid has to give a short block somewhere to be before it
+ * can be placed accurately.
+ */
+export const HOUR_HEIGHT = 96
+export const SLOT_HEIGHT = HOUR_HEIGHT / (60 / SLOT_MINUTES)
+export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES
+/** Week view drops on half-hours: seven columns of ten-minute targets is too many. */
+export const WEEK_DROP_STEP = 30 / SLOT_MINUTES
+/*
+ * Floor for a block's height, so a very short one is still readable.
+ *
+ * Kept deliberately small. At 44px — the old value, sized for half-hour slots
+ * — a five-minute habit would be drawn over forty minutes of grid and collide
+ * with whatever came next, which is the stacked mess this was meant to fix.
+ * 26px is a single legible line and under twenty minutes of grid.
+ */
+export const MIN_BLOCK_HEIGHT = 26
+/** Below this, a block only has room for its title. */
+const TIGHT_HEIGHT = 40
 
 export function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
@@ -21,7 +47,7 @@ export function timeToMinutes(time: string): number {
 }
 
 export function timeToPx(time: string): number {
-  return (timeToMinutes(time) / 30) * SLOT_HEIGHT
+  return (timeToMinutes(time) / SLOT_MINUTES) * SLOT_HEIGHT
 }
 
 export function minutesToTime(mins: number): string {
@@ -138,10 +164,10 @@ export function PositionedBlock({ block, isDragging, onResize, onDelete, onSelec
     if (!resizeRef.current) return
     const deltaSlots = Math.round((e.clientY - resizeRef.current.startY) / SLOT_HEIGHT)
     const newEndMinutes = Math.max(
-      timeToMinutes(block.startTime) + 30,
-      resizeRef.current.startEndMinutes + deltaSlots * 30,
+      timeToMinutes(block.startTime) + SLOT_MINUTES,
+      resizeRef.current.startEndMinutes + deltaSlots * SLOT_MINUTES,
     )
-    setResizeEndTime(minutesToTime(Math.min(newEndMinutes, 24 * 60 - 30)))
+    setResizeEndTime(minutesToTime(Math.min(newEndMinutes, 24 * 60 - SLOT_MINUTES)))
   }
 
   function handleResizePointerUp() {
@@ -156,7 +182,10 @@ export function PositionedBlock({ block, isDragging, onResize, onDelete, onSelec
   }
 
   const displayEnd = resizeEndTime ?? block.endTime
-  const displayHeight = Math.max(compact ? SLOT_HEIGHT : MIN_BLOCK_HEIGHT, timeToPx(displayEnd) - top)
+  const naturalHeight = timeToPx(displayEnd) - top
+  const displayHeight = Math.max(compact ? SLOT_HEIGHT : MIN_BLOCK_HEIGHT, naturalHeight)
+  // A short block drops its second line rather than crushing both.
+  const tight = compact || naturalHeight < TIGHT_HEIGHT
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
@@ -170,12 +199,12 @@ export function PositionedBlock({ block, isDragging, onResize, onDelete, onSelec
       {...listeners}
       {...attributes}
     >
-      <div className={`flex items-start justify-between gap-1 pt-2 pb-1 ${compact ? 'px-1.5' : 'px-2'}`}>
+      <div className={`flex items-start justify-between gap-1 ${tight ? 'pt-1 pb-0.5' : 'pt-2 pb-1'} ${tight ? 'px-1.5' : 'px-2'}`}>
         <div className="flex-1 min-w-0">
-          <p className={`font-serif leading-tight truncate ${colors.text} ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
+          <p className={`font-serif leading-tight truncate ${colors.text} ${tight ? 'text-[10px]' : 'text-[11px]'}`}>
             {block.source?.name ?? 'Time block'}
           </p>
-          {!compact && (
+          {!tight && (
             <p className="text-[9px] font-mono text-muted-foreground/50 mt-0.5">
               {block.startTime} – {displayEnd}
             </p>
@@ -222,16 +251,18 @@ export function EventBlock({ event, compact }: { event: CalendarEvent; compact?:
   if (!event.time) return null
   const top = timeToPx(event.time)
   const durationMins = event.duration ?? 60
-  const height = Math.max(compact ? SLOT_HEIGHT : MIN_BLOCK_HEIGHT, (durationMins / 30) * SLOT_HEIGHT)
+  const natural = (durationMins / SLOT_MINUTES) * SLOT_HEIGHT
+  const height = Math.max(compact ? SLOT_HEIGHT : MIN_BLOCK_HEIGHT, natural)
+  const tight = compact || natural < TIGHT_HEIGHT
 
   return (
     <div
       className={`absolute inset-x-1 rounded-lg border select-none cursor-default ${EVENT_COLORS.bg} ${EVENT_COLORS.border}`}
       style={{ top, height }}
     >
-      <div className={`pt-1.5 ${compact ? 'px-1.5' : 'px-2'}`}>
-        <p className={`font-serif leading-tight truncate ${EVENT_COLORS.text} ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{event.name}</p>
-        {!compact && (
+      <div className={`${tight ? 'pt-1 px-1.5' : 'pt-1.5 px-2'}`}>
+        <p className={`font-serif leading-tight truncate ${EVENT_COLORS.text} ${tight ? 'text-[10px]' : 'text-[11px]'}`}>{event.name}</p>
+        {!tight && (
           <p className="text-[9px] font-mono text-amber-700/60 dark:text-amber-400/50 mt-0.5">
             {event.time}{event.duration ? ` – ${minutesToTime(timeToMinutes(event.time) + event.duration)}` : ''}
             {event.location ? ` · ${event.location}` : ''}

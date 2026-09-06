@@ -6,6 +6,7 @@ import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import {
   HOUR_HEIGHT, SLOT_HEIGHT,
   DroppableSlot, PositionedBlock, EventBlock, DropPreview, layoutOverlaps,
+  SLOT_MINUTES, SLOTS_PER_DAY,
 } from './blockRendering'
 import { todayStr } from '@/lib/date'
 
@@ -44,7 +45,7 @@ export function TimeGrid({
     const el = scrollRef.current
     if (!el) return
     const now = new Date()
-    const px = ((now.getHours() * 60 + now.getMinutes()) / 30) * SLOT_HEIGHT
+    const px = ((now.getHours() * 60 + now.getMinutes()) / SLOT_MINUTES) * SLOT_HEIGHT
     el.scrollTop = Math.max(0, px - el.clientHeight / 2)
   }, [])
 
@@ -52,7 +53,7 @@ export function TimeGrid({
   useEffect(() => {
     function update() {
       const now = new Date()
-      setNowPx(((now.getHours() * 60 + now.getMinutes()) / 30) * SLOT_HEIGHT)
+      setNowPx(((now.getHours() * 60 + now.getMinutes()) / SLOT_MINUTES) * SLOT_HEIGHT)
     }
     update()
     const id = setInterval(update, 60_000)
@@ -97,7 +98,7 @@ export function TimeGrid({
 
           {/* Drop zones (sit behind blocks) */}
           <div className="absolute" style={{ left: 56, right: 0, top: 0, height: 24 * HOUR_HEIGHT }}>
-            {Array.from({ length: 48 }, (_, slot) => (
+            {Array.from({ length: SLOTS_PER_DAY }, (_, slot) => (
               <DroppableSlot key={slot} date={date} slot={slot} />
             ))}
           </div>

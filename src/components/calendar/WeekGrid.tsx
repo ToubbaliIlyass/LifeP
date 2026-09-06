@@ -6,6 +6,7 @@ import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import {
   HOUR_HEIGHT, SLOT_HEIGHT,
   DroppableSlot, PositionedBlock, EventBlock, DropPreview, layoutOverlaps,
+  SLOT_MINUTES, SLOTS_PER_DAY, WEEK_DROP_STEP,
 } from './blockRendering'
 import { todayStr } from '@/lib/date'
 
@@ -53,14 +54,14 @@ export function WeekGrid({
     const el = scrollRef.current
     if (!el) return
     const now = new Date()
-    const px = ((now.getHours() * 60 + now.getMinutes()) / 30) * SLOT_HEIGHT
+    const px = ((now.getHours() * 60 + now.getMinutes()) / SLOT_MINUTES) * SLOT_HEIGHT
     el.scrollTop = Math.max(0, px - el.clientHeight / 2)
   }, [scrollToNowSignal])
 
   useEffect(() => {
     function update() {
       const now = new Date()
-      setNowPx(((now.getHours() * 60 + now.getMinutes()) / 30) * SLOT_HEIGHT)
+      setNowPx(((now.getHours() * 60 + now.getMinutes()) / SLOT_MINUTES) * SLOT_HEIGHT)
     }
     update()
     const id = setInterval(update, 60_000)
@@ -121,7 +122,14 @@ export function WeekGrid({
                   ))}
 
                   {/* Drop zones */}
-                  {Array.from({ length: 48 }, (_, slot) => (
+                  {/*
+                    Seven columns of ten-minute drop targets would be over a
+                    thousand registered droppables; the week keeps half-hour
+                    targets while slot numbers stay in the same unit as
+                    everywhere else, so a block dropped here still lands where
+                    the day view would put it.
+                  */}
+                  {Array.from({ length: SLOTS_PER_DAY / WEEK_DROP_STEP }, (_, i) => i * WEEK_DROP_STEP).map((slot) => (
                     <DroppableSlot key={slot} date={d} slot={slot} />
                   ))}
 

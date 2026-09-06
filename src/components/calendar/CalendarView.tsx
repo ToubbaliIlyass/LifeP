@@ -11,7 +11,8 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { ChevronLeft, ChevronRight, ListTodo, CalendarDays, CalendarRange } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ListTodo, CalendarDays, CalendarRange, Sparkles } from 'lucide-react'
+import { SLOT_MINUTES, SLOTS_PER_DAY } from './blockRendering'
 import { TimeGrid } from './TimeGrid'
 import { WeekGrid } from './WeekGrid'
 import { UnscheduledRail } from './UnscheduledRail'
@@ -40,8 +41,9 @@ interface DayData {
 type ViewMode = 'day' | 'week'
 
 function slotToTime(slot: number): string {
-  const h = Math.floor(slot / 2)
-  const m = slot % 2 === 0 ? '00' : '30'
+  const total = slot * SLOT_MINUTES
+  const h = Math.floor(total / 60)
+  const m = String(total % 60).padStart(2, '0')
   return `${String(h).padStart(2, '0')}:${m}`
 }
 
@@ -50,7 +52,7 @@ function timeToSlots(startTime: string, endTime: string): number {
     const [h, m] = t.split(':').map(Number)
     return h * 60 + m
   }
-  return Math.max(1, Math.round((toMin(endTime) - toMin(startTime)) / 30))
+  return Math.max(1, Math.round((toMin(endTime) - toMin(startTime)) / SLOT_MINUTES))
 }
 
 function formatDateHeader(date: string): string {
@@ -138,6 +140,50 @@ export function CalendarView({ onViewModeChange, initialViewMode }: CalendarView
       setWeekData(next)
     }
   }, [viewMode, date, dates, fetchDay])
+
+  const [replanning, setReplanning] = useState(false)
+  const [replanNote, setReplanNote] = useState<string | null>(null)
+
+  /*
+   * Re-lays out every habit over the next fortnight in one go.
+   *
+   * Doing this a day at a time is not worth anyone's afternoon, and a day that
+   * already has habit blocks is left alone by the planner — so without this a
+   * bad layout would stay bad indefinitely. Only habit blocks are touched.
+   */
+  const replanHabits = useCallback(async () => {
+    if (replanning) return
+    setReplanning(true)
+    setReplanNote(null)
+    try {
+      // Acts on what is on screen: the day you are looking at, or the week.
+      // A button in a day's header that silently rewrote the next fortnight
+      // would be the wrong kind of surprise.
+      const res = await fetch('/api/schedule/habits/replan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          viewMode === 'week' ? { from: dates[0], days: dates.length } : { from: date, days: 1 },
+        ),
+      })
+      const data = (await res.json().catch(() => null)) as
+        | { scheduled?: number; cleared?: number; days?: number }
+        | null
+      setReplanNote(
+        data && typeof data.scheduled === 'number'
+          ? data.days === 1
+            ? `${data.scheduled} habits placed`
+            : `${data.scheduled} habits across ${data.days} days`
+          : 'Could not reschedule',
+      )
+      await refresh()
+    } catch {
+      setReplanNote('Could not reschedule')
+    } finally {
+      setReplanning(false)
+      setTimeout(() => setReplanNote(null), 6000)
+    }
+  }, [replanning, refresh, viewMode, date, dates])
 
   useEffect(() => {
     let cancelled = false
@@ -244,7 +290,7 @@ export function CalendarView({ onViewModeChange, initialViewMode }: CalendarView
     const [, blockDate, slotStr] = idStr.split(':')
     const slot = parseInt(slotStr, 10)
     const startTime = slotToTime(slot)
-    const endSlot = Math.min(47, slot + activeDurationSlots)
+    const endSlot = Math.min(SLOTS_PER_DAY - 1, slot + activeDurationSlots)
     const endTime = slotToTime(endSlot)
 
     if (id.startsWith('rail:')) {
@@ -341,6 +387,21 @@ export function CalendarView({ onViewModeChange, initialViewMode }: CalendarView
               >
                 today
               </button>
+            )}
+            <button
+              onClick={replanHabits}
+              disabled={replanning}
+              title={viewMode === 'week' ? 'Lay this week\'s habits out again' : 'Lay this day\'s habits out again'}
+              aria-label="Reschedule all habits"
+              className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{replanning ? 'planning…' : 'replan habits'}</span>
+            </button>
+            {replanNote && (
+              <span className="text-[10px] font-mono text-muted-foreground/60 hidden md:inline" role="status">
+                {replanNote}
+              </span>
             )}
             <div className="flex items-center gap-0.5 bg-muted/40 rounded-lg p-0.5 ml-1">
               <button
