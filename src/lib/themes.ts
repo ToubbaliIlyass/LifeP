@@ -49,6 +49,30 @@ export const THEMES: ThemeDef[] = [
     swatch: ['#faa916', '#96031a', '#fef8ea', '#13262f'],
     description: 'Amber and deep crimson, on cream.',
   },
+  {
+    id: 'tide',
+    name: 'Tide',
+    swatch: ['#1d5f8a', '#17879a', '#eef4f8', '#0e1c26'],
+    description: 'Deep blue and teal, on cool mist.',
+  },
+  {
+    id: 'orchid',
+    name: 'Orchid',
+    swatch: ['#6b3fa0', '#b0327f', '#f5f1f8', '#1a1220'],
+    description: 'Plum and magenta, on pale lilac.',
+  },
+  {
+    id: 'moss',
+    name: 'Moss',
+    swatch: ['#2f6b45', '#7a8b3a', '#f0f4ec', '#131a12'],
+    description: 'Forest and olive, on pale sage.',
+  },
+  {
+    id: 'slate',
+    name: 'Slate',
+    swatch: ['#27272a', '#a1a1aa', '#f4f4f5', '#161618'],
+    description: 'No colour at all, for when it distracts.',
+  },
 ]
 
 export const THEME_STORAGE_KEY = 'acture-theme'

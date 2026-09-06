@@ -115,11 +115,12 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90 transition-opacity"
+        className="fixed right-4 sm:right-5 z-40 w-14 h-14 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
+        style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
         title="Quick add"
         aria-label="Quick add"
       >
-        <Plus className="w-5 h-5" />
+        <Plus className="w-6 h-6 sm:w-5 sm:h-5" />
       </button>
     )
   }
@@ -128,7 +129,10 @@ export function QuickAddButton({ onAdded }: QuickAddButtonProps) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
 
-      <div className="relative z-10 w-full sm:max-w-sm sm:mx-4 bg-card border border-border/60 rounded-t-2xl sm:rounded-2xl shadow-2xl">
+      <div
+        className="relative z-10 w-full sm:max-w-sm sm:mx-4 bg-card border border-border/60 rounded-t-2xl sm:rounded-2xl shadow-2xl"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <p className="text-[13px] font-semibold text-foreground">Quick add</p>
           <button onClick={() => setOpen(false)} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-muted/40 transition-colors">

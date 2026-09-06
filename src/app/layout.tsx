@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono, Source_Serif_4, Montserrat } from "next/font/google";
 import "./globals.css";
 
@@ -29,6 +29,14 @@ const sourceSerif = Source_Serif_4({
   style: ["normal", "italic"],
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Lets env(safe-area-inset-*) resolve, so the floating controls can keep
+  // clear of the home indicator instead of sitting under it.
+  viewportFit: 'cover',
+}
 
 export const metadata: Metadata = {
   title: "Acture",

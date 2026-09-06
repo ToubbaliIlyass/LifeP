@@ -21,7 +21,7 @@ const userId = 1
 const builtinTypes = [
   'Goal', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
   'HabitLog', 'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
-  'HealthMetric', 'SavedView', 'Settings',
+  'HealthMetric', 'Settings',
 ]
 
 const url = process.env.TURSO_DATABASE_URL ?? 'file:./data/lifep.db'

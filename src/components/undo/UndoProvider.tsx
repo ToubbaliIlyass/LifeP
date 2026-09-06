@@ -90,7 +90,8 @@ export function UndoProvider({ children }: { children: React.ReactNode }) {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-3 pl-4 pr-2 py-2.5 rounded-xl border border-border/60 bg-card shadow-2xl max-w-[calc(100vw-2rem)]"
+          className="fixed left-1/2 -translate-x-1/2 z-[70] flex items-center gap-3 pl-4 pr-2 py-2.5 rounded-xl border border-border/60 bg-card shadow-2xl max-w-[calc(100vw-2rem)]"
+          style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
         >
           <span className="text-[13px] text-foreground/85 truncate">{toast.label}</span>
           <button

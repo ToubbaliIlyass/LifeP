@@ -398,7 +398,7 @@ export default function Home() {
         <header className="flex items-center gap-2 px-3 md:px-5 h-[52px] border-b border-border/60 shrink-0">
           <button
             onClick={() => setMobileNavOpen(true)}
-            className="md:hidden -ml-1 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            className="md:hidden -ml-1 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
             aria-label="Open navigation"
           >
             <Menu className="w-[18px] h-[18px]" />
@@ -409,8 +409,15 @@ export default function Home() {
               : activeTab?.label}
           </p>
           <button
+            onClick={() => setSearchOpen(true)}
+            className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            aria-label="Search"
+          >
+            <Search className="w-[18px] h-[18px]" />
+          </button>
+          <button
             onClick={() => setMobileShowChat(true)}
-            className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
             aria-label="Open chat"
           >
             <MessageSquare className="w-[18px] h-[18px]" />
