@@ -11,7 +11,7 @@ export interface Settings {
   defaultCalendarView: 'day' | 'week'
   theme: string
   weather: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
-  autoScheduleTasks: boolean
+  scheduleMode: 'off' | 'suggest' | 'auto'
   workingHours: { start: string; end: string }
 }
 
@@ -279,26 +279,39 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
           description="Habits already place themselves on the calendar. This does the same for tasks that are due or overdue, so deciding when to do them stops being your job."
         >
           <div className="space-y-4">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-serif text-foreground/85">Auto-schedule tasks</p>
-                <p className="text-[11px] text-muted-foreground/55 mt-0.5">
-                  Fills free gaps only — anything already on the calendar stays put.
-                </p>
+            <div>
+              <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">
+                When a due task has no time
+              </label>
+              <div className="space-y-1.5">
+                {([
+                  ['off', 'Do nothing', 'Tasks stay unscheduled until you place them.'],
+                  ['suggest', 'Suggest times for approval', 'Proposes a plan on the dashboard. Nothing lands on the calendar until you accept it.'],
+                  ['auto', 'Schedule them for me', 'Places them straight into free gaps, no approval.'],
+                ] as const).map(([value, label, blurb]) => {
+                  const active = (settings.scheduleMode ?? 'off') === value
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => save({ scheduleMode: value })}
+                      className={`flex w-full items-start gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                        active ? 'border-primary/50 bg-primary/[0.07]' : 'border-border/50 hover:bg-muted/30'
+                      }`}
+                    >
+                      <span
+                        className={`mt-1 w-2 h-2 rounded-full shrink-0 ${active ? 'bg-primary' : 'bg-muted-foreground/25'}`}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-serif text-foreground/85">{label}</span>
+                        <span className="block text-[11px] text-muted-foreground/55 mt-0.5">{blurb}</span>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-              <button
-                onClick={() => save({ autoScheduleTasks: !settings.autoScheduleTasks })}
-                className={`text-[11px] font-mono px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
-                  settings.autoScheduleTasks
-                    ? 'bg-primary/15 border-primary/40 text-primary'
-                    : 'border-border/50 text-muted-foreground/60 hover:text-foreground hover:bg-muted/40'
-                }`}
-              >
-                {settings.autoScheduleTasks ? 'on' : 'off'}
-              </button>
             </div>
 
-            {settings.autoScheduleTasks && (
+            {settings.scheduleMode !== 'off' && (
               <div className="flex items-end gap-3">
                 <div>
                   <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Day starts</label>

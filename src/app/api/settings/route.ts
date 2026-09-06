@@ -22,10 +22,12 @@ export interface Settings {
   /** Weather on the dashboard. Stored so the location is asked for once, not every visit. */
   weather: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
   /**
-   * Place due and overdue tasks into free calendar slots automatically, so
-   * "when do I do this" stops being a question the user has to answer.
+   * How the app handles tasks that are due but have no time.
+   * - off:     nothing happens
+   * - suggest: it proposes times each morning for the user to approve
+   * - auto:    it places them directly, no approval
    */
-  autoScheduleTasks: boolean
+  scheduleMode: 'off' | 'suggest' | 'auto'
   /** The window auto-scheduling is allowed to place things in, 24h HH:MM. */
   workingHours: { start: string; end: string }
 }
@@ -36,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCalendarView: 'day',
   theme: 'default',
   weather: { enabled: false, lat: null, lon: null, place: null },
-  autoScheduleTasks: false,
+  scheduleMode: 'suggest',
   workingHours: { start: '09:00', end: '18:00' },
 }
 

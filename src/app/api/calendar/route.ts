@@ -2,6 +2,7 @@ import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges, getNodeById, createNode, createEdge } from '@/lib/graph/queries'
 import type { Node } from '@/lib/db/schema'
 import { todayStr, isDueOn } from '@/lib/date'
+import { planDay } from '@/lib/schedule-day'
 
 function addMinutes(time: string, minutes: number): string {
   const [h, m] = time.split(':').map(Number)
@@ -71,132 +72,6 @@ async function autoFillHabitsForDate(userId: number, date: string) {
   }
 }
 
-const DEFAULT_TASK_MINUTES = 30
-
-function toMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
-function fromMinutes(total: number): string {
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
-
-/**
- * Places due and overdue tasks into whatever time is actually free.
- *
- * This is the counterpart to autoFillHabitsForDate, and the reason it exists:
- * habits already scheduled themselves while every task had to be dragged onto
- * the calendar by hand — leaving "when do I do this" as a question the user
- * still had to answer for everything they owned.
- *
- * Only ever *adds* to free gaps. Existing blocks and events are treated as
- * immovable, so nothing the user placed deliberately is displaced, and a task
- * that will not fit is simply left unscheduled rather than double-booked.
- */
-async function autoScheduleTasksForDate(
-  userId: number,
-  date: string,
-  workingHours: { start: string; end: string },
-) {
-  const tasks = await getNodes(userId, { type: 'Task' })
-  if (tasks.length === 0) return
-
-  const scheduledForEdges = await getEdges(userId, { type: 'scheduled-for' })
-  const timeBlocks = await getNodes(userId, { type: 'TimeBlock' })
-  const blockById = new Map(timeBlocks.map((b) => [b.id, b]))
-
-  // A task already sitting on any day's calendar is left alone — rescheduling
-  // something the user has already placed would be the opposite of helpful.
-  const scheduledNodeIds = new Set(
-    scheduledForEdges
-      .filter((e) => blockById.has(e.sourceId))
-      .map((e) => e.targetId),
-  )
-
-  const candidates = tasks
-    .map((t) => {
-      const p = t.properties as Record<string, unknown>
-      return {
-        node: t,
-        name: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `Task #${t.id}`,
-        status: typeof p.status === 'string' ? p.status : 'todo',
-        dueDate: typeof p.dueDate === 'string' ? p.dueDate : null,
-        priority: typeof p.priority === 'string' ? p.priority : 'medium',
-        minutes: typeof p.estimatedMinutes === 'number' && p.estimatedMinutes > 0
-          ? p.estimatedMinutes
-          : DEFAULT_TASK_MINUTES,
-      }
-    })
-    // Due today or already late. Anything further out is not yet this day's
-    // problem, and filling the week ahead would bury the things that matter now.
-    .filter((t) => t.status !== 'done' && t.dueDate !== null && t.dueDate <= date)
-    .filter((t) => !scheduledNodeIds.has(t.node.id))
-
-  if (candidates.length === 0) return
-
-  // Most overdue first, then by priority — the order someone would pick if
-  // they were doing this by hand.
-  const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
-  candidates.sort((a, b) => {
-    const dateDiff = (a.dueDate ?? '').localeCompare(b.dueDate ?? '')
-    if (dateDiff !== 0) return dateDiff
-    return (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1)
-  })
-
-  // Everything already committed on this day, as busy intervals.
-  const busy: { start: number; end: number }[] = []
-  for (const block of timeBlocks) {
-    const p = block.properties as Record<string, unknown>
-    if (p.date !== date) continue
-    if (typeof p.startTime === 'string' && typeof p.endTime === 'string') {
-      busy.push({ start: toMinutes(p.startTime), end: toMinutes(p.endTime) })
-    }
-  }
-  for (const event of await getNodes(userId, { type: 'Event' })) {
-    const p = event.properties as Record<string, unknown>
-    if (p.date !== date || typeof p.time !== 'string') continue
-    const start = toMinutes(p.time)
-    busy.push({ start, end: start + (typeof p.duration === 'number' ? p.duration : 60) })
-  }
-  busy.sort((a, b) => a.start - b.start)
-
-  const dayStart = toMinutes(workingHours.start)
-  const dayEnd = toMinutes(workingHours.end)
-
-  // On today itself, nothing is scheduled into hours that have already gone.
-  const now = new Date()
-  const isToday = date === todayStr()
-  const earliest = isToday
-    ? Math.max(dayStart, Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15)
-    : dayStart
-
-  let cursor = earliest
-  for (const task of candidates) {
-    let placed = false
-    while (!placed && cursor + task.minutes <= dayEnd) {
-      const end = cursor + task.minutes
-      const clash = busy.find((b) => cursor < b.end && end > b.start)
-      if (clash) {
-        cursor = clash.end // jump past whatever is in the way and try again
-        continue
-      }
-      const block = await createNode(userId, 'TimeBlock', {
-        date,
-        startTime: fromMinutes(cursor),
-        endTime: fromMinutes(end),
-        autoScheduled: true, // so it is recognisable as the app's guess, not the user's decision
-      })
-      await createEdge(userId, block.id, task.node.id, 'scheduled-for', {})
-      busy.push({ start: cursor, end })
-      busy.sort((a, b) => a.start - b.start)
-      cursor = end
-      placed = true
-    }
-    if (!placed) break // the day is full; the rest stay unscheduled
-  }
-}
-
 export async function GET(request: Request) {
   const user = await getCurrentUser()
   if (!user) return unauthorized()
@@ -208,19 +83,30 @@ export async function GET(request: Request) {
   if (date >= todayStr()) {
     await autoFillHabitsForDate(user.id, date)
 
-    // Opt-in: filling someone's calendar unasked would be a surprise, so this
-    // stays off until it is switched on in Settings.
+    // Only "auto" writes without asking. In "suggest" mode the same plan is
+    // computed on the dashboard instead and waits for approval, which is why
+    // both paths go through planDay rather than each having their own idea of
+    // what a good schedule looks like.
     const settingsNodes = await getNodes(user.id, { type: 'Settings' })
     const settings = (settingsNodes[0]?.properties ?? {}) as {
-      autoScheduleTasks?: boolean
+      scheduleMode?: 'off' | 'suggest' | 'auto'
       workingHours?: { start: string; end: string }
     }
-    if (settings.autoScheduleTasks) {
-      await autoScheduleTasksForDate(
+    if (settings.scheduleMode === 'auto') {
+      const placements = await planDay(
         user.id,
         date,
         settings.workingHours ?? { start: '09:00', end: '18:00' },
       )
+      for (const p of placements) {
+        const block = await createNode(user.id, 'TimeBlock', {
+          date,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          autoScheduled: true,
+        })
+        await createEdge(user.id, block.id, p.taskId, 'scheduled-for', {})
+      }
     }
   }
 
