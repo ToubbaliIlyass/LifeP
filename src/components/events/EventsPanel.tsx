@@ -12,7 +12,11 @@ interface EventRow {
   time: string | null
   duration: number | null
   location: string | null
-  recurring: string
+  /** 'once' | 'daily' | 'weekdays' | 'weekly' */
+  frequency: string
+  daysOfWeek: number[] | null
+  until: string | null
+  recurring: boolean
 }
 
 interface EventsData {
@@ -47,8 +51,17 @@ function isToday(iso: string) {
   return d.getTime() === today.getTime()
 }
 
-const RECURRING_LABELS: Record<string, string> = {
-  daily: '↻ daily', weekly: '↻ weekly', monthly: '↻ monthly',
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** "↻ Tue, Thu" says more than "↻ weekly" for the same cost. */
+function recurrenceLabel(e: EventRow): string | null {
+  if (!e.recurring) return null
+  if (e.frequency === 'weekly' && e.daysOfWeek?.length) {
+    return `↻ ${e.daysOfWeek.map((d) => DOW_SHORT[d]).join(', ')}`
+  }
+  if (e.frequency === 'weekdays') return '↻ weekdays'
+  if (e.frequency === 'daily') return '↻ daily'
+  return `↻ ${e.frequency}`
 }
 
 export function EventsPanel() {
@@ -97,14 +110,14 @@ export function EventsPanel() {
                     </p>
                     <div className="space-y-1.5">
                       {events.map((e: EventRow) => (
-                        <div key={e.id} className="group flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
+                        <div key={`${e.id}-${e.date}`} className="group flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
                           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <p className="text-[13px] font-serif text-foreground/85 truncate">{e.name}</p>
                               <div className="flex items-center gap-1 shrink-0">
-                                {e.recurring !== 'none' && (
-                                  <span className="text-[10px] font-mono text-muted-foreground/65">{RECURRING_LABELS[e.recurring] ?? e.recurring}</span>
+                                {recurrenceLabel(e) && (
+                                  <span className="text-[10px] font-mono text-muted-foreground/65">{recurrenceLabel(e)}</span>
                                 )}
                                 <button
                                   onClick={() => setSelectedId(e.id)}

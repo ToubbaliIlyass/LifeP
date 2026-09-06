@@ -41,6 +41,44 @@ export function isDueOn(frequency: string, daysOfWeek: number[] | null, dow: num
   return true // daily, and anything unrecognized, defaults to due every day
 }
 
+/** The recurrence fields an Event carries. All optional — most events happen once. */
+export interface EventRecurrence {
+  /** The first (or only) day it happens. */
+  date: string | null
+  /** 'once' | 'daily' | 'weekdays' | 'weekly' — same vocabulary as Habits. */
+  frequency?: string | null
+  /** For 'weekly'/'weekdays': which days, 0=Sun..6=Sat. */
+  daysOfWeek?: number[] | null
+  /** Optional last day; open-ended without it. */
+  until?: string | null
+}
+
+/**
+ * Whether a recurring event falls on `date`.
+ *
+ * Events used to be a single fixed day, which meant a weekly class or a
+ * standing meeting had to be re-entered every time — the one kind of entry
+ * most worth automating. They now use the same frequency/daysOfWeek pair as
+ * Habits, so "every Tuesday and Thursday" means the same thing in both
+ * places, and `isDueOn` stays the single definition of that rule.
+ *
+ * Occurrences are computed on read rather than written out as rows: nothing
+ * to backfill when a rule changes, and no cleanup when one is deleted.
+ */
+export function eventOccursOn(e: EventRecurrence, date: string): boolean {
+  if (!e.date) return false
+
+  const frequency = e.frequency ?? 'once'
+  // 'none' is what earlier events stored; treat it the same as 'once'.
+  if (frequency === 'once' || frequency === 'none') return e.date === date
+
+  if (date < e.date) return false
+  if (e.until && date > e.until) return false
+
+  const dow = new Date(date + 'T00:00:00').getDay()
+  return isDueOn(frequency, e.daysOfWeek ?? null, dow)
+}
+
 /** The next date (strictly after `fromDateStr`) that satisfies a frequency/daysOfWeek rule. */
 export function nextDueDate(fromDateStr: string, frequency: string, daysOfWeek: number[] | null): string {
   let candidate = fromDateStr

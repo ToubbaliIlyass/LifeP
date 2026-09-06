@@ -1,6 +1,6 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
-import { localDateStr } from '@/lib/date'
+import { localDateStr, addDays, eventOccursOn } from '@/lib/date'
 
 function labelOf(p: Record<string, unknown>, id: number, type: string) {
   return typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${type} #${id}`
@@ -17,25 +17,44 @@ export async function GET(request: Request) {
   const cutoff = new Date(today)
   cutoff.setDate(cutoff.getDate() + days)
 
-  const events = (await getNodes(user.id, { type: 'Event' }))
-    .map((n) => {
-      const p = n.properties as Record<string, unknown>
-      return {
-        id: n.id,
-        name: labelOf(p, n.id, 'Event'),
-        date: typeof p.date === 'string' ? p.date : null,
-        time: typeof p.time === 'string' ? p.time : null,
-        duration: typeof p.duration === 'number' ? p.duration : null,
-        location: typeof p.location === 'string' ? p.location : null,
-        recurring: typeof p.recurring === 'string' ? p.recurring : 'none',
-      }
-    })
-    .filter((e) => {
-      if (!e.date) return false
-      const d = new Date(e.date + 'T00:00:00')
-      return d >= today && d <= cutoff
-    })
-    .sort((a, b) => (a.date! < b.date! ? -1 : 1))
+  const from = localDateStr(today)
+  const to = localDateStr(cutoff)
 
-  return Response.json({ events, from: localDateStr(today), days })
+  // A recurring event is one node, so it is expanded into one entry per day
+  // it actually falls on inside the window. `id` stays the node's id — that
+  // is what editing and deleting act on — while `date` is the occurrence, so
+  // callers that group by day keep working unchanged.
+  const events = (await getNodes(user.id, { type: 'Event' })).flatMap((n) => {
+    const p = n.properties as Record<string, unknown>
+    const rule = {
+      date: typeof p.date === 'string' ? p.date : null,
+      frequency: typeof p.frequency === 'string' ? p.frequency : null,
+      daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
+      until: typeof p.until === 'string' ? p.until : null,
+    }
+    if (!rule.date) return []
+
+    const base = {
+      id: n.id,
+      name: labelOf(p, n.id, 'Event'),
+      time: typeof p.time === 'string' ? p.time : null,
+      duration: typeof p.duration === 'number' ? p.duration : null,
+      location: typeof p.location === 'string' ? p.location : null,
+      frequency: rule.frequency ?? 'once',
+      daysOfWeek: rule.daysOfWeek,
+      until: rule.until,
+    }
+
+    const out: (typeof base & { date: string; recurring: boolean })[] = []
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      if (eventOccursOn(rule, d)) {
+        out.push({ ...base, date: d, recurring: base.frequency !== 'once' })
+      }
+    }
+    return out
+  })
+
+  events.sort((a, b) => (a.date === b.date ? (a.time ?? '').localeCompare(b.time ?? '') : a.date < b.date ? -1 : 1))
+
+  return Response.json({ events, from, days })
 }

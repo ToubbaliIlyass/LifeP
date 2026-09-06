@@ -34,6 +34,7 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
   Task:        'bg-sky-500/15 text-sky-400',
   Habit:       'bg-emerald-500/15 text-emerald-400',
   Goal:        'bg-violet-500/15 text-violet-400',
+  Milestone:   'bg-violet-500/10 text-violet-300',
   Event:       'bg-amber-500/15 text-amber-400',
   Note:        'bg-zinc-500/15 text-zinc-400',
   JournalEntry:'bg-rose-500/15 text-rose-400',
@@ -55,10 +56,11 @@ const SKIP_FIELDS = new Set(['courseNodeId', 'habitNodeId'])
 // system prompt so every expected field always gets a row, even when null.
 const TYPE_FIELDS: Record<string, string[]> = {
   Goal: ['name', 'description', 'status', 'targetDate'],
+  Milestone: ['name', 'status', 'dueDate'],
   Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes'],
   Task: ['name', 'status', 'priority', 'estimatedMinutes', 'dueDate'],
   Project: ['name', 'description', 'status', 'dueDate'],
-  Event: ['name', 'date', 'time', 'duration', 'location', 'recurring'],
+  Event: ['name', 'date', 'time', 'duration', 'location', 'frequency', 'daysOfWeek', 'until'],
   Course: ['name', 'code', 'semester', 'credits'],
   Assignment: ['name', 'dueDate', 'status', 'grade'],
   Exam: ['name', 'date', 'time', 'location', 'status', 'grade'],
@@ -138,14 +140,50 @@ function FieldEditor({
     )
   }
 
+  if (name === 'daysOfWeek') {
+    // Was raw JSON, which is no way to say "Tuesdays and Thursdays". Stored
+    // as 0=Sun..6=Sat to match isDueOn, but shown Mon-first, which is how
+    // people read a week.
+    const days = Array.isArray(value) ? (value as unknown[]).map(Number) : []
+    const ORDER = [1, 2, 3, 4, 5, 6, 0]
+    const LABEL = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    return (
+      <div className="flex items-center gap-1">
+        {ORDER.map((d) => {
+          const on = days.includes(d)
+          return (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={on}
+              aria-label={['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d]}
+              onClick={() =>
+                onChange(
+                  (on ? days.filter((x) => x !== d) : [...days, d]).sort((a, b) => a - b),
+                )
+              }
+              className={`w-7 h-7 rounded-md text-[11px] font-mono transition-colors ${
+                on
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/40 border border-border/40 text-muted-foreground/70 hover:text-foreground'
+              }`}
+            >
+              {LABEL[d]}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   if (name === 'frequency') {
     return (
       <select
-        value={strVal}
+        value={strVal || 'once'}
         onChange={(e) => onChange(e.target.value)}
         className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-mono text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
       >
-        {['daily', 'weekly', 'weekdays'].map((o) => <option key={o} value={o}>{o}</option>)}
+        {['once', 'daily', 'weekdays', 'weekly'].map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     )
   }
