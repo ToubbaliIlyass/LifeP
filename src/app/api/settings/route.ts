@@ -1,5 +1,6 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, createNode, updateNode } from '@/lib/graph/queries'
+import { DEFAULT_DAY } from '@/lib/schedule'
 
 /**
  * User settings, stored as a single Settings node rather than a new table.
@@ -39,7 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'default',
   weather: { enabled: false, lat: null, lon: null, place: null },
   scheduleMode: 'suggest',
-  workingHours: { start: '09:00', end: '18:00' },
+  workingHours: DEFAULT_DAY,
 }
 
 async function settingsNode(userId: number) {

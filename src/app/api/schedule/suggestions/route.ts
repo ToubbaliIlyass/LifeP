@@ -2,6 +2,7 @@ import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
 import { planDay } from '@/lib/schedule-day'
+import { DEFAULT_DAY } from '@/lib/schedule'
 
 /**
  * What the app would put on the calendar today, without putting it there.
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const suggestions = await planDay(
     user.id,
     date,
-    settings.workingHours ?? { start: '09:00', end: '18:00' },
+    settings.workingHours ?? DEFAULT_DAY,
   )
 
   return Response.json({ date, mode, suggestions })

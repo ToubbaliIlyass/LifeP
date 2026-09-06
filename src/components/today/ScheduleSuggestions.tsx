@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarClock, Check, X } from 'lucide-react'
+import { CalendarClock, Check, X, Repeat } from 'lucide-react'
 import { safeGet, safeSet } from '@/lib/storage'
 import { todayStr } from '@/lib/date'
 
 interface Suggestion {
   taskId: number
   name: string
+  kind: 'task' | 'habit'
   startTime: string
   endTime: string
   minutes: number
@@ -104,7 +105,9 @@ export function ScheduleSuggestions({ onScheduled }: { onScheduled?: () => void 
               <span className="text-[11px] font-mono text-muted-foreground/70 tabular-nums shrink-0 w-24">
                 {s.startTime}–{s.endTime}
               </span>
-              <span className={`text-[13px] font-serif flex-1 truncate ${dropped ? 'line-through text-muted-foreground/60' : 'text-foreground/85'}`}>
+              <span className={`text-[13px] font-serif flex-1 truncate flex items-center gap-1.5 ${dropped ? 'line-through text-muted-foreground/60' : 'text-foreground/85'}`}>
+                {/* Habits and tasks are proposed together, so say which is which. */}
+                {s.kind === 'habit' && <Repeat className="w-3 h-3 shrink-0 text-muted-foreground/45" aria-label="habit" />}
                 {s.name}
               </span>
               <span className="text-[10px] font-mono text-muted-foreground/50 shrink-0 hidden sm:inline">

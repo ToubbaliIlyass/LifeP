@@ -1,7 +1,7 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
-import { toMinutes } from '@/lib/schedule'
+import { toMinutes, DEFAULT_DAY } from '@/lib/schedule'
 import { buildNowQueue } from '@/lib/now'
 
 /**
@@ -34,7 +34,7 @@ export async function GET() {
 
   const settingsNodes = await getNodes(user.id, { type: 'Settings' })
   const settings = (settingsNodes[0]?.properties ?? {}) as { workingHours?: { start: string; end: string } }
-  const hours = settings.workingHours ?? { start: '09:00', end: '18:00' }
+  const hours = settings.workingHours ?? DEFAULT_DAY
 
   return Response.json({
     date,

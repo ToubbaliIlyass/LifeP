@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Download, Upload, LogOut, Eye, EyeOff, Check, Sun, Moon, MapPin } from 'lucide-react'
 import { THEMES, applyTheme, storedTheme } from '@/lib/themes'
+import { DEFAULT_DAY } from '@/lib/schedule'
 
 export interface Settings {
   hiddenTabs: string[]
@@ -317,9 +318,9 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
                   <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Day starts</label>
                   <input
                     type="time"
-                    defaultValue={settings.workingHours?.start ?? '09:00'}
+                    defaultValue={settings.workingHours?.start ?? DEFAULT_DAY.start}
                     onChange={(e) =>
-                      save({ workingHours: { start: e.target.value, end: settings.workingHours?.end ?? '18:00' } })
+                      save({ workingHours: { start: e.target.value, end: settings.workingHours?.end ?? DEFAULT_DAY.end } })
                     }
                     className="bg-muted/40 border border-border/40 rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
                   />
@@ -328,9 +329,9 @@ export function SettingsPanel({ allTabs, onSettingsChanged, onImport }: Settings
                   <label className="text-[10px] font-mono text-muted-foreground/50 mb-1.5 block">Day ends</label>
                   <input
                     type="time"
-                    defaultValue={settings.workingHours?.end ?? '18:00'}
+                    defaultValue={settings.workingHours?.end ?? DEFAULT_DAY.end}
                     onChange={(e) =>
-                      save({ workingHours: { start: settings.workingHours?.start ?? '09:00', end: e.target.value } })
+                      save({ workingHours: { start: settings.workingHours?.start ?? DEFAULT_DAY.start, end: e.target.value } })
                     }
                     className="bg-muted/40 border border-border/40 rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
                   />

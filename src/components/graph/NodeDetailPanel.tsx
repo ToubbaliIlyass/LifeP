@@ -57,7 +57,7 @@ const SKIP_FIELDS = new Set(['courseNodeId', 'habitNodeId'])
 const TYPE_FIELDS: Record<string, string[]> = {
   Goal: ['name', 'description', 'status', 'targetDate'],
   Milestone: ['name', 'status', 'dueDate'],
-  Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes'],
+  Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes', 'anytime'],
   Task: ['name', 'status', 'priority', 'estimatedMinutes', 'dueDate'],
   Project: ['name', 'description', 'status', 'dueDate'],
   Event: ['name', 'date', 'time', 'duration', 'location', 'frequency', 'daysOfWeek', 'until'],
@@ -137,6 +137,30 @@ function FieldEditor({
         placeholder='{"frequency":"weekly","daysOfWeek":[1]}'
         className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[12px] font-mono text-foreground/85 resize-y focus:outline-none focus:ring-1 focus:ring-primary/50"
       />
+    )
+  }
+
+  if (name === 'anytime' || typeof value === 'boolean') {
+    // Habits that belong to the whole day rather than a slot in it — these
+    // are never given a place on the calendar.
+    const on = value === true
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        onClick={() => onChange(!on)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[12px] transition-colors ${
+          on
+            ? 'bg-primary/15 border-primary/40 text-primary'
+            : 'bg-muted/40 border-border/40 text-muted-foreground/70 hover:text-foreground'
+        }`}
+      >
+        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'bg-primary border-primary' : 'border-border/60'}`}>
+          {on && <span className="w-1.5 h-1.5 rounded-[1px] bg-primary-foreground" />}
+        </span>
+        {name === 'anytime' ? (on ? 'Any time of day' : 'Give it a time') : on ? 'Yes' : 'No'}
+      </button>
     )
   }
 
