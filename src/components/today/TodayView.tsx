@@ -9,6 +9,7 @@ import { WeatherStrip } from './WeatherStrip'
 import { ScheduleSuggestions } from './ScheduleSuggestions'
 import { NowQueue } from './NowQueue'
 import { todayStr } from '@/lib/date'
+import { notifyDataChanged } from '@/lib/dataSignal'
 
 interface HabitRow {
   id: number
@@ -130,6 +131,7 @@ export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
     })
     setToggling(null)
     load()
+    notifyDataChanged()
   }
 
   async function cycleTask(task: TaskRow) {
@@ -140,6 +142,7 @@ export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
       body: JSON.stringify({ status: next }),
     })
     load()
+    notifyDataChanged()
   }
 
   const urgentTasks = tasks.filter(

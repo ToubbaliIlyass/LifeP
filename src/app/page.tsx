@@ -24,6 +24,7 @@ import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { QuickAddButton } from '@/components/quickadd/QuickAddButton'
 import { SettingsPanel, type Settings } from '@/components/settings/SettingsPanel'
 import { UndoProvider } from '@/components/undo/UndoProvider'
+import { useDataChanged } from '@/lib/dataSignal'
 import { safeGet, safeSet } from '@/lib/storage'
 import { applyTheme, storedTheme } from '@/lib/themes'
 
@@ -217,7 +218,11 @@ export default function Home() {
       .then(({ count }: { count: number }) => setReminderCount(count))
       .catch(() => {})
   }, [])
-  useVisiblePolling(refreshReminders, 60_000)
+  useVisiblePolling(refreshReminders, 20_000)
+  // Completing or deleting something changes this count immediately. Waiting
+  // for the next poll left the badge showing a number the user had just
+  // cleared, which reads as stuck rather than merely late.
+  useDataChanged(refreshReminders)
 
   // ── Keyboard shortcuts ────────────────────────────────
   useEffect(() => {

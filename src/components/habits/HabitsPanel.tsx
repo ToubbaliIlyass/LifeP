@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Pencil } from 'lucide-react'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
+import { notifyDataChanged } from '@/lib/dataSignal'
 
 interface HabitRow {
   id: number
@@ -70,6 +71,7 @@ export function HabitsPanel() {
     })
     setToggling(null)
     load()
+    notifyDataChanged()
   }
 
   const habits = data?.habits ?? []
@@ -90,7 +92,7 @@ export function HabitsPanel() {
         <NodeDetailPanel
           nodeId={selectedId}
           onClose={() => setSelectedId(null)}
-          onMutated={() => { load(); setSelectedId(null) }}
+          onMutated={() => { load(); notifyDataChanged(); setSelectedId(null) }}
         />
       )}
 

@@ -8,6 +8,7 @@ import { StatusCheckbox } from '@/components/ui/completion-checkbox'
 import { ScheduleDialog } from './ScheduleDialog'
 import { todayStr, addDays } from '@/lib/date'
 import { useUndo } from '@/components/undo/UndoProvider'
+import { notifyDataChanged } from '@/lib/dataSignal'
 
 interface Task {
   id: number
@@ -97,6 +98,7 @@ export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
     const { spawned } = ((await res.json().catch(() => ({}))) ?? {}) as { spawned?: { id: number } | null }
     setCycling(null)
     load()
+    notifyDataChanged()
 
     record(`"${task.name}" → ${next}`, async () => {
       await fetch(`/api/tasks/${task.id}`, {
@@ -106,6 +108,7 @@ export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
       })
       if (spawned?.id) await fetch(`/api/nodes/${spawned.id}`, { method: 'DELETE' })
       load()
+      notifyDataChanged()
     })
   }
 
@@ -136,7 +139,7 @@ export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
         <NodeDetailPanel
           nodeId={selectedId}
           onClose={() => setSelectedId(null)}
-          onMutated={() => { load(); setSelectedId(null) }}
+          onMutated={() => { load(); notifyDataChanged(); setSelectedId(null) }}
         />
       )}
       {schedulingTask && (

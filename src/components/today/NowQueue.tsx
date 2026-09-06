@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Clock, MapPin, AlertTriangle } from 'lucide-react'
 import { StatusCheckbox, CompletionCheckbox } from '@/components/ui/completion-checkbox'
 import { useUndo } from '@/components/undo/UndoProvider'
+import { notifyDataChanged } from '@/lib/dataSignal'
 
 import type { NowItem } from '@/lib/now'
 
@@ -84,6 +85,7 @@ export function NowQueue({ onChanged }: { onChanged?: () => void }) {
         })
         load()
         onChanged?.()
+        notifyDataChanged()
       })
     } else if (item.targetType === 'Task') {
       await fetch(`/api/tasks/${item.targetId}`, {
@@ -99,12 +101,14 @@ export function NowQueue({ onChanged }: { onChanged?: () => void }) {
         })
         load()
         onChanged?.()
+        notifyDataChanged()
       })
     }
 
     setBusy(null)
     load()
     onChanged?.()
+    notifyDataChanged()
   }
 
   if (loading || items.length === 0) return null
