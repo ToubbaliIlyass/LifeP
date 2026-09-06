@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Acture">
+  <title>Acture</title>
+  <!--
+    The aperture mark on its own tile. Taken from
+    public/acture_logo_aperture.svg, minus the wordmark (the tab already shows
+    the name) and minus 12KB of embedded C2PA metadata, which a favicon
+    refetched on every visit has no use for.
+
+    The tile keeps its own black ground rather than using currentColor: a
+    favicon sits on browser chrome, not on the page, so it cannot inherit a
+    usable colour and has to carry its own contrast.
+  -->
+  <rect width="200" height="200" rx="44" fill="#000000"/>
+  <g transform="translate(100,100)" fill="#ffffff">
+    <polygon points="0,-52 30,-40 22,-4 -22,-4 -30,-40"/>
+    <polygon points="45,-8 45,26 12,42 -8,16 12,-16"/>
+    <polygon points="28,48 -28,48 -38,16 -8,16 12,42"/>
+    <polygon points="-45,26 -45,-8 -12,-16 8,16 -12,42"/>
+    <polygon points="-30,-40 0,-52 22,-4 -8,16 -30,4"/>
+    <polygon points="30,-40 45,-8 12,-16 -8,-4 22,-4"/>
+    <circle cx="0" cy="0" r="13" fill="#808080"/>
+  </g>
+</svg>

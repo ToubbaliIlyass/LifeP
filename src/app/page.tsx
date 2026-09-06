@@ -22,6 +22,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { SplashScreen } from '@/components/SplashScreen'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
 import { QuickAddButton } from '@/components/quickadd/QuickAddButton'
+import { ActureMark } from '@/components/ui/acture-mark'
 import { SettingsPanel, type Settings } from '@/components/settings/SettingsPanel'
 import { UndoProvider } from '@/components/undo/UndoProvider'
 import { useDataChanged } from '@/lib/dataSignal'
@@ -81,16 +82,6 @@ function useVisiblePolling(callback: () => void, intervalMs: number) {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [callback, intervalMs])
-}
-
-function ActureMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <path d="M2.5 17.5 L10 6.5 L17.5 17.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="5.5" y1="13.5" x2="14.5" y2="13.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="10" cy="6.5" r="2" fill="currentColor" />
-    </svg>
-  )
 }
 
 export default function Home() {

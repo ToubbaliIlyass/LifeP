@@ -2,16 +2,7 @@
 
 import { useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-
-function ActureMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <path d="M2.5 17.5 L10 6.5 L17.5 17.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="5.5" y1="13.5" x2="14.5" y2="13.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="10" cy="6.5" r="2" fill="currentColor" />
-    </svg>
-  )
-}
+import { ActureMark } from '@/components/ui/acture-mark'
 
 function GoogleMark() {
   return (
