@@ -1,6 +1,6 @@
 'use client'
 
-import { Inbox, Link2, Plus, Pencil, Search, Sparkles, Loader2 } from 'lucide-react'
+import { Inbox, Link2, Plus, Pencil, Search, Sparkles, Loader2, CalendarCheck, CalendarDays } from 'lucide-react'
 import type { BatchOperation } from '@/lib/ai/tools'
 
 /**
@@ -82,9 +82,10 @@ function describeOps(ops: BatchOperation[]): string {
 interface ToolActivityProps {
   part: ToolPart
   onReviewProposals?: () => void
+  onOpenCalendar?: () => void
 }
 
-export function ToolActivity({ part, onReviewProposals }: ToolActivityProps) {
+export function ToolActivity({ part, onReviewProposals, onOpenCalendar }: ToolActivityProps) {
   const name = toolName(part)
   const input = (part.input ?? {}) as Record<string, unknown>
   const pending = part.state === 'input-streaming' || part.state === 'input-available'
@@ -145,6 +146,16 @@ export function ToolActivity({ part, onReviewProposals }: ToolActivityProps) {
   if (name === 'createNode') {
     const props = input.properties as Record<string, unknown> | undefined
     const n = label(props)
+    // A refused create returns an error as its output, not as a failed call;
+    // it used to be reported as "Added" all the same.
+    const refused = (part.output as { error?: unknown } | undefined)?.error
+    if (!pending && typeof refused === 'string') {
+      return (
+        <Row icon={<Plus className={ICON} />} faint>
+          Not added{n ? ` — ${n}` : ''}: {refused}
+        </Row>
+      )
+    }
     return (
       <Row icon={<Plus className={ICON} />}>
         {pending ? 'Adding…' : `Added ${input.type ?? 'node'}${n ? ` — ${n}` : ''}`}
@@ -176,6 +187,47 @@ export function ToolActivity({ part, onReviewProposals }: ToolActivityProps) {
     return (
       <Row icon={<Pencil className={ICON} />}>
         {pending ? 'Updating…' : `Updated ${n}${changed ? ` — ${changed}` : ''}`}
+      </Row>
+    )
+  }
+
+  // ── The day, planned: the one write worth a card of its own ──────────
+  if (name === 'planDay') {
+    const out = part.output as { date?: string; planned?: unknown[]; noRoomFor?: unknown[]; error?: string } | undefined
+    if (pending) {
+      return (
+        <Row icon={<Loader2 className={`${ICON} animate-spin`} />} faint>
+          Planning the day…
+        </Row>
+      )
+    }
+    if (out?.error) return <Row icon={<CalendarCheck className={ICON} />} faint>{out.error}</Row>
+    const placed = out?.planned?.length ?? 0
+    const missed = out?.noRoomFor?.length ?? 0
+    return (
+      <div className="border border-border/60 bg-muted/30 rounded-xl px-3 py-2.5 flex items-center gap-2.5">
+        <CalendarCheck className="w-3.5 h-3.5 shrink-0 text-primary" />
+        <p className="text-[12px] text-foreground/85 flex-1 min-w-0">
+          {placed === 0 ? 'Nothing left to plan' : `${placed} on the calendar`}
+          {out?.date && <span className="text-muted-foreground/60"> · {out.date}</span>}
+          {missed > 0 && <span className="text-amber-600 dark:text-amber-400"> · {missed} didn&apos;t fit</span>}
+        </p>
+        {onOpenCalendar && (
+          <button
+            onClick={onOpenCalendar}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors shrink-0"
+          >
+            Open calendar
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (name === 'getDay') {
+    return (
+      <Row icon={pending ? <Loader2 className={`${ICON} animate-spin`} /> : <CalendarDays className={ICON} />} faint>
+        {pending ? 'Looking at your day…' : `Checked ${typeof input.date === 'string' ? input.date : 'today'}`}
       </Row>
     )
   }

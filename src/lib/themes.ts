@@ -77,6 +77,47 @@ export const THEMES: ThemeDef[] = [
 
 export const THEME_STORAGE_KEY = 'acture-theme'
 
+/*
+ * Light/dark mode.
+ *
+ * Separate from the palette, and stored under its own key. Three states, not
+ * two: "not chosen" has to be distinguishable from "chose light", or an
+ * explicit light choice cannot survive a machine whose OS prefers dark —
+ * which is exactly what went wrong. Absent means `system`, so the existing
+ * 'light'/'dark' values keep working untouched.
+ *
+ * The rule below is mirrored by the pre-paint script in src/app/layout.tsx,
+ * which cannot import anything. If it changes here, change it there: the two
+ * disagreeing is what left the page dark while the toggle claimed light.
+ */
+export const MODE_STORAGE_KEY = 'theme'
+
+export type Mode = 'light' | 'dark' | 'system'
+
+export function isMode(value: string | null | undefined): value is Mode {
+  return value === 'light' || value === 'dark' || value === 'system'
+}
+
+export function storedMode(): Mode {
+  const stored = safeGet('local', MODE_STORAGE_KEY)
+  return isMode(stored) ? stored : 'system'
+}
+
+export function prefersDark(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+/** Whether a mode means dark right now. Only `system` depends on the OS. */
+export function isDark(mode: Mode): boolean {
+  return mode === 'dark' || (mode === 'system' && prefersDark())
+}
+
+/** Applies a mode to the document and remembers it for the next load. */
+export function applyMode(mode: Mode) {
+  document.documentElement.classList.toggle('dark', isDark(mode))
+  safeSet('local', MODE_STORAGE_KEY, mode)
+}
+
 export function isTheme(id: string | null | undefined): boolean {
   return !!id && THEMES.some((t) => t.id === id)
 }

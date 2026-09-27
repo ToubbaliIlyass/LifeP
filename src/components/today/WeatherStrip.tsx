@@ -40,7 +40,7 @@ export function WeatherStrip({ lat, lon, place }: { lat: number; lon: number; pl
     <div className="flex items-center gap-3 mb-6 px-3 py-2.5 rounded-lg bg-muted/20">
       <span className="text-[20px] leading-none" aria-hidden="true">{weather.icon}</span>
       <div className="flex items-baseline gap-2 flex-1 min-w-0">
-        <span className="text-[17px] font-serif text-foreground/85 tabular-nums">{weather.temperature}°</span>
+        <span className="text-[17px] text-foreground/85 tabular-nums">{weather.temperature}°</span>
         <span className="text-[12px] text-muted-foreground/70 truncate">{weather.label}</span>
       </div>
       <div className="flex items-center gap-2.5 text-[10px] font-mono text-muted-foreground/55 shrink-0">

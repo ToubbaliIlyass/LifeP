@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Geist_Mono, Source_Serif_4, Montserrat } from "next/font/google";
+import { Inter, Geist_Mono, Source_Serif_4, Montserrat } from "next/font/google";
 import "./globals.css";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+// The sans the app reads in: neutral, clear at small sizes, and with
+// numbers that line up — most of this app is times.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -47,11 +48,22 @@ export const metadata: Metadata = {
   Runs before first paint so neither the mode nor the palette can flash the
   wrong colours. Two separate things are restored:
 
-  - `theme` (light/dark mode) → the `.dark` class, as before.
-  - `acture-theme` (palette) → the `data-theme` attribute. The palette is also
-    stored in the database so it follows the user across devices, but a fetch
-    cannot be awaited here; localStorage is the copy that is readable
-    synchronously, and the database is what a new device falls back to.
+  - `theme` (light/dark mode) → the `.dark` class.
+  - `acture-theme` (palette) → the `data-theme` attribute.
+
+  Both are also stored in the database so they follow the user across
+  devices, but a fetch cannot be awaited here; localStorage is the copy that
+  is readable synchronously, and the database is what a new device falls
+  back to.
+
+  The mode rule mirrors `isDark` in src/lib/themes.ts, which this script
+  cannot import. An explicit choice always wins; the OS preference is only
+  consulted when there is no choice to honour. It previously read
+
+      if (!s || s === 'dark' || d) ...add('dark')
+
+  — so `d` alone forced dark over a stored 'light', and light mode was
+  unreachable on any machine whose OS prefers dark.
 
   Storage access is wrapped because it throws outright on iOS Safari with
   cookies blocked — see src/lib/storage.ts.
@@ -59,9 +71,10 @@ export const metadata: Metadata = {
 const themeScript = `
 (function(){
   try {
-    var s = localStorage.getItem('theme');
-    var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (!s || s === 'dark' || d) document.documentElement.classList.add('dark');
+    var m = localStorage.getItem('theme');
+    if (m !== 'light' && m !== 'dark') m = 'system';
+    var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (dark) document.documentElement.classList.add('dark');
   } catch(e){}
   try {
     var p = localStorage.getItem('acture-theme');
@@ -76,7 +89,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${plusJakarta.variable} ${geistMono.variable} ${sourceSerif.variable} ${montserrat.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} ${sourceSerif.variable} ${montserrat.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

@@ -42,7 +42,7 @@ export default function LoginPage() {
         <span className="text-[26px] font-bold tracking-tight">Acture</span>
       </div>
 
-      <p className="text-[14px] font-serif text-muted-foreground/80 mb-8 text-center max-w-[34ch]">
+      <p className="text-[14px] text-muted-foreground/80 mb-8 text-center max-w-[34ch]">
         Where action meets structure. Sign in to reach your graph.
       </p>
 

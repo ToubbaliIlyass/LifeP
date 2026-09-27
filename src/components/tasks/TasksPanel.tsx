@@ -38,18 +38,27 @@ function getBucket(dueDate: string | null, status: Task['status']): string {
   if (!dueDate) return 'undated'
   const today = todayStr()
   if (dueDate < today) return 'overdue'
+  // Today gets its own heading. It used to fall into "Next 3 days" with
+  // tomorrow and the day after, so the one question the list exists to
+  // answer — what is due *today* — was the one it would not say.
+  if (dueDate === today) return 'today'
   if (dueDate < addDays(today, 3)) return 'next3'
   if (dueDate < addDays(today, 7)) return 'nextWeek'
   if (dueDate <= addDays(today, 14)) return 'twoWeeks'
-  return 'beyond'
+  return 'later'
 }
 
 const BUCKETS = [
   { key: 'overdue',   label: 'Overdue',     labelClass: 'text-red-400/80',           borderClass: 'border-red-400/50' },
+  { key: 'today',     label: 'Today',       labelClass: 'text-primary',               borderClass: 'border-primary/50' },
   { key: 'next3',     label: 'Next 3 days', labelClass: 'text-amber-400/80',          borderClass: 'border-amber-400/40' },
   { key: 'nextWeek',  label: 'Next week',   labelClass: 'text-muted-foreground/60',   borderClass: 'border-yellow-400/25' },
   { key: 'twoWeeks',  label: 'Two weeks',   labelClass: 'text-muted-foreground/50',   borderClass: 'border-border/30' },
   { key: 'undated',   label: 'No date',     labelClass: 'text-muted-foreground/65',   borderClass: 'border-border/20' },
+  // Further out than a fortnight. These used to be dropped on the floor —
+  // `continue`d past before bucketing — so a task with a distant due date
+  // simply did not appear in the task list at all.
+  { key: 'later',     label: 'Later',       labelClass: 'text-muted-foreground/45',   borderClass: 'border-border/20' },
 ]
 
 // Higher priority first; within the same priority, earlier due date first.
@@ -118,7 +127,6 @@ export function TasksPanel({ refreshKey }: { refreshKey?: number } = {}) {
 
   for (const task of tasks) {
     const bucket = getBucket(task.dueDate, task.status)
-    if (bucket === 'beyond') continue
     if (bucket === 'done') {
       if (task.archived) archivedTasks.push(task)
       else doneTasks.push(task)
@@ -285,7 +293,7 @@ function TaskItem({
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`flex items-center gap-1.5 text-[13px] font-serif truncate ${task.status === 'done' ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
+        <p className={`flex items-center gap-1.5 text-[13px] truncate ${task.status === 'done' ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
           {task.priority !== 'medium' && task.status !== 'done' && (
             <span
               className={`shrink-0 w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[task.priority]}`}

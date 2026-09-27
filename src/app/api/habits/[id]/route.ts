@@ -1,6 +1,7 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
-import { getNodes, createNode, updateNode } from '@/lib/graph/queries'
+import { getNodes, createNode, updateNode, getNodeById } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
+import { blockStartFor, nowMinutes, recordSignal } from '@/lib/availability'
 
 export async function PATCH(
   request: Request,
@@ -14,6 +15,24 @@ export async function PATCH(
 
   const body = await request.json() as { completed: boolean; date?: string }
   const date = body.date ?? todayStr()
+
+  if (body.completed) {
+    const habit = await getNodeById(user.id, habitNodeId)
+    // Without a planned slot, "now" only means something for today —
+    // back-filling last Tuesday says nothing about the time of day.
+    const minute = (await blockStartFor(user.id, habitNodeId, date)) ?? (date === todayStr() ? nowMinutes() : null)
+    if (habit && minute !== null) {
+      const hp = habit.properties as Record<string, unknown>
+      await recordSignal(user.id, {
+        kind: 'done',
+        itemType: 'Habit',
+        itemId: habitNodeId,
+        name: typeof hp.name === 'string' ? hp.name : `Habit #${habitNodeId}`,
+        date,
+        minute,
+      })
+    }
+  }
 
   // Find existing HabitLog for this habit + date
   const allLogs = await getNodes(user.id, { type: 'HabitLog' })

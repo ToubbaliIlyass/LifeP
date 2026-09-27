@@ -44,7 +44,24 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+  // The MCP endpoint is called by outside chatbots with no session cookie; it
+  // checks its own bearer token. Exact match, so /api/mcp/tokens (which mints
+  // those tokens) stays behind the session gate.
+  /*
+   * MCP discovery has to answer honestly to a stranger.
+   *
+   * A client that gets a 401 from /api/mcp goes looking for OAuth metadata
+   * at /.well-known/oauth-* next. Those paths do not exist here — this
+   * server takes static personal tokens — and a plain 404 is exactly the
+   * answer that tells a client so. What they used to get instead was a 307
+   * to the HTML login page, which an MCP client cannot parse and cannot
+   * recover from: Claude Desktop reported only "Connection closed", with
+   * nothing to say that the real problem was a token that never arrived.
+   */
+  const isPublic =
+    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
+    pathname === '/api/mcp' ||
+    pathname.startsWith('/.well-known/')
 
   if (!data.user && !isPublic) {
     // API callers get a status they can act on; browsers get the login page.

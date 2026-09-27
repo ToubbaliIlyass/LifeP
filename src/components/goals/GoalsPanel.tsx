@@ -78,7 +78,8 @@ export function GoalsPanel({ refreshKey }: { refreshKey?: number } = {}) {
       )}
 
       <ScrollArea className="flex-1">
-        <div className="px-8 py-8 max-w-3xl">
+        {/* Full width, like every other panel — this was the only one capped. */}
+        <div className="px-8 py-8">
 
           <div className="flex items-center justify-between mb-5">
             <p className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
@@ -99,7 +100,7 @@ export function GoalsPanel({ refreshKey }: { refreshKey?: number } = {}) {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="What do you want to be true?"
-                className="flex-1 bg-muted/40 border border-border/40 rounded-lg px-3 py-2.5 text-[14px] font-serif focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="flex-1 bg-muted/40 border border-border/40 rounded-lg px-3 py-2.5 text-[14px] focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
               <button
                 type="submit"
@@ -114,7 +115,7 @@ export function GoalsPanel({ refreshKey }: { refreshKey?: number } = {}) {
           {goals.length === 0 && !adding && (
             <div className="py-16 text-center">
               <Target className="w-8 h-8 mx-auto text-muted-foreground/25 mb-3" />
-              <p className="text-[13px] text-muted-foreground/60 font-serif italic max-w-[36ch] mx-auto">
+              <p className="text-[13px] text-muted-foreground/60 italic max-w-[36ch] mx-auto">
                 No goals yet. A goal is the thing your habits and tasks are supposed to add up to.
               </p>
             </div>
@@ -140,7 +141,7 @@ export function GoalsPanel({ refreshKey }: { refreshKey?: number } = {}) {
                         className={`block w-full text-left px-4 py-3.5 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border-l-2 ${accent}`}
                       >
                         <div className="flex items-baseline justify-between gap-3 mb-1">
-                          <span className={`text-[14px] font-serif truncate ${g.status === 'completed' ? 'text-muted-foreground/60' : 'text-foreground/90'}`}>
+                          <span className={`text-[14px] truncate ${g.status === 'completed' ? 'text-muted-foreground/60' : 'text-foreground/90'}`}>
                             {g.name}
                           </span>
                           <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0 tabular-nums">

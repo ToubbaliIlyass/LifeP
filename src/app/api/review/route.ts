@@ -1,6 +1,9 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
-import { getNodes, getNodeWithNeighbors } from '@/lib/graph/queries'
+import { getEdges, getNodes } from '@/lib/graph/queries'
 import { todayStr, addDays, isDueOn } from '@/lib/date'
+import { collectWork, lastActivityFor } from '@/lib/goals'
+import { hiddenTypes } from '@/lib/modules'
+import { readSettings } from '@/lib/settings'
 
 const STALE_GOAL_DAYS = 14
 
@@ -62,27 +65,32 @@ export async function GET(request: Request) {
     if (status !== 'done' && dueDate && dueDate < weekStart) tasksOverdue++
   }
 
-  // ── Goals: flag any active goal with no linked-node activity recently ──
+  // ── Goals: flag any active goal with no activity anywhere in its work ──
+  //
+  // "Its work" is deliberately broad — see src/lib/goals.ts. Counting only
+  // directly-linked Tasks and Habits reported every goal organised into
+  // Projects as having no linked activity at all, and filed it under stale
+  // while its projects were being worked on.
   const goals = (await getNodes(user.id, { type: 'Goal' })).filter((g) => {
     const p = g.properties as Record<string, unknown>
     return (p.status ?? 'active') === 'active'
   })
+
+  const [allNodes, allEdges] = await Promise.all([getNodes(user.id), getEdges(user.id)])
+  // Same rule as the Goals panel: a switched-off module's work is not work.
+  const off = hiddenTypes(await readSettings(user.id))
+  const work = collectWork(goals, allNodes.filter((n) => !off.has(n.type)), allEdges)
   const staleCutoff = addDays(todayStr(), -STALE_GOAL_DAYS)
-  const staleGoals = (await Promise.all(goals
-    .map(async (g) => {
+
+  const staleGoals = goals
+    .map((g) => {
       const p = g.properties as Record<string, unknown>
-      const detail = await getNodeWithNeighbors(user.id, g.id)
-      const linked = (detail?.neighbors ?? []).filter((n) => n.node.type === 'Task' || n.node.type === 'Habit')
-      const mostRecentActivity = linked.reduce<string | null>((latest, { node }) => {
-        const updated = node.updatedAt.slice(0, 10)
-        return !latest || updated > latest ? updated : latest
-      }, null)
       return {
         id: g.id,
         name: typeof p.name === 'string' ? p.name : `Goal #${g.id}`,
-        lastActivity: mostRecentActivity,
+        lastActivity: lastActivityFor(work.get(g.id)!, habitLogs),
       }
-    })))
+    })
     .filter((g) => !g.lastActivity || g.lastActivity < staleCutoff)
 
   return Response.json({

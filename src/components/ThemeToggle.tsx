@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { safeGet, safeSet } from '@/lib/storage'
+import { Moon, Sun } from 'lucide-react'
+import { useMode } from '@/lib/useMode'
 
 interface ThemeToggleProps {
   /** When true, renders as a full sidebar row with icon + label */
@@ -9,74 +9,37 @@ interface ThemeToggleProps {
   collapsed?: boolean
 }
 
-function SunIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7z" />
-    </svg>
-  )
-}
-
-function MoonIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-    </svg>
-  )
-}
-
+/**
+ * Switches light and dark.
+ *
+ * Shows the mode you are *in*, not the one you would switch to. It used to
+ * do the opposite, which meant that in dark mode the sidebar read "Light
+ * mode" with a sun while the Settings picker two panels away highlighted
+ * "dark" with a moon — both correct, and flatly contradictory to look at.
+ * The two say the same thing now, in the same icons; what pressing it does
+ * is in the tooltip, where an action label belongs.
+ */
 export function ThemeToggle({ sidebar = false, collapsed = false }: ThemeToggleProps) {
-  // Starts false unconditionally so the client's first hydration pass
-  // matches the server-rendered markup exactly — the real value (which
-  // needs localStorage, unavailable during SSR) is picked up right after
-  // mount instead. The inline script in layout.tsx already applies the
-  // `.dark` class to <html> before hydration, so the page's own colors
-  // never flash wrong; this only fixes the toggle button's own icon/label
-  // briefly showing the opposite state for a frame.
-  const [dark, setDark] = useState(false)
+  // Shared with the Settings picker, so the two can never show different
+  // answers while both are on screen — see src/lib/useMode.ts.
+  const { dark, toggle } = useMode()
 
-  // Only reads state here — the inline script in layout.tsx already
-  // applied (or didn't) the `.dark` class to <html> before hydration, so
-  // this must NOT also toggle the class on mount: doing so with the
-  // placeholder `false` state would immediately undo a correct dark
-  // application for a frame before this effect's setDark re-render fixes
-  // it back. The class is only ever changed explicitly, in toggle().
-  useEffect(() => {
-    const stored = safeGet('local', 'theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    setDark(stored ? stored === 'dark' : prefersDark)
-
-    // Settings can change the mode too, and this button would otherwise keep
-    // showing the old icon until it happened to remount. Watching the class
-    // means whoever changes it, both stay in step.
-    const observer = new MutationObserver(() => {
-      setDark(document.documentElement.classList.contains('dark'))
-    })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
-  }, [])
-
-  function toggle() {
-    const next = !dark
-    setDark(next)
-    document.documentElement.classList.toggle('dark', next)
-    safeSet('local', 'theme', next ? 'dark' : 'light')
-  }
+  const Icon = dark ? Moon : Sun
+  const label = dark ? 'Dark mode' : 'Light mode'
+  const action = dark ? 'Switch to light mode' : 'Switch to dark mode'
 
   if (sidebar) {
     return (
       <button
         onClick={toggle}
-        title={collapsed ? (dark ? 'Light mode' : 'Dark mode') : undefined}
+        title={action}
+        aria-label={action}
         className={`flex items-center rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors w-full ${
           collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'
         }`}
       >
-        {dark
-          ? <SunIcon className={`shrink-0 opacity-55 ${collapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
-          : <MoonIcon className={`shrink-0 opacity-55 ${collapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
-        }
-        {!collapsed && (dark ? 'Light mode' : 'Dark mode')}
+        <Icon className={`shrink-0 opacity-55 ${collapsed ? 'w-[18px] h-[18px]' : 'w-[15px] h-[15px]'}`} />
+        {!collapsed && label}
       </button>
     )
   }
@@ -85,9 +48,10 @@ export function ThemeToggle({ sidebar = false, collapsed = false }: ThemeToggleP
     <button
       onClick={toggle}
       className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded"
-      aria-label="Toggle dark mode"
+      title={action}
+      aria-label={action}
     >
-      {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+      <Icon className="w-4 h-4" />
     </button>
   )
 }

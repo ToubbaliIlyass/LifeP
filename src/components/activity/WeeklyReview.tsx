@@ -77,7 +77,7 @@ export function WeeklyReview() {
         <div className="p-4 grid grid-cols-2 gap-3">
           <div className="px-3 py-2.5 rounded-lg bg-muted/20">
             <p className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest mb-1">Habits</p>
-            <p className="text-[18px] font-serif text-foreground/85">
+            <p className="text-[18px] text-foreground/85">
               {data.habits.rate === null ? '—' : `${data.habits.rate}%`}
             </p>
             <p className="text-[10px] text-muted-foreground/55 mt-0.5">
@@ -86,7 +86,7 @@ export function WeeklyReview() {
           </div>
           <div className="px-3 py-2.5 rounded-lg bg-muted/20">
             <p className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest mb-1">Tasks</p>
-            <p className="text-[18px] font-serif text-foreground/85">{data.tasks.completed}</p>
+            <p className="text-[18px] text-foreground/85">{data.tasks.completed}</p>
             <p className="text-[10px] text-muted-foreground/55 mt-0.5">
               completed · {data.tasks.created} new
               {data.tasks.overdue > 0 && (
@@ -102,7 +102,7 @@ export function WeeklyReview() {
               </p>
               <div className="space-y-1">
                 {data.staleGoals.map((g) => (
-                  <p key={g.id} className="text-[12px] font-serif text-foreground/75">
+                  <p key={g.id} className="text-[12px] text-foreground/75">
                     {g.name}
                     <span className="text-muted-foreground/55 text-[10px] font-mono ml-1.5">
                       {g.lastActivity ? `· last activity ${g.lastActivity}` : '· no linked activity yet'}

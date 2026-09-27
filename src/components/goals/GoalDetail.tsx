@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { X, Plus, Trash2, Link2, Unlink, Check } from 'lucide-react'
+import { X, Plus, Trash2, Link2, Unlink, Check, Flag } from 'lucide-react'
 import { StatusCheckbox } from '@/components/ui/completion-checkbox'
 import { Markdown } from '@/components/notes/Markdown'
 import { LinkNodePicker } from './LinkNodePicker'
@@ -18,6 +18,7 @@ type Milestone = Linked & { status: 'todo' | 'in-progress' | 'done'; dueDate: st
 type LinkedHabit = Linked & { frequency: string; recentlyDone: boolean }
 type LinkedNote = Linked & { content: string }
 type LinkedOther = Linked & { type: string }
+type MilestoneOption = { id: number; name: string; status: string; dueDate: string | null }
 
 interface GoalDetailData {
   goal: { id: number; properties: Record<string, unknown>; createdAt: string; updatedAt: string }
@@ -46,6 +47,9 @@ export function GoalDetail({
   const [saving, setSaving] = useState(false)
   const [addingMilestone, setAddingMilestone] = useState(false)
   const [milestoneName, setMilestoneName] = useState('')
+  const [milestoneDue, setMilestoneDue] = useState('')
+  /** Milestones not yet on this goal, while the link list is open. */
+  const [linkable, setLinkable] = useState<MilestoneOption[] | null>(null)
   const [picking, setPicking] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [newKey, setNewKey] = useState('')
@@ -99,10 +103,35 @@ export function GoalDetail({
     await fetch(`/api/goals/${goalId}/milestones`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, dueDate: milestoneDue || null }),
     })
     setMilestoneName('')
+    setMilestoneDue('')
     setAddingMilestone(false)
+    load()
+    onChanged()
+  }
+
+  async function openLinkable() {
+    if (linkable) { setLinkable(null); return }
+    setAddingMilestone(false)
+    const d = (await fetch(`/api/goals/${goalId}/milestones`).then((r) => r.json()).catch(() => null)) as
+      | { milestones?: MilestoneOption[] }
+      | null
+    setLinkable(d?.milestones ?? [])
+  }
+
+  /**
+   * Links an existing Milestone here, or turns a linked Task into one — which
+   * is how milestones from before they had their own type come back.
+   */
+  async function attachMilestone(body: { milestoneId: number } | { fromTaskId: number }) {
+    await fetch(`/api/goals/${goalId}/milestones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    setLinkable((l) => l && l.filter((m) => !('milestoneId' in body) || m.id !== body.milestoneId))
     load()
     onChanged()
   }
@@ -212,7 +241,7 @@ export function GoalDetail({
                   onBlur={(e) => patch({ description: e.target.value })}
                   rows={3}
                   placeholder="What does reaching this actually look like?"
-                  className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-serif resize-y focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] resize-y focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               </div>
 
@@ -263,7 +292,7 @@ export function GoalDetail({
               <p className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest">Custom fields</p>
 
               {customKeys.length === 0 && (
-                <p className="text-[12px] text-muted-foreground/50 font-serif italic">
+                <p className="text-[12px] text-muted-foreground/50 italic">
                   None yet — add anything you want to track about this goal.
                 </p>
               )}
@@ -330,12 +359,20 @@ export function GoalDetail({
                 <p className="text-[10px] font-mono text-muted-foreground/55 uppercase tracking-widest">
                   Milestones · {data.milestones.length}
                 </p>
-                <button
-                  onClick={() => setAddingMilestone((v) => !v)}
-                  className="flex items-center gap-1 text-[11px] text-muted-foreground/65 hover:text-foreground transition-colors"
-                >
-                  <Plus className="w-3 h-3" /> Add
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={openLinkable}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground/65 hover:text-foreground transition-colors"
+                  >
+                    <Link2 className="w-3 h-3" /> Link existing
+                  </button>
+                  <button
+                    onClick={() => { setLinkable(null); setAddingMilestone((v) => !v) }}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground/65 hover:text-foreground transition-colors"
+                  >
+                    <Plus className="w-3 h-3" /> Add
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -344,13 +381,13 @@ export function GoalDetail({
                     <button onClick={() => toggleMilestone(m)} className="shrink-0">
                       <StatusCheckbox status={m.status} />
                     </button>
-                    <span className={`text-[13px] font-serif flex-1 truncate ${m.status === 'done' ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
+                    <span className={`text-[13px] flex-1 truncate ${m.status === 'done' ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
                       {m.label}
                     </span>
                     {m.dueDate && <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">{m.dueDate}</span>}
                     <button
                       onClick={() => unlink(m.edgeId)}
-                      title="Unlink from this goal (keeps the task)"
+                      title="Unlink from this goal (keeps the milestone)"
                       className="p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground hover:text-destructive transition-all shrink-0"
                     >
                       <Unlink className="w-3 h-3" />
@@ -366,7 +403,14 @@ export function GoalDetail({
                     value={milestoneName}
                     onChange={(e) => setMilestoneName(e.target.value)}
                     placeholder="What's the next concrete step?"
-                    className="flex-1 bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-serif focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    className="flex-1 min-w-0 bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                  <input
+                    type="date"
+                    value={milestoneDue}
+                    onChange={(e) => setMilestoneDue(e.target.value)}
+                    title="Due date (optional)"
+                    className="w-[132px] shrink-0 bg-muted/40 border border-border/40 rounded-lg px-2 py-2 text-[12px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
                   />
                   <button type="submit" disabled={!milestoneName.trim()} className="text-[12px] font-semibold px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50">
                     Add
@@ -374,8 +418,32 @@ export function GoalDetail({
                 </form>
               )}
 
-              {data.milestones.length === 0 && !addingMilestone && (
-                <p className="text-[12px] text-muted-foreground/50 font-serif italic">Break this goal into concrete steps.</p>
+              {linkable && (
+                <div className="mt-2 rounded-lg border border-border/50 p-1.5 max-h-56 overflow-y-auto">
+                  {linkable.length === 0 ? (
+                    <p className="text-[12px] text-muted-foreground/55 italic px-2 py-1.5">
+                      No other milestones yet — add one here, and it can be linked to other goals too.
+                    </p>
+                  ) : (
+                    linkable.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => attachMilestone({ milestoneId: m.id })}
+                        className="flex items-center gap-3 w-full text-left px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
+                      >
+                        <Flag className="w-3 h-3 text-muted-foreground/55 shrink-0" />
+                        <span className={`text-[13px] flex-1 truncate ${m.status === 'done' ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
+                          {m.name}
+                        </span>
+                        {m.dueDate && <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">{m.dueDate}</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {data.milestones.length === 0 && !addingMilestone && !linkable && (
+                <p className="text-[12px] text-muted-foreground/50 italic">Break this goal into concrete steps.</p>
               )}
             </section>
 
@@ -389,7 +457,7 @@ export function GoalDetail({
                   {data.habits.map((h) => (
                     <div key={h.edgeId} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20 group">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${h.recentlyDone ? 'bg-emerald-400' : 'bg-muted-foreground/30'}`} />
-                      <span className="text-[13px] font-serif flex-1 truncate text-foreground/85">{h.label}</span>
+                      <span className="text-[13px] flex-1 truncate text-foreground/85">{h.label}</span>
                       <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">{h.frequency}</span>
                       <button
                         onClick={() => unlink(h.edgeId)}
@@ -414,7 +482,7 @@ export function GoalDetail({
                   {data.notes.map((n) => (
                     <div key={n.edgeId} className="px-3 py-2.5 rounded-lg bg-muted/20 group">
                       <div className="flex items-start gap-2">
-                        <p className="text-[13px] font-serif font-medium text-foreground/85 flex-1">{n.label}</p>
+                        <p className="text-[13px] font-medium text-foreground/85 flex-1">{n.label}</p>
                         <button
                           onClick={() => unlink(n.edgeId)}
                           title="Unlink from this goal (keeps the note)"
@@ -440,10 +508,19 @@ export function GoalDetail({
                   {data.other.map((o) => (
                     <div key={o.edgeId} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/10 group">
                       <span className="text-[9px] font-mono uppercase tracking-wide text-muted-foreground/60 w-20 shrink-0">{o.type}</span>
-                      <span className="text-[12px] font-serif flex-1 truncate text-foreground/75">{o.label}</span>
+                      <span className="text-[12px] flex-1 truncate text-foreground/75">{o.label}</span>
                       <span className="text-[9px] font-mono text-muted-foreground/50 shrink-0">
                         {o.direction === 'outgoing' ? '→' : '←'} {o.edgeType}
                       </span>
+                      {o.type === 'Task' && (
+                        <button
+                          onClick={() => attachMilestone({ fromTaskId: o.id })}
+                          title="Turn this task into a milestone of this goal — it stops being scheduled as work"
+                          className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-70 hover:!opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all shrink-0"
+                        >
+                          <Flag className="w-2.5 h-2.5" /> Make milestone
+                        </button>
+                      )}
                       <button
                         onClick={() => unlink(o.edgeId)}
                         title="Remove this link"

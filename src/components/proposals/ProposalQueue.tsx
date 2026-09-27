@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Proposal } from '@/lib/db/schema'
+import { notifyDataChanged } from '@/lib/dataSignal'
 import type { BatchOperation } from '@/lib/ai/tools'
 
 // --- Pending count badge (exported for header use) ---
@@ -84,10 +85,15 @@ function ProposalCard({ proposal, onResolved, onApproved }: ProposalCardProps) {
     await fetch(`/api/proposals/${proposal.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, reason: action === 'reject' ? reason : undefined }),
+      body: JSON.stringify({
+        action,
+        reason: action === 'reject' ? reason : undefined,
+        // Approving plans today around what was approved — in the user's today.
+        tz: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return undefined } })(),
+      }),
     })
     setBusy(false)
-    if (action === 'approve') onApproved()
+    if (action === 'approve') { onApproved(); notifyDataChanged() }
     onResolved()
   }
 
@@ -177,7 +183,7 @@ export function ProposalQueue({ onCountChange, onApproved }: ProposalQueueProps)
   return (
     <ScrollArea className="h-full">
       {proposals.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground/50 text-center pt-12 font-serif italic">
+        <p className="text-[13px] text-muted-foreground/50 text-center pt-12 italic">
           No pending proposals
         </p>
       ) : (

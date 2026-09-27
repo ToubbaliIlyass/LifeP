@@ -9,7 +9,7 @@ import remarkGfm from 'remark-gfm'
 export function Markdown({ children, className = '' }: { children: string; className?: string }) {
   return (
     <div
-      className={`text-[13px] font-serif text-foreground/85 leading-relaxed break-words
+      className={`text-[13px] text-foreground/85 leading-relaxed break-words
         [&>*+*]:mt-2.5
         [&_h1]:text-[16px] [&_h1]:font-sans [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mt-4 [&_h1]:first:mt-0
         [&_h2]:text-[14px] [&_h2]:font-sans [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mt-3 [&_h2]:first:mt-0

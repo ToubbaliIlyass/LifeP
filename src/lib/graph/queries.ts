@@ -137,6 +137,21 @@ export async function updateNode(
     .get()
 }
 
+/**
+ * Changes what a node is, keeping its id, properties and every edge.
+ *
+ * Only for types that share a shape — a Task becoming a Milestone keeps its
+ * name, status and due date and simply stops being scheduled as work.
+ */
+export async function setNodeType(userId: number, nodeId: number, type: string): Promise<Node | undefined> {
+  return db
+    .update(nodes)
+    .set({ type, updatedAt: new Date().toISOString() })
+    .where(and(eq(nodes.id, nodeId), eq(nodes.userId, userId)))
+    .returning()
+    .get()
+}
+
 export async function deleteNode(userId: number, nodeId: number): Promise<void> {
   // Foreign key cascade removes connected edges when the node is deleted.
   await db.delete(nodes).where(and(eq(nodes.id, nodeId), eq(nodes.userId, userId))).run()

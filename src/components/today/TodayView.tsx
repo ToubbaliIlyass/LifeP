@@ -2,55 +2,40 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Clock, MapPin } from 'lucide-react'
-import { CompletionCheckbox } from '@/components/ui/completion-checkbox'
-import { GoalDetail } from '@/components/goals/GoalDetail'
+import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
+import { Resurfaced } from '@/components/activity/Resurfaced'
 import { WeatherStrip } from './WeatherStrip'
-import { ScheduleSuggestions } from './ScheduleSuggestions'
-import { NowQueue } from './NowQueue'
-import { todayStr } from '@/lib/date'
-import { notifyDataChanged } from '@/lib/dataSignal'
+import { NowQueue, nowIsCached } from './NowQueue'
+import { TodayAssistant } from './TodayAssistant'
+import { DailyQuote } from './DailyQuote'
+import { GoalNudgeCard, NothingYet, ProjectList, PulseStrip } from './TodayPulse'
+import type { ActiveProject, GoalNudge, Pulse } from '@/lib/today'
 
-interface HabitRow {
-  id: number
-  name: string
-  frequency: string
-  daysOfWeek: number[] | null
-  todayCompleted: boolean
-  streak: number
-}
+/*
+ * The dashboard.
+ *
+ * It used to be five lists — habits, tasks, events, goals — sitting under a
+ * Now timeline that already contained the first three. The busier the day,
+ * the longer the page got saying the same thing repeatedly, and the goals
+ * list was on screen every single day, which is how a thing stops being
+ * read. What is left is the sequence, and then only what the sequence cannot
+ * tell you:
+ *
+ *   Now        what has a time, in order               (NowQueue)
+ *     beside   habits with no time, what is due, the week ahead (DayColumn)
+ *   Projects   what is under way and how far along
+ *   Goal       one, and only when one is being neglected
+ *   Resurface  what has gone quiet long enough to review
+ *   Last 7d    how it has actually been going, and what slipped yesterday
+ *
+ * Nothing is listed twice: a habit or task with a slot is on the rail, one
+ * without is in the column, never both.
+ */
 
-interface TaskRow {
-  id: number
-  name: string
-  status: 'todo' | 'in-progress' | 'done'
-  dueDate: string | null
-  archived: boolean
-}
-
-interface EventRow {
-  id: number
-  name: string
-  date: string | null
-  time: string | null
-  location: string | null
-}
-
-interface Milestone {
-  id: number
-  name: string
-  status: 'todo' | 'in-progress' | 'done'
-  dueDate: string | null
-}
-
-interface GoalRow {
-  id: number
-  name: string
-  targetDate: string | null
-  status: string
-  linkedCount: number
-  progress: number | null
-  milestones: Milestone[]
+interface TodayData {
+  projects: ActiveProject[]
+  nudge: GoalNudge | null
+  pulse: Pulse
 }
 
 interface TodayViewProps {
@@ -58,98 +43,33 @@ interface TodayViewProps {
   refreshKey?: number
   /** Set in Settings; the strip is hidden until a location exists. */
   weather?: { enabled: boolean; lat: number | null; lon: number | null; place: string | null }
+  /** Simple mode: capture and the day, nothing reviewed or summarised. */
+  simple?: boolean
 }
 
-function formatDay(date: Date) {
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  })
-}
-
-function isOverdue(dueDate: string | null, status: string) {
-  if (!dueDate || status === 'done') return false
-  return dueDate < todayStr()
-}
-
-function isDueToday(dueDate: string | null) {
-  if (!dueDate) return false
-  return dueDate === todayStr()
-}
-
-function isHabitForToday(habit: HabitRow): boolean {
-  const { frequency, daysOfWeek } = habit
-  const todayDow = new Date().getDay()
-  if (frequency === 'daily') return true
-  if (frequency === 'weekdays') {
-    if (daysOfWeek && daysOfWeek.length > 0) return daysOfWeek.includes(todayDow)
-    return todayDow >= 1 && todayDow <= 5
-  }
-  if (frequency === 'weekly') {
-    if (!daysOfWeek || daysOfWeek.length === 0) return false
-    return daysOfWeek.includes(todayDow)
-  }
-  return true
-}
-
-export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
-  const [habits, setHabits] = useState<HabitRow[]>([])
-  const [tasks, setTasks] = useState<TaskRow[]>([])
-  const [events, setEvents] = useState<EventRow[]>([])
-  const [goals, setGoals] = useState<GoalRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [toggling, setToggling] = useState<number | null>(null)
-  const [viewingGoalId, setViewingGoalId] = useState<number | null>(null)
-
-  const today = todayStr()
+export function TodayView({ onNavigate, refreshKey, weather, simple = false }: TodayViewProps) {
+  const [data, setData] = useState<TodayData | null>(null)
+  // Simple mode shows none of what /api/today returns, so it neither asks
+  // for it nor waits on it.
+  const [loading, setLoading] = useState(!simple)
+  /*
+   * The assistant needs nothing loaded and the plan does, so on their own
+   * the one appeared a beat before the other. The column stays hidden until
+   * the plan can be drawn, then both arrive together — at once, when the
+   * plan is already in memory from an earlier visit.
+   */
+  const [planReady, setPlanReady] = useState(nowIsCached)
+  const markPlanReady = useCallback(() => setPlanReady(true), [])
+  const [openId, setOpenId] = useState<number | null>(null)
 
   const load = useCallback(() => {
-    Promise.all([
-      fetch('/api/habits').then((r) => r.json()),
-      fetch('/api/tasks').then((r) => r.json()),
-      fetch('/api/events').then((r) => r.json()),
-      fetch('/api/goals').then((r) => r.json()),
-    ])
-      .then(([habitsData, tasksData, eventsData, goalsData]) => {
-        const allHabits = (habitsData as { habits: HabitRow[] }).habits ?? []
-        setHabits(allHabits.filter(isHabitForToday))
-        setTasks((tasksData as { tasks: TaskRow[] }).tasks ?? [])
-        setEvents((eventsData as { events: EventRow[] }).events?.filter((e: EventRow) => e.date === today) ?? [])
-        setGoals(((goalsData as { goals: GoalRow[] }).goals ?? []).filter((g) => g.status === 'active'))
-        setLoading(false)
-      })
+    fetch('/api/today')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: TodayData | null) => { if (d) setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [today])
+  }, [])
 
-  useEffect(() => { load() }, [load, refreshKey])
-
-  async function toggleHabit(habit: HabitRow) {
-    setToggling(habit.id)
-    await fetch(`/api/habits/${habit.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completed: !habit.todayCompleted }),
-    })
-    setToggling(null)
-    load()
-    notifyDataChanged()
-  }
-
-  async function cycleTask(task: TaskRow) {
-    const next = task.status === 'todo' ? 'in-progress' : 'done'
-    await fetch(`/api/tasks/${task.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: next }),
-    })
-    load()
-    notifyDataChanged()
-  }
-
-  const urgentTasks = tasks.filter(
-    (t) => !t.archived && t.status !== 'done' && (isOverdue(t.dueDate, t.status) || isDueToday(t.dueDate))
-  )
-  const completedHabits = habits.filter((h) => h.todayCompleted).length
-  const isEmpty = !loading && habits.length === 0 && urgentTasks.length === 0 && events.length === 0 && goals.length === 0
+  useEffect(() => { if (!simple) load() }, [load, refreshKey, simple])
 
   if (loading) {
     return (
@@ -159,200 +79,60 @@ export function TodayView({ onNavigate, refreshKey, weather }: TodayViewProps) {
     )
   }
 
+  const nothingPlanned =
+    !!data && data.projects.length === 0 && !data.nudge && data.pulse.tasks.completed === 0
+
   return (
     <ScrollArea className="h-full">
-      <div className="px-8 py-8">
-
-        {weather?.enabled && weather.lat !== null && weather.lon !== null && (
+      {/* One centred column: capture, then the day. */}
+      <div className={`px-5 md:px-8 py-8 mx-auto w-full max-w-2xl transition-opacity duration-150 ${planReady ? 'opacity-100' : 'opacity-0'}`}>
+        {!simple && weather?.enabled && weather.lat !== null && weather.lon !== null && (
           <WeatherStrip lat={weather.lat} lon={weather.lon} place={weather.place} />
         )}
 
-        <ScheduleSuggestions onScheduled={load} />
+        {/* The one way in (the chat aside): say what needs to happen, and it
+            is read, added and planned in one go. The typed quick-add box and
+            the approve-a-plan card it replaced only repeated this. */}
+        {/* The day's name, centred over the column it heads. */}
+        <h1 className="mb-6 text-center font-serif">
+          <span className="block text-[11px] font-sans font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
+          </span>
+          <span className="block mt-1 text-[26px] leading-tight text-foreground">
+            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+          </span>
+        </h1>
 
-        <NowQueue onChanged={load} />
+        <TodayAssistant onNavigate={onNavigate} />
 
-        {isEmpty && (
-          <div className="py-10 text-center">
-            <p className="text-[13px] text-muted-foreground/60 font-serif italic">
-              Nothing urgent today. Open the chat to add something.
-            </p>
-          </div>
+        {/* The whole point of the page. Renders nothing when the day is empty. */}
+        <NowQueue onChanged={simple ? undefined : load} onReady={markPlanReady} />
+
+        {data && !simple && (
+          <>
+            <ProjectList projects={data.projects} onOpen={setOpenId} />
+            <GoalNudgeCard nudge={data.nudge} onOpen={setOpenId} />
+
+            {/* The top few only — the full review lives in Activity. Renders
+                nothing at all until something has actually gone quiet. */}
+            <Resurfaced limit={3} onSeeAll={() => onNavigate?.('activity')} />
+
+            <PulseStrip pulse={data.pulse} onNavigate={onNavigate} />
+
+            {nothingPlanned && <NothingYet overdue={data.pulse.tasks.overdue} />}
+          </>
         )}
 
-        {/* Habits */}
-        {habits.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
-                Habits · {completedHabits}/{habits.length}
-              </h2>
-              <button
-                onClick={() => onNavigate?.('habits')}
-                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
-              >
-                view all →
-              </button>
-            </div>
-
-            <div className="h-0.5 bg-border/40 rounded-full mb-4 overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-500"
-                style={{ width: habits.length > 0 ? `${(completedHabits / habits.length) * 100}%` : '0%' }}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              {habits.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => toggleHabit(h)}
-                  disabled={toggling === h.id}
-                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors text-left group ${
-                    h.todayCompleted ? 'bg-muted/20' : 'bg-muted/20 hover:bg-muted/40'
-                  }`}
-                >
-                  <CompletionCheckbox checked={h.todayCompleted} />
-                  <span className={`text-[13px] font-serif flex-1 ${h.todayCompleted ? 'line-through text-muted-foreground/65' : 'text-foreground/85'}`}>
-                    {h.name}
-                  </span>
-                  {h.streak > 1 && (
-                    <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">
-                      {h.streak}d
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Tasks due today / overdue */}
-        {urgentTasks.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
-                Tasks · {urgentTasks.length}
-              </h2>
-              <button
-                onClick={() => onNavigate?.('tasks')}
-                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
-              >
-                view all →
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              {urgentTasks.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => cycleTask(t)}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors text-left group"
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === 'in-progress' ? 'bg-sky-400' : 'bg-muted-foreground/30'}`} />
-                  <span className="text-[13px] font-serif flex-1 text-foreground/85">
-                    {t.name}
-                  </span>
-                  {isOverdue(t.dueDate, t.status) && (
-                    <span className="text-[10px] font-mono text-red-400/60 shrink-0">overdue</span>
-                  )}
-                  {isDueToday(t.dueDate) && !isOverdue(t.dueDate, t.status) && (
-                    <span className="text-[10px] font-mono text-muted-foreground/65 shrink-0 flex items-center gap-0.5">
-                      <Clock className="w-2.5 h-2.5" /> today
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Events today */}
-        {events.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
-                Events today · {events.length}
-              </h2>
-              <button
-                onClick={() => onNavigate?.('events')}
-                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
-              >
-                view all →
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              {events.map((e) => (
-                <div key={e.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/20">
-                  {e.time && (
-                    <span className="text-[11px] font-mono text-muted-foreground/50 shrink-0 mt-0.5 w-10">
-                      {e.time.slice(0, 5)}
-                    </span>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-serif text-foreground/85">{e.name}</p>
-                    {e.location && (
-                      <p className="text-[10px] text-muted-foreground/65 mt-0.5 flex items-center gap-1">
-                        <MapPin className="w-2.5 h-2.5" />{e.location}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Goals — progress derived from linked Habits/Tasks, never stored */}
-        {goals.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] font-mono text-muted-foreground/65 uppercase tracking-widest">
-                Goals · {goals.length}
-              </h2>
-              <button
-                onClick={() => onNavigate?.('graph')}
-                className="text-[10px] text-muted-foreground/65 hover:text-muted-foreground transition-colors font-mono"
-              >
-                view all →
-              </button>
-            </div>
-            <div className="space-y-2.5">
-              {goals.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setViewingGoalId(g.id)}
-                  className="block w-full text-left px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-[13px] font-serif text-foreground/85 truncate">{g.name}</span>
-                    <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">
-                      {g.progress === null ? 'no linked activity' : `${g.progress}%`}
-                    </span>
-                  </div>
-                  <div className="h-0.5 bg-border/40 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${g.progress ?? 0}%` }}
-                    />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {viewingGoalId !== null && (() => {
-          const g = goals.find((x) => x.id === viewingGoalId)
-          if (!g) return null
-          return (
-            <GoalDetail
-              goalId={g.id}
-              onClose={() => setViewingGoalId(null)}
-              onChanged={load}
-            />
-          )
-        })()}
-
+        {!simple && <DailyQuote />}
       </div>
+
+      {openId !== null && (
+        <NodeDetailPanel
+          nodeId={openId}
+          onClose={() => setOpenId(null)}
+          onMutated={() => { setOpenId(null); load() }}
+        />
+      )}
     </ScrollArea>
   )
 }

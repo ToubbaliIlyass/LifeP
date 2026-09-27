@@ -150,7 +150,7 @@ export function HabitsPanel() {
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <p className={`text-[13px] font-serif truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
+                          <p className={`text-[13px] truncate ${habit.todayCompleted ? 'line-through text-muted-foreground/50' : 'text-foreground/85'}`}>
                             {habit.name}
                           </p>
                           <p className="text-[10px] text-muted-foreground/65 font-mono mt-0.5">

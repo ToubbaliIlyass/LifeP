@@ -107,7 +107,8 @@ function estimateLabelRadius(text: string): number {
   return (text.length * 5.5) / 2 + 17
 }
 
-function pluralize(type: string): string {
+/** A category circle's word: the type, in the plural the graph labels it with. */
+export function pluralize(type: string): string {
   const lower = type.toLowerCase()
   if (lower === 'journalentry') return 'Journal'
   if (lower.endsWith('s')) return type
@@ -115,15 +116,30 @@ function pluralize(type: string): string {
   return type + 's'
 }
 
+/**
+ * Types that are never drawn, lower-cased.
+ *
+ * HabitLog and TimeBlock are bookkeeping nodes, not things the user thinks
+ * of as part of their graph -- TimeBlock's schedule info surfaces instead
+ * via the hover tooltip on whatever it's linked to (see GraphView).
+ * Memory, availability, learning signals and access tokens are the app's
+ * own bookkeeping too — shown in Settings, not as graph nodes.
+ *
+ * Exported because anything that lists "the types the user has" — the
+ * colour picker, for one — has to hide exactly the same ones, and two lists
+ * that agree today will not agree after the next type is added.
+ */
+export const HIDDEN_NODE_TYPES = new Set([
+  'habitlog', 'timeblock', 'savedview', 'settings',
+  'memory', 'availabilityrule', 'activitysignal', 'apitoken',
+  'canvascredential',
+])
+
 export function toFlowGraph(
   nodes: Node[],
   edges: Edge[],
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  // HabitLog and TimeBlock are bookkeeping nodes, not things the user thinks
-  // of as part of their graph -- TimeBlock's schedule info surfaces instead
-  // via the hover tooltip on whatever it's linked to (see GraphView).
-  const HIDDEN_TYPES = new Set(['habitlog', 'timeblock', 'savedview', 'settings'])
-  const filteredNodes = nodes.filter((n) => !HIDDEN_TYPES.has(n.type.toLowerCase()))
+  const filteredNodes = nodes.filter((n) => !HIDDEN_NODE_TYPES.has(n.type.toLowerCase()))
   const filteredNodeIds = new Set(filteredNodes.map((n) => String(n.id)))
 
   const byType = new Map<string, Node[]>()
@@ -265,6 +281,9 @@ export function toFlowGraph(
         data: {
           dbNode: node,
           label: leafLabel,
+          // The key its colour is looked up under, same as the category
+          // circle above it — see src/lib/colors.ts.
+          nodeType: node.type.toLowerCase(),
           properties: node.properties as Record<string, unknown>,
           circleR: 23,
         },

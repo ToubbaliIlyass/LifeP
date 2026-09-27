@@ -114,7 +114,7 @@ export function EventsPanel() {
                           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
-                              <p className="text-[13px] font-serif text-foreground/85 truncate">{e.name}</p>
+                              <p className="text-[13px] text-foreground/85 truncate">{e.name}</p>
                               <div className="flex items-center gap-1 shrink-0">
                                 {recurrenceLabel(e) && (
                                   <span className="text-[10px] font-mono text-muted-foreground/65">{recurrenceLabel(e)}</span>

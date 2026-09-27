@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { WeeklyReview } from './WeeklyReview'
+import { Resurfaced } from './Resurfaced'
+import { DayLog } from './DayLog'
+import { RoutineOffers } from './RoutineOffers'
 
 interface ArchivedTask {
   id: number
@@ -51,13 +54,16 @@ export function ActivityPanel() {
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
         <div className="px-4 pt-4">
+          <RoutineOffers />
+          <DayLog />
           <WeeklyReview />
+          <Resurfaced />
         </div>
         {loading && (
           <p className="text-[12px] text-muted-foreground/50 text-center pt-10 font-mono">loading…</p>
         )}
         {!loading && archived.length === 0 && (
-          <p className="text-[12px] text-muted-foreground/50 text-center pt-10 px-5 font-serif italic">
+          <p className="text-[12px] text-muted-foreground/50 text-center pt-10 px-5 italic">
             No archived tasks yet — completed tasks appear here after 7 days.
           </p>
         )}
@@ -78,7 +84,7 @@ export function ActivityPanel() {
                         className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/10"
                       >
                         <div className="w-2 h-2 rounded-full bg-emerald-400/40 shrink-0" />
-                        <p className="text-[13px] font-serif text-foreground/50 line-through flex-1 truncate">
+                        <p className="text-[13px] text-foreground/50 line-through flex-1 truncate">
                           {task.name}
                         </p>
                         <span className="text-[10px] font-mono text-muted-foreground/55 shrink-0">

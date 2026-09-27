@@ -16,6 +16,15 @@ export async function POST(request: Request) {
     // drag-and-drop don't set this, since a recurring habit legitimately
     // gets a separate block per occurrence.
     replaceExisting?: boolean
+    /**
+     * Makes this a routine: one block that occurs on many days, carrying the
+     * same contents each time. Same vocabulary as Events and Habits.
+     */
+    frequency?: string
+    daysOfWeek?: number[]
+    until?: string
+    /** What the session is called, when it holds more than one thing. */
+    label?: string
   }
 
   if (body.replaceExisting && body.sourceNodeId) {
@@ -26,10 +35,19 @@ export async function POST(request: Request) {
     }
   }
 
+  const RECURRENCE = ['daily', 'weekdays', 'weekly']
   const block = await createNode(user.id, 'TimeBlock', {
     date: body.date,
     startTime: body.startTime,
     endTime: body.endTime,
+    ...(typeof body.frequency === 'string' && RECURRENCE.includes(body.frequency)
+      ? {
+          frequency: body.frequency,
+          ...(Array.isArray(body.daysOfWeek) ? { daysOfWeek: body.daysOfWeek } : {}),
+          ...(typeof body.until === 'string' ? { until: body.until } : {}),
+        }
+      : {}),
+    ...(typeof body.label === 'string' && body.label.trim() ? { label: body.label.trim().slice(0, 120) } : {}),
   })
 
   if (body.sourceNodeId) {

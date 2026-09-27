@@ -1,17 +1,35 @@
 'use client'
 
-import { useChat } from '@ai-sdk/react'
+import { useAssistant } from './AssistantProvider'
 import { useEffect, useRef, useState } from 'react'
-import { SquarePen } from 'lucide-react'
+import { PanelRightClose, SquarePen } from 'lucide-react'
 import { ToolActivity, isToolPart, type ToolPart } from './ToolActivity'
 import { useSpeechInput } from '@/lib/useSpeechInput'
+import { useGreeting } from '@/lib/useGreeting'
 import { MicButton } from '@/components/ui/mic-button'
+import { AttachButton, AttachmentStrip, FilePreview, useAttachments } from './attachments'
 
 interface ChatPanelProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
   onMutated?: () => void
   /** Jump the main panel to a tab — used by the "Review" button on proposals. */
   onNavigate?: (tab: string) => void
+  /** md+ only: fold the chat away. Phones have their own close bar. */
+  onCollapse?: () => void
+}
+
+function CollapseButton({ onCollapse }: { onCollapse?: () => void }) {
+  if (!onCollapse) return null
+  return (
+    <button
+      onClick={onCollapse}
+      title="Hide chat"
+      aria-label="Hide chat"
+      className="hidden md:block text-muted-foreground/50 hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-muted/40"
+    >
+      <PanelRightClose className="w-[15px] h-[15px]" />
+    </button>
+  )
 }
 
 const SUGGESTIONS = [
@@ -21,27 +39,45 @@ const SUGGESTIONS = [
   { label: "Plan my day", prompt: 'Help me plan my day' },
 ]
 
-function getGreeting(): string {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
-}
-
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
   el.style.height = `${el.scrollHeight}px`
 }
 
-export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
-  const { messages, setMessages, sendMessage, stop, status, error } = useChat()
+export function ChatPanel({ inputRef, onMutated, onNavigate, onCollapse }: ChatPanelProps) {
+  // The same conversation as Today's — see AssistantProvider.
+  const { messages, setMessages, sendMessage, stop, status, error } = useAssistant()
   const [input, setInput] = useState('')
   const speech = useSpeechInput((text) => setInput(text))
   const scrollRef = useRef<HTMLDivElement>(null)
   const localInputRef = useRef<HTMLTextAreaElement>(null)
   const resolvedRef = inputRef ?? localInputRef
+  const attachments = useAttachments()
+  const greeting = useGreeting()
   const busy = status === 'submitted' || status === 'streaming'
   const empty = messages.length === 0
+  const canSend = !!input.trim() || attachments.items.length > 0
+
+  // Screenshots pasted straight into the box, or dropped onto it, attach
+  // rather than doing nothing — on a laptop that is the fastest route.
+  const fileInputProps = {
+    onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const files = Array.from(e.clipboardData.files)
+      if (files.length) {
+        e.preventDefault()
+        attachments.add(files)
+      }
+    },
+  }
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault() },
+    onDrop: (e: React.DragEvent) => {
+      if (e.dataTransfer.files.length) {
+        e.preventDefault()
+        attachments.add(e.dataTransfer.files)
+      }
+    },
+  }
 
   useEffect(() => {
     const el = scrollRef.current
@@ -59,13 +95,19 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
 
   function submit(text?: string) {
     const t = (text ?? input).trim()
-    if (!t || busy) return
+    const files = attachments.items.map((a) => a.part)
+    if ((!t && files.length === 0) || busy) return
     setInput('')
     // Reset textarea height after clearing
     if (resolvedRef.current) {
       resolvedRef.current.style.height = 'auto'
     }
-    sendMessage({ text: t })
+    sendMessage(
+      files.length > 0
+        ? { text: t || 'Pull out anything from this that belongs in my plans.', files }
+        : { text: t },
+    )
+    attachments.clear()
   }
 
   function handleSubmit(e: React.SyntheticEvent) {
@@ -84,9 +126,14 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
   if (empty) {
     return (
       <div className="flex flex-col h-full">
+        {onCollapse && (
+          <div className="hidden md:flex h-[52px] shrink-0 items-center justify-end px-4">
+            <CollapseButton onCollapse={onCollapse} />
+          </div>
+        )}
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
           <p className="text-3xl font-bold text-foreground mb-1">
-            {getGreeting()}, Ilyass
+            {greeting}, Ilyass
           </p>
           <p className="text-sm text-muted-foreground mb-8">
             What do you want to track today?
@@ -95,11 +142,14 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
           <div className="w-full max-w-md">
             <form
               onSubmit={handleSubmit}
+              {...dropProps}
               className="bg-card border border-border/70 rounded-2xl shadow-[0_4px_24px_oklch(0_0_0/0.15)] px-4 pt-4 pb-3"
             >
+              <AttachmentStrip items={attachments.items} onRemove={attachments.remove} error={attachments.error} />
               <textarea
                 ref={resolvedRef}
-                value={speech.listening ? speech.transcript : input}
+                {...fileInputProps}
+                value={speech.listening && speech.mode === 'live' ? speech.transcript : input}
                 rows={1}
                 onChange={(e) => {
                   setInput(e.target.value)
@@ -117,16 +167,11 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none resize-none overflow-hidden min-h-[48px] max-h-[200px] overflow-y-auto leading-relaxed"
               />
               <div className="flex items-center gap-2 justify-end mt-2 pt-2 border-t border-border/40">
-                <MicButton
-                  supported={speech.supported}
-                  listening={speech.listening}
-                  onStart={() => { speech.reset(); speech.start() }}
-                  onStop={speech.stop}
-                  className="w-7 h-7 mr-auto"
-                />
+                <AttachButton onFiles={attachments.add} disabled={busy} className="w-7 h-7" />
+                <MicButton speech={speech} className="w-7 h-7 mr-auto" />
                 <button
                   type="submit"
-                  disabled={busy || !input.trim()}
+                  disabled={busy || !canSend}
                   className="flex items-center gap-1.5 text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg disabled:opacity-30 transition-opacity hover:opacity-90"
                 >
                   Send
@@ -171,13 +216,16 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
         <p className="text-[9px] font-mono text-muted-foreground/65 uppercase tracking-widest">
           Assistant
         </p>
-        <button
-          onClick={newChat}
-          title="New chat"
-          className="text-muted-foreground/50 hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-muted/40"
-        >
-          <SquarePen className="w-[15px] h-[15px]" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={newChat}
+            title="New chat"
+            className="text-muted-foreground/50 hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-muted/40"
+          >
+            <SquarePen className="w-[15px] h-[15px]" />
+          </button>
+          <CollapseButton onCollapse={onCollapse} />
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 min-h-0">
@@ -194,12 +242,14 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
               >
                 {msg.parts.map((part, i) => {
                   if (part.type === 'text') return <p key={i} className="whitespace-pre-wrap">{part.text}</p>
+                  if (part.type === 'file') return <FilePreview key={i} part={part} />
                   if (isToolPart(part)) {
                     return (
                       <ToolActivity
                         key={i}
                         part={part as ToolPart}
                         onReviewProposals={onNavigate ? () => onNavigate('proposals') : undefined}
+                        onOpenCalendar={onNavigate ? () => onNavigate('calendar') : undefined}
                       />
                     )
                   }
@@ -227,13 +277,19 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
 
       {/* Bottom input */}
       <div className="shrink-0 px-4 pb-4 pt-2">
+        <div className="max-w-2xl mx-auto">
+          <AttachmentStrip items={attachments.items} onRemove={attachments.remove} error={attachments.error} />
+        </div>
         <form
           onSubmit={handleSubmit}
+          {...dropProps}
           className="flex items-center gap-2 bg-muted/40 border border-border/60 rounded-xl px-3 py-2 focus-within:border-border/80 transition-colors max-w-2xl mx-auto"
         >
+          <AttachButton onFiles={attachments.add} disabled={busy} className="w-7 h-7 -ml-1" />
           <textarea
             ref={resolvedRef}
-            value={speech.listening ? speech.transcript : input}
+            {...fileInputProps}
+            value={speech.listening && speech.mode === 'live' ? speech.transcript : input}
             rows={1}
             onChange={(e) => {
               setInput(e.target.value)
@@ -245,16 +301,10 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
                 handleSubmit(e)
               }
             }}
-            placeholder={speech.listening ? "Listening…" : "Write a message…"}
+            placeholder={speech.transcribing ? "Writing that down…" : speech.listening ? (speech.mode === 'record' ? "Recording…" : "Listening…") : "Write a message…"}
             className="flex-1 bg-transparent text-[13.5px] text-foreground placeholder:text-muted-foreground/65 outline-none resize-none overflow-hidden max-h-[160px] overflow-y-auto leading-relaxed"
           />
-          <MicButton
-            supported={speech.supported}
-            listening={speech.listening}
-            onStart={() => { speech.reset(); speech.start() }}
-            onStop={speech.stop}
-            className="w-7 h-7"
-          />
+          <MicButton speech={speech} className="w-7 h-7" />
           {busy ? (
             <button
               type="button"
@@ -270,7 +320,7 @@ export function ChatPanel({ inputRef, onMutated, onNavigate }: ChatPanelProps) {
           ) : (
             <button
               type="submit"
-              disabled={!input.trim()}
+              disabled={!canSend}
               className="shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 transition-opacity hover:opacity-90"
               aria-label="Send"
             >

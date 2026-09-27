@@ -122,7 +122,7 @@ export function NotesPanel({ refreshKey }: { refreshKey?: number } = {}) {
                                   <span className="text-sm">{MOOD_EMOJI[note.mood] ?? note.mood}</span>
                                 )}
                               </div>
-                              <p className="text-[13px] font-serif truncate mt-0.5 text-foreground/85">{note.title}</p>
+                              <p className="text-[13px] truncate mt-0.5 text-foreground/85">{note.title}</p>
                               {!isOpen && note.content && (
                                 <p className="text-[11px] text-muted-foreground/50 mt-0.5 line-clamp-1">{note.content}</p>
                               )}

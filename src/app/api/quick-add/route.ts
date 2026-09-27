@@ -1,5 +1,9 @@
+import { after } from 'next/server'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, createEdge, getNodeById } from '@/lib/graph/queries'
+import { LINKABLE_SUBJECTS, linkNode } from '@/lib/ai/suggest-links'
+import { hiddenTypes } from '@/lib/modules'
+import { readSettings } from '@/lib/settings'
 
 // The user's own direct capture — never gated by the AI proposal queue,
 // same tier as toggling a habit or editing a field in NodeDetailPanel. This
@@ -12,6 +16,7 @@ import { createNode, createEdge, getNodeById } from '@/lib/graph/queries'
 const ALLOWED_TYPES = new Set([
   'Task', 'Note', 'Event', 'HealthMetric',
   'Goal', 'Habit', 'Project', 'Course', 'Exam', 'Assignment',
+  'ContentPiece',
 ])
 
 export async function POST(request: Request) {
@@ -27,6 +32,11 @@ export async function POST(request: Request) {
   const type = body.type
   if (!type || !ALLOWED_TYPES.has(type)) {
     return Response.json({ error: `type must be one of ${[...ALLOWED_TYPES].join(', ')}` }, { status: 400 })
+  }
+  // The capture sheet already hides these, but the endpoint is the one that
+  // has to be right: a stale tab or a script must not slip one past.
+  if (hiddenTypes(await readSettings(user.id)).has(type)) {
+    return Response.json({ error: `${type} belongs to a section you have switched off` }, { status: 400 })
   }
 
   const properties = body.properties ?? {}
@@ -50,5 +60,26 @@ export async function POST(request: Request) {
     }
   }
 
-  return Response.json({ ok: true, node, linkedTo })
+  /*
+   * Everything captured here lands in the graph, and a node with no edges is
+   * invisible in every view that matters. So the assistant gets a look at it
+   * and connects what it recognises — the same pass the weekly sweep makes,
+   * run once at the moment of capture.
+   *
+   * In `after`, because it is a model call: capture has to stay instant, and
+   * a link arriving a second later is no worse than one arriving now.
+   */
+  const { autoLink } = await readSettings(user.id)
+  const linking = autoLink !== 'off' && LINKABLE_SUBJECTS.has(type)
+  if (linking) {
+    after(async () => {
+      try {
+        await linkNode(user.id, node.id, autoLink)
+      } catch {
+        // The thing the user typed is saved; its edges are a bonus.
+      }
+    })
+  }
+
+  return Response.json({ ok: true, node, linkedTo, linking })
 }

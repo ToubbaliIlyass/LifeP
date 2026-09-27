@@ -76,7 +76,7 @@
   --ring: oklch(0.72 0.14 72);
   --radius: 0.5rem;
 
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-source-serif), Georgia, 'Times New Roman', serif;
 
   --chart-1: oklch(0.72 0.14 72);
@@ -116,7 +116,7 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.74 0.14 72);
 
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-source-serif), Georgia, 'Times New Roman', serif;
 
   --chart-1: oklch(0.74 0.14 72);
@@ -143,8 +143,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Sans for reading and doing; the serif is kept for a few display
+     moments (a date, the thing to do now, a name) where it gives the page
+     its character — see font-serif in the components. */
   html {
-    font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+    font-family: var(--font-sans);
   }
 }
 
@@ -738,4 +741,18 @@
   --sidebar-ring: #d4d4d8;
   --chart-1: #d4d4d8;
   --chart-2: #8b8b93;
+}
+
+/* The assistant listening: a few bars rising and falling out of step, so it
+   reads as a voice being heard rather than a spinner waiting. */
+@keyframes acture-voice {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.acture-voice-bar {
+  transform-origin: center;
+  animation: acture-voice 0.9s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .acture-voice-bar { animation: none; transform: scaleY(0.6); }
 }

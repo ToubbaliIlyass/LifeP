@@ -1,15 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { X, Trash2, Save, Pencil } from 'lucide-react'
+import { X, Trash2, Save, Pencil, Unlink, Sparkles } from 'lucide-react'
 import { Markdown } from '@/components/notes/Markdown'
+import type { DayPart } from '@/lib/settings'
 
 interface RelatedNode {
   id: number
   type: string
   properties: Record<string, unknown>
+  edgeId: number
   edgeType: string
   direction: 'incoming' | 'outgoing'
+  /** Written by the assistant rather than by the user. */
+  auto: boolean
 }
 
 interface NodeDetail {
@@ -57,8 +61,8 @@ const SKIP_FIELDS = new Set(['courseNodeId', 'habitNodeId'])
 const TYPE_FIELDS: Record<string, string[]> = {
   Goal: ['name', 'description', 'status', 'targetDate'],
   Milestone: ['name', 'status', 'dueDate'],
-  Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes', 'anytime'],
-  Task: ['name', 'status', 'priority', 'estimatedMinutes', 'dueDate'],
+  Habit: ['name', 'frequency', 'daysOfWeek', 'durationMinutes', 'anytime', 'dayPart'],
+  Task: ['name', 'status', 'priority', 'estimatedMinutes', 'dueDate', 'dayPart'],
   Project: ['name', 'description', 'status', 'dueDate'],
   Event: ['name', 'date', 'time', 'duration', 'location', 'frequency', 'daysOfWeek', 'until'],
   Course: ['name', 'code', 'semester', 'credits'],
@@ -78,12 +82,33 @@ function FieldEditor({
   name,
   value,
   onChange,
+  dayParts,
 }: {
   name: string
   value: unknown
   onChange: (val: unknown) => void
+  /** The user's own parts of the day, for the `dayPart` row. */
+  dayParts: DayPart[]
 }) {
   const strVal = value == null ? '' : String(value)
+
+  if (name === 'dayPart') {
+    // Which stretch of the day this belongs in. Only ever a choice between
+    // the parts the user has defined, so a typo cannot quietly unpin a habit
+    // from a part that no longer matches anything.
+    return (
+      <select
+        value={strVal}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+      >
+        <option value="">Any time in the day</option>
+        {dayParts.map((p) => (
+          <option key={p.id} value={p.id}>{p.name || 'Unnamed'} · {p.start}–{p.end}</option>
+        ))}
+      </select>
+    )
+  }
 
   if (name === 'status') {
     const opts = ['todo', 'in-progress', 'done', 'active', 'completed', 'paused', 'upcoming', 'taken', 'graded', 'submitted']
@@ -286,7 +311,7 @@ function FieldEditor({
       type="text"
       value={strVal}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] font-serif text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
+      className="w-full bg-muted/40 border border-border/40 rounded-lg px-3 py-2 text-[13px] text-foreground/85 focus:outline-none focus:ring-1 focus:ring-primary/50"
     />
   )
 }
@@ -307,6 +332,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [unlinking, setUnlinking] = useState<number | null>(null)
 
   const load = useCallback(() => {
     if (!nodeId) return
@@ -324,6 +350,37 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
   }, [nodeId])
 
   useEffect(() => { load() }, [load])
+
+  // The user's parts of the day, for the `dayPart` row. Loaded once the panel
+  // opens rather than per field, since every row shares the same list.
+  const [dayParts, setDayParts] = useState<DayPart[]>([])
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { dayParts?: DayPart[] } | null) => setDayParts(d?.dayParts ?? []))
+      .catch(() => {})
+  }, [])
+
+  /**
+   * Removes one relationship, leaving both things it connected alone.
+   *
+   * The counterweight to the assistant writing links by itself: anything it
+   * connects has to be as easy to disconnect, from wherever the user happens
+   * to be looking, not only from the Goals screen.
+   */
+  async function unlink(edgeId: number) {
+    if (unlinking !== null) return
+    setUnlinking(edgeId)
+    const res = await fetch(`/api/edges?id=${edgeId}`, { method: 'DELETE' })
+    setUnlinking(null)
+    if (!res.ok) return
+    setDetail((current) => current && {
+      ...current,
+      relatedNodes: current.relatedNodes.filter((rn) => rn.edgeId !== edgeId),
+      relatedNotes: current.relatedNotes.filter((rn) => rn.edgeId !== edgeId),
+    })
+    onMutated?.()
+  }
 
   // Close on Escape
   useEffect(() => {
@@ -425,12 +482,13 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
                           <FieldEditor
                             name={key}
                             value={draft[key]}
+                            dayParts={dayParts}
                             onChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
                           />
                         ) : (key === 'content' || key === 'description') && typeof val === 'string' && val ? (
                           <Markdown>{val}</Markdown>
                         ) : (
-                          <p className="text-[13px] font-serif text-foreground/85 whitespace-pre-wrap">
+                          <p className="text-[13px] text-foreground/85 whitespace-pre-wrap">
                             {val == null ? <span className="text-muted-foreground/55 italic">—</span> : typeof val === 'object' ? JSON.stringify(val) : String(val)}
                           </p>
                         )}
@@ -456,7 +514,7 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
                             </span>
                           </div>
                           {typeof p.title === 'string' && (
-                            <p className="text-[12px] font-serif font-medium text-foreground/80">{p.title}</p>
+                            <p className="text-[12px] font-medium text-foreground/80">{p.title}</p>
                           )}
                           {typeof p.content === 'string' && p.content && (
                             <p className="text-[12px] text-muted-foreground/70 mt-0.5 whitespace-pre-wrap">{p.content}</p>
@@ -479,16 +537,33 @@ export function NodeDetailPanel({ nodeId, onClose, onMutated }: NodeDetailPanelP
                   </p>
                   <div className="space-y-1">
                     {detail.relatedNodes.map((rn) => (
-                      <div key={rn.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/10">
+                      // Keyed by the edge: two nodes can be connected more
+                      // than once, by different relationships.
+                      <div key={rn.edgeId} className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/10">
                         <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full ${TYPE_BADGE_COLORS[rn.type] ?? 'bg-muted/40 text-muted-foreground'}`}>
                           {rn.type}
                         </span>
-                        <span className="text-[12px] font-serif text-foreground/70 flex-1 truncate">
+                        <span className="text-[12px] text-foreground/70 flex-1 truncate">
                           {relatedNodeLabel(rn)}
                         </span>
+                        {rn.auto && (
+                          <Sparkles
+                            className="w-2.5 h-2.5 text-primary/50 shrink-0"
+                            aria-label="Linked by the assistant"
+                          />
+                        )}
                         <span className="text-[9px] font-mono text-muted-foreground/55">
                           {rn.direction === 'outgoing' ? '→' : '←'} {rn.edgeType}
                         </span>
+                        <button
+                          onClick={() => unlink(rn.edgeId)}
+                          disabled={unlinking === rn.edgeId}
+                          title="Remove this link"
+                          aria-label={`Remove the ${rn.edgeType} link to ${relatedNodeLabel(rn)}`}
+                          className="shrink-0 p-1 -mr-1 rounded-md text-muted-foreground/40 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity disabled:opacity-40"
+                        >
+                          <Unlink className="w-3 h-3" />
+                        </button>
                       </div>
                     ))}
                   </div>

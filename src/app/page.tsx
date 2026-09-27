@@ -5,8 +5,13 @@ import dynamic from 'next/dynamic'
 import {
   House, Share2, Activity, CheckSquare, Calendar, BookOpen,
   FileText, Search, Inbox, PanelLeft, PanelLeftClose, ClipboardList, CalendarRange,
-  Menu, X, MessageSquare, Settings as SettingsIcon, Target,
+  Menu, X, MessageSquare, Settings as SettingsIcon, Target, PanelRightOpen, Clapperboard,
+  NotebookPen, HeartPulse, ChevronDown,
 } from 'lucide-react'
+import { ContentPanel } from '@/components/content/ContentPanel'
+import { JournalPanel } from '@/components/journal/JournalPanel'
+import { HealthPanel } from '@/components/health/HealthPanel'
+import { hiddenTabs as hiddenTabsForModules } from '@/lib/modules'
 import { HabitsPanel } from '@/components/habits/HabitsPanel'
 import { TasksPanel } from '@/components/tasks/TasksPanel'
 import { EventsPanel } from '@/components/events/EventsPanel'
@@ -16,26 +21,32 @@ import { TodayView } from '@/components/today/TodayView'
 import { GoalsPanel } from '@/components/goals/GoalsPanel'
 import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { ActivityPanel } from '@/components/activity/ActivityPanel'
-import { CalendarView } from '@/components/calendar/CalendarView'
 import { SearchBar } from '@/components/search/SearchBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { SplashScreen } from '@/components/SplashScreen'
+import { AppLoading } from '@/components/AppLoading'
+import { Onboarding } from '@/components/onboarding/Onboarding'
 import { NodeDetailPanel } from '@/components/graph/NodeDetailPanel'
-import { QuickAddButton } from '@/components/quickadd/QuickAddButton'
+import { startListening } from '@/components/today/TodayAssistant'
+import { AssistantProvider } from '@/components/chat/AssistantProvider'
 import { ActureMark } from '@/components/ui/acture-mark'
 import { SettingsPanel, type Settings } from '@/components/settings/SettingsPanel'
 import { UndoProvider } from '@/components/undo/UndoProvider'
 import { useDataChanged } from '@/lib/dataSignal'
 import { safeGet, safeSet } from '@/lib/storage'
-import { applyTheme, storedTheme } from '@/lib/themes'
+import { applyTheme, applyMode, storedMode, storedTheme } from '@/lib/themes'
 
 // Both pull in heavy libraries (@xyflow/react, the `ai` SDK) that mobile's
 // first paint shouldn't have to pay for — split into their own chunks,
 // loaded only once their tab/panel is actually reached.
 const GraphView = dynamic(() => import('@/components/graph/GraphView').then((m) => m.GraphView), { ssr: false })
 const ChatPanel = dynamic(() => import('@/components/chat/ChatPanel').then((m) => m.ChatPanel), { ssr: false })
+// FullCalendar measures the DOM and reads the viewport on first render.
+const CalendarView = dynamic(() => import('@/components/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false })
 
-type Tab = 'today' | 'goals' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'activity' | 'proposals' | 'settings'
+type Tab = 'today' | 'goals' | 'calendar' | 'graph' | 'habits' | 'tasks' | 'events' | 'school' | 'notes' | 'journal' | 'health' | 'content' | 'activity' | 'proposals' | 'settings'
+
+
 
 const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'today',     label: 'Today',     Icon: House },
@@ -47,6 +58,9 @@ const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: st
   { id: 'events',    label: 'Events',    Icon: Calendar },
   { id: 'school',    label: 'School',    Icon: BookOpen },
   { id: 'notes',     label: 'Notes',     Icon: FileText },
+  { id: 'journal',   label: 'Journal',   Icon: NotebookPen },
+  { id: 'health',    label: 'Health',    Icon: HeartPulse },
+  { id: 'content',   label: 'Content',   Icon: Clapperboard },
   { id: 'activity',  label: 'Activity',  Icon: ClipboardList },
   { id: 'proposals', label: 'Proposals', Icon: Inbox },
 ]
@@ -55,6 +69,24 @@ const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: st
 // action, and it must never be hideable — it is the only way to unhide
 // anything else.
 const SETTINGS_TAB = { id: 'settings' as const, label: 'Settings', Icon: SettingsIcon }
+
+/*
+ * Simple mode is the app as it is meant to be used: capture with the AI, and
+ * see what is planned. Acture is action-based — something stays only if it
+ * is an action or tied to one.
+ *
+ *   core        Today (capture + the plan) and Calendar (the plan, wider)
+ *   under More  what actions come from or are made of: goals, tasks,
+ *               habits, school, content, proposals
+ *   gone        what is not an action at all: the graph view, health,
+ *               journal, notes, activity review, and an events list that
+ *               only repeats the calendar
+ *
+ * Nothing is deleted; turning simple mode off in Settings brings every
+ * panel back.
+ */
+const CORE_TABS: ReadonlySet<Tab> = new Set(['today', 'calendar'])
+const NOT_ACTIONABLE: ReadonlySet<Tab> = new Set(['graph', 'health', 'journal', 'notes', 'activity', 'events'])
 
 // Backgrounded tabs (mobile Safari/Chrome switched away, laptop lid closed)
 // don't need to keep polling — pause while hidden and catch up the moment
@@ -102,12 +134,35 @@ export default function Home() {
   // between the active tab's content and the chat panel (which is
   // otherwise shown side-by-side with it).
   const [mobileShowChat, setMobileShowChat] = useState(false)
+  // md+ only: the chat folds away to give the content the whole width, the
+  // way it already stays out of the way on phones. Remembered per device —
+  // a laptop and a big monitor can reasonably want different answers.
+  const [chatCollapsed, setChatCollapsed] = useState(false)
+  useEffect(() => {
+    // Read after mount, not in a lazy initialiser: the server render has no
+    // storage, and a first client render that disagreed would not hydrate.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (safeGet('local', 'acture-chat-collapsed') === '1') setChatCollapsed(true)
+  }, [])
+  function toggleChatCollapsed(next: boolean) {
+    setChatCollapsed(next)
+    safeSet('local', 'acture-chat-collapsed', next ? '1' : '0')
+  }
   // The Calendar tab's Week view needs the extra width chat would take, so it's hidden while active.
   const [calendarViewMode, setCalendarViewMode] = useState<'day' | 'week'>('day')
   // Settings live in the database rather than this device, so hidden panels
   // and startup preferences follow the user between laptop and phone.
   const [settings, setSettings] = useState<Settings | null>(null)
+  /* Whether the answer has come back at all — including "it failed", which
+     must still let the app through rather than holding the loader forever. */
+  const [settingsReady, setSettingsReady] = useState(false)
   const settingsAppliedRef = useRef(false)
+  /* Setup opens by itself once. After Skip or Finish it stays shut for the
+     rest of the session even if the server never heard about it — only
+     "Run setup again" in Settings brings it back. */
+  const [setupClosed, setSetupClosed] = useState(false)
+  /** Simple mode's "More" in the sidebar. Per session: it starts folded. */
+  const [moreOpen, setMoreOpen] = useState(false)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
   function selectTab(t: Tab) {
@@ -137,18 +192,22 @@ export default function Home() {
       .then((d: { settings: Settings } | null) => {
         if (!d) return
         setSettings(d.settings)
-        // The palette is already on the page from the pre-paint script; this
-        // only corrects it when the database disagrees, which happens the
-        // first time a device loads a theme chosen somewhere else.
+        // Palette and mode are already on the page from the pre-paint script;
+        // this only corrects them when the database disagrees, which happens
+        // the first time a device loads a choice made somewhere else.
         if (d.settings.theme && d.settings.theme !== storedTheme()) {
           applyTheme(d.settings.theme)
+        }
+        if (d.settings.mode && d.settings.mode !== storedMode()) {
+          applyMode(d.settings.mode)
         }
         // Startup preferences apply on first load only — re-applying them on
         // every settings save would yank the user out of the tab they are in.
         if (!settingsAppliedRef.current) {
           settingsAppliedRef.current = true
           const wanted = d.settings.defaultTab
-          const isHidden = (d.settings.hiddenTabs ?? []).includes(wanted)
+          const isHidden =
+            (d.settings.hiddenTabs ?? []).includes(wanted) || hiddenTabsForModules(d.settings).has(wanted)
           if (wanted && wanted !== 'today' && !isHidden) {
             setTab(wanted as Tab)
           }
@@ -156,6 +215,42 @@ export default function Home() {
         }
       })
       .catch(() => {})
+      .finally(() => setSettingsReady(true))
+  }, [])
+
+  /*
+   * The recurring graph tidy-up.
+   *
+   * Nothing schedules it — there is no cron behind a single-user Next app —
+   * so the app asks once per load and the endpoint decides whether the
+   * interval has elapsed. Fired and forgotten: the sweep runs after its own
+   * response, and nothing on screen is waiting for the answer.
+   */
+  // Only in the full app: in simple mode there is no graph to tidy for, and
+  // an AI job on every load that nothing on screen uses is cost, not help.
+  const sweptRef = useRef(false)
+  useEffect(() => {
+    if (!settings || settings.simple !== false || sweptRef.current) return
+    sweptRef.current = true
+    fetch('/api/graph/sweep', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }).catch(() => {})
+  }, [settings])
+
+  /*
+   * Canvas, on the same terms: asked on every load, and the endpoint decides
+   * whether enough time has passed. This is what makes the integration feel
+   * automatic — an assignment posted this morning is simply there, rather
+   * than waiting for someone to remember to press Sync in Settings.
+   */
+  useEffect(() => {
+    fetch('/api/canvas/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto: true }),
+    }).catch(() => {})
   }, [])
 
   // ── Resize (chat is now on the right — drag handle on left edge) ──
@@ -214,6 +309,10 @@ export default function Home() {
   // for the next poll left the badge showing a number the user had just
   // cleared, which reads as stuck rather than merely late.
   useDataChanged(refreshReminders)
+  // Panels that load once redraw when the day changes elsewhere — a capture,
+  // a tick, the chat. This used to be bumped only by the old quick-add sheet.
+  const bumpData = useCallback(() => setDataRefreshKey((k) => k + 1), [])
+  useDataChanged(bumpData)
 
   // ── Keyboard shortcuts ────────────────────────────────
   useEffect(() => {
@@ -251,11 +350,42 @@ export default function Home() {
   }
 
   const hiddenTabs = new Set(settings?.hiddenTabs ?? [])
-  const visibleTabs = TABS.filter((t) => t.id === 'settings' || !hiddenTabs.has(t.id))
+  // A switched-off module's tab does not exist — the registry says which, so
+  // adding a module never means editing this file (src/lib/modules.ts).
+  const offTabs = hiddenTabsForModules(settings)
+  const moduleTabs = TABS.filter((t) => !offTabs.has(t.id))
+  const visibleTabs = moduleTabs.filter((t) => t.id === 'settings' || !hiddenTabs.has(t.id))
   const activeTab = tab === 'settings' ? SETTINGS_TAB : TABS.find((t) => t.id === tab)
+
+  // Simple mode shows the core three, plus Proposals only while something is
+  // waiting in it, plus whichever tab is open so it never vanishes from
+  // under you. Everything else is one click away under "More".
+  const simple = settings?.simple !== false
+  const isCore = (t: Tab) => CORE_TABS.has(t) || t === tab || (t === 'proposals' && pendingCount > 0)
+  // A non-actionable tab still shows while it is the one open (a saved
+  // default tab, say), so it never vanishes from under the reader.
+  const inSimpleNav = (t: Tab) => !NOT_ACTIONABLE.has(t) || t === tab
+  const extraTabs = simple ? visibleTabs.filter((t) => !isCore(t.id) && inSimpleNav(t.id)) : []
+  const navTabs = !simple
+    ? visibleTabs
+    : visibleTabs.filter((t) => isCore(t.id) || (moreOpen && inSimpleNav(t.id)))
+  const moreToggle = (collapsed: boolean) => extraTabs.length > 0 && (
+    <button
+      onClick={() => setMoreOpen((v) => !v)}
+      title={collapsed ? (moreOpen ? 'Less' : 'More') : undefined}
+      className={`flex items-center rounded-lg text-[12px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors w-full mt-1 ${
+        collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-1.5 text-left'
+      }`}
+    >
+      <ChevronDown className={`shrink-0 w-[15px] h-[15px] opacity-55 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+      {!collapsed && (moreOpen ? 'Less' : `More · ${extraTabs.length}`)}
+    </button>
+  )
 
   return (
     <UndoProvider>
+    {/* One conversation, whether spoken to on Today or in the side panel. */}
+    <AssistantProvider>
     <main
       // `fixed inset-0` instead of `h-dvh`: dvh is a *computed value* that
       // some browsers don't correctly re-resolve on real page zoom (as
@@ -309,7 +439,7 @@ export default function Home() {
             (Search/Export/Import/Dark mode) off-screen on short viewports,
             in either the expanded or collapsed sidebar width. */}
         <nav className={`flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto pt-3 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-          {visibleTabs.map((t) => (
+          {navTabs.map((t) => (
             <button
               key={t.id}
               onClick={() => selectTab(t.id)}
@@ -347,6 +477,7 @@ export default function Home() {
               )}
             </button>
           ))}
+          {moreToggle(sidebarCollapsed)}
         </nav>
 
         {/* Bottom — pinned below the scrollable nav, never scrolls itself */}
@@ -399,10 +530,10 @@ export default function Home() {
           >
             <Menu className="w-[18px] h-[18px]" />
           </button>
+          {/* Today carries its date as the heading of its own centred column,
+              so the bar stays empty there rather than pinning it to the left. */}
           <p className="text-[15px] font-semibold text-foreground flex-1 truncate">
-            {tab === 'today'
-              ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-              : activeTab?.label}
+            {tab === 'today' ? '' : activeTab?.label}
           </p>
           <button
             onClick={() => setSearchOpen(true)}
@@ -411,6 +542,9 @@ export default function Home() {
           >
             <Search className="w-[18px] h-[18px]" />
           </button>
+          {/* In simple mode the assistant is on Today itself — there is no
+              separate chat to open or to bring back. */}
+          {!simple && (
           <button
             onClick={() => setMobileShowChat(true)}
             className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -418,23 +552,40 @@ export default function Home() {
           >
             <MessageSquare className="w-[18px] h-[18px]" />
           </button>
+          )}
+          {!simple && chatCollapsed && (
+            <button
+              onClick={() => toggleChatCollapsed(false)}
+              className="hidden md:flex p-2 -mr-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              aria-label="Show chat"
+              title="Show chat"
+            >
+              <PanelRightOpen className="w-[17px] h-[17px]" />
+            </button>
+          )}
         </header>
 
         <div className="flex-1 min-h-0 overflow-hidden">
-          {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} refreshKey={dataRefreshKey} weather={settings?.weather} />}
+          {tab === 'today'     && <TodayView onNavigate={(t) => setTab(t as Tab)} refreshKey={dataRefreshKey} weather={settings?.weather} simple={simple} />}
           {tab === 'goals'     && <GoalsPanel refreshKey={dataRefreshKey} />}
           {tab === 'graph'     && <GraphView refreshKey={graphRefreshKey} />}
           {tab === 'habits'    && <HabitsPanel />}
           {tab === 'tasks'     && <TasksPanel refreshKey={dataRefreshKey} />}
           {tab === 'events'    && <EventsPanel />}
-          {tab === 'school'    && <SchoolPanel />}
+          {tab === 'school'    && <SchoolPanel refreshKey={dataRefreshKey} />}
           {tab === 'notes'     && <NotesPanel refreshKey={dataRefreshKey} />}
-          {tab === 'calendar'  && <CalendarView onViewModeChange={setCalendarViewMode} initialViewMode={settings?.defaultCalendarView} />}
+          {tab === 'journal'   && <JournalPanel refreshKey={dataRefreshKey} />}
+          {tab === 'health'    && <HealthPanel refreshKey={dataRefreshKey} />}
+          {tab === 'content'   && <ContentPanel refreshKey={dataRefreshKey} />}
+          {tab === 'calendar'  && <CalendarView onViewModeChange={setCalendarViewMode} initialViewMode={settings?.defaultCalendarView} workingHours={settings?.workingHours} />}
           {tab === 'activity'  && <ActivityPanel />}
           {tab === 'settings'  && (
             <SettingsPanel
-              allTabs={TABS.map((t) => ({ id: t.id, label: t.label }))}
-              onSettingsChanged={setSettings}
+              allTabs={moduleTabs.map((t) => ({ id: t.id, label: t.label }))}
+              onSettingsChanged={(next) => {
+                setSettings(next)
+                if (!next.onboarding?.completed) setSetupClosed(false)
+              }}
               onImport={handleImport}
             />
           )}
@@ -459,9 +610,10 @@ export default function Home() {
         breakpoint (the 7-column grid needs the room even on desktop) —
         mobileShowChat can still force it open manually either way.
       */}
+      {!simple && (
       <div
         className={`${mobileShowChat ? 'flex' : 'hidden'} ${
-          tab === 'calendar' ? (calendarViewMode === 'week' ? '' : 'lg:flex') : 'md:flex'
+          chatCollapsed ? '' : tab === 'calendar' ? (calendarViewMode === 'week' ? '' : 'lg:flex') : 'md:flex'
         } flex-col w-full md:w-[min(var(--chat-w),calc(100vw-var(--sidebar-w)-240px))] shrink-0 relative border-l-0 md:border-l border-border/60 overflow-hidden`}
         style={{ '--chat-w': `${chatWidth}px` } as React.CSSProperties}
       >
@@ -494,8 +646,10 @@ export default function Home() {
             refreshCount()
           }}
           onNavigate={(t) => { setTab(t as Tab); setMobileShowChat(false) }}
+          onCollapse={() => toggleChatCollapsed(true)}
         />
       </div>
+      )}
 
       {/* ── Mobile nav drawer ─────────────────────────── */}
       {mobileNavOpen && (
@@ -521,7 +675,7 @@ export default function Home() {
               </button>
             </div>
             <nav className="flex flex-col gap-0.5 flex-1 pt-3 px-3 overflow-y-auto">
-              {visibleTabs.map((t) => (
+              {navTabs.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => selectTab(t.id)}
@@ -547,6 +701,7 @@ export default function Home() {
                   )}
                 </button>
               ))}
+              {moreToggle(false)}
             </nav>
             <div className="pt-3 pb-4 border-t border-border/40 mt-3 space-y-0.5 px-3">
               <button
@@ -588,16 +743,57 @@ export default function Home() {
         />
       )}
 
-      <QuickAddButton
-        onAdded={() => {
-          setDataRefreshKey((k) => k + 1)
-          setGraphRefreshKey((k) => k + 1)
-          refreshReminders()
-        }}
-      />
+      {/* On a phone, one thumb from anywhere to the capture box — the same
+          box as on Today, not a second way of adding things. Hidden while
+          the chat fills the screen: the chat is its own way in. */}
+      {!mobileShowChat && (
+        <button
+          onClick={() => { selectTab('today'); startListening() }}
+          aria-label="Add to my day"
+          className="md:hidden fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-2xl leading-none"
+        >
+          +
+        </button>
+      )}
 
       {showSplash && <SplashScreen onDone={handleSplashDone} />}
+
+      {/* On a reload the splash is already spent, so without this the
+          dashboard shows for a frame before settings arrive and decide what
+          should have been on screen. */}
+      {!showSplash && !settingsReady && <AppLoading />}
+
+      {/* The setup interview, shown once, over everything. Only after the
+          splash: two full-screen overlays at once is one too many, and the
+          first question should not be competing with an animation. */}
+      {!showSplash && settings && !settings.onboarding?.completed && !setupClosed && (
+        <Onboarding
+          onDone={() => {
+            setSetupClosed(true)
+            // Re-read rather than patch: onboarding writes modules, hours and
+            // day parts, and the sidebar is built from all three.
+            fetch('/api/settings')
+              .then((r) => (r.ok ? r.json() : null))
+              .then(async (d: { settings: Settings } | null) => {
+                if (!d) return
+                // The write that closed setup was lost, so the next load would
+                // open it again. Send it once more rather than ask twice.
+                if (!d.settings.onboarding?.completed) {
+                  const res = await fetch('/api/settings', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ onboarding: { completed: true, completedAt: new Date().toISOString() } }),
+                  })
+                  if (res.ok) d = (await res.json()) as { settings: Settings }
+                }
+                setSettings(d.settings)
+              })
+              .catch(() => {})
+          }}
+        />
+      )}
     </main>
+    </AssistantProvider>
     </UndoProvider>
   )
 }

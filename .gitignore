@@ -48,8 +48,11 @@ next-env.d.ts
 /data/*.db-shm
 /data/backups/
 
-# alternate dist dir for production test builds
+# alternate dist dirs (production test builds, side-by-side dev servers).
+# Ignored so Tailwind never scans their compiled output for class names —
+# a stray one broke the stylesheet build once.
 .next-prod
+.next-*
 
 # local tooling output
 .playwright-mcp/

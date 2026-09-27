@@ -1,4 +1,7 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
+import { hiddenTypes } from '@/lib/modules'
+import { visibleToClient } from '@/lib/graph/secrets'
+import { readSettings } from '@/lib/settings'
 import { searchNodes } from '@/lib/graph/queries'
 import type { Node } from '@/lib/db/schema'
 
@@ -28,6 +31,7 @@ export async function GET(request: Request) {
   const q = searchParams.get('q')?.trim()
   if (!q || q.length < 2) return Response.json({ results: [] })
 
-  const nodes = (await searchNodes(user.id, q)).slice(0, 25)
+  const off = hiddenTypes(await readSettings(user.id))
+  const nodes = visibleToClient(await searchNodes(user.id, q)).filter((n) => !off.has(n.type)).slice(0, 25)
   return Response.json({ results: nodes.map(toResult) })
 }

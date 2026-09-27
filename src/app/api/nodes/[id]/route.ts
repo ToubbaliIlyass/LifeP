@@ -1,5 +1,6 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodeById, getNodeWithNeighbors, updateNode, deleteNode, getEdges } from '@/lib/graph/queries'
+import { isSecretType } from '@/lib/graph/secrets'
 
 export async function GET(
   _request: Request,
@@ -13,27 +14,25 @@ export async function GET(
 
   const result = await getNodeWithNeighbors(user.id, nodeId)
   if (!result) return Response.json({ error: 'Not found' }, { status: 404 })
+  // A credential is not a node anyone browses to, and an id is easy to guess.
+  if (isSecretType(result.node.type)) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  // Collect related notes and logs from neighbors
-  const relatedNotes = result.neighbors
-    .map(({ node, edge, direction }) => ({
-      id: node.id,
-      type: node.type,
-      properties: node.properties,
-      edgeType: edge.type,
-      direction,
-    }))
-    .filter(({ type }) => ['Note', 'JournalEntry', 'HabitLog'].includes(type))
+  // Collect related notes and logs from neighbors. The edge's own id and
+  // provenance come along: the panel offers to remove a link, and says which
+  // ones the assistant made rather than the user.
+  const related = result.neighbors.map(({ node, edge, direction }) => ({
+    id: node.id,
+    type: node.type,
+    properties: node.properties,
+    edgeId: edge.id,
+    edgeType: edge.type,
+    direction,
+    auto: (edge.properties as Record<string, unknown>)?.auto === true,
+  }))
 
-  const relatedNodes = result.neighbors
-    .map(({ node, edge, direction }) => ({
-      id: node.id,
-      type: node.type,
-      properties: node.properties,
-      edgeType: edge.type,
-      direction,
-    }))
-    .filter(({ type }) => !['Note', 'JournalEntry', 'HabitLog'].includes(type))
+  const IS_LOG = (type: string) => ['Note', 'JournalEntry', 'HabitLog'].includes(type)
+  const relatedNotes = related.filter(({ type }) => IS_LOG(type))
+  const relatedNodes = related.filter(({ type }) => !IS_LOG(type))
 
   return Response.json({
     node: result.node,

@@ -54,7 +54,7 @@ export function ScheduleDialog({ nodeId, nodeName, defaultDate, onClose, onSched
       <div className="relative z-10 w-full max-w-sm mx-4 bg-card border border-border/60 rounded-2xl shadow-2xl flex flex-col">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border/40 shrink-0">
           <CalendarClock className="w-3.5 h-3.5 text-muted-foreground/50" />
-          <p className="text-[13px] font-serif text-foreground/85 truncate flex-1">{nodeName}</p>
+          <p className="text-[13px] text-foreground/85 truncate flex-1">{nodeName}</p>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-muted/40 transition-colors"

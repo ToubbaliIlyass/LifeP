@@ -1,118 +1,123 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
-import { getNodes, getEdges, getNodeById, createNode, createEdge } from '@/lib/graph/queries'
-import { todayStr, eventOccursOn } from '@/lib/date'
-import { planDay } from '@/lib/schedule-day'
-import { DEFAULT_DAY } from '@/lib/schedule'
+import { getNodes, getEdges } from '@/lib/graph/queries'
+import { todayStr, eventOccursOn, addDays } from '@/lib/date'
+import { hiddenTypes } from '@/lib/modules'
+import { buildSessions } from '@/lib/sessions'
+import type { Node } from '@/lib/db/schema'
 
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+/** A month view with its leading and trailing weeks. */
+const MAX_DAYS = 42
+
+const labelOf = (n: Node) => {
+  const p = n.properties as Record<string, unknown>
+  return typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${n.type} #${n.id}`
+}
+
+/**
+ * GET ?date=YYYY-MM-DD           → { date, blocks, events }  (one day; unchanged shape)
+ * GET ?from=YYYY-MM-DD&to=…      → { days: [{ date, blocks, events }] }
+ *
+ * The range form exists for the calendar, which asks for whatever the current
+ * view spans in one request instead of one request per day.
+ */
 export async function GET(request: Request) {
   const user = await getCurrentUser()
   if (!user) return unauthorized()
   const { searchParams } = new URL(request.url)
-  const date = searchParams.get('date') ?? todayStr()
+  const from = searchParams.get('from')
+  const to = searchParams.get('to')
+  const isRange = !!(from && to && DATE.test(from) && DATE.test(to) && from <= to)
 
-  // Today or any future day — never a past one, so browsing history never
-  // fabricates an entry that wasn't actually there.
-  if (date >= todayStr()) {
-    const settingsNodes = await getNodes(user.id, { type: 'Settings' })
-    const settings = (settingsNodes[0]?.properties ?? {}) as {
-      scheduleMode?: 'off' | 'suggest' | 'auto'
-      workingHours?: { start: string; end: string }
-    }
-    const hours = settings.workingHours ?? DEFAULT_DAY
+  const dates: string[] = []
+  if (isRange) {
+    for (let d = from!; d <= to! && dates.length < MAX_DAYS; d = addDays(d, 1)) dates.push(d)
+  } else {
+    const date = searchParams.get('date')
+    dates.push(date && DATE.test(date) ? date : todayStr())
+  }
 
-    // Only "auto" writes without asking; it now covers habits as well as
-    // tasks. Habits used to be stamped onto every day regardless of this
-    // setting, at a hardcoded time outside the working day and with no
-    // approval — which is how one morning collected eight overlapping
-    // blocks. In "suggest" mode the same plan is offered on the dashboard
-    // and waits to be accepted; both paths go through planDay, so what is
-    // approved is what gets written.
-    if (settings.scheduleMode === 'auto') {
-      const placements = await planDay(user.id, date, hours)
-      for (const p of placements) {
-        const block = await createNode(user.id, 'TimeBlock', {
+  const nodes = await getNodes(user.id)
+  const settings = (nodes.find((n) => n.type === 'Settings')?.properties ?? {}) as {
+    workingHours?: { start: string; end: string }
+    modules?: Record<string, boolean>
+    timeZone?: string | null
+  }
+
+  // Reading the calendar never writes to it. An "auto" mode used to plan
+  // whatever days were on screen as a side effect of looking at them; the
+  // day is now planned when something is captured or Plan / Replan is
+  // pressed, all through replanDay (src/lib/schedule-day.ts).
+
+  // Everything is loaded once and sliced per day in memory: a month is 42
+  // days, and 42 rounds of queries over the network would be felt.
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  // Every target, not just one: a block may hold a whole batch of tasks.
+  // This used to be `new Map(edges.map(...))`, which silently kept the last
+  // edge per block and dropped the rest — see src/lib/sessions.ts.
+  const scheduledEdges = await getEdges(user.id, { type: 'scheduled-for' })
+  const habitLogs = nodes.filter((n) => n.type === 'HabitLog')
+  // Every block is offered to every day in view and asked whether it falls
+  // there — a routine is one block that occurs all week, so it cannot be
+  // bucketed by its own date. buildSessions does the asking.
+  const allBlocks = nodes.filter((n) => n.type === 'TimeBlock')
+  const eventNodes = nodes.filter((n) => n.type === 'Event')
+  // Content hub: pieces with a publish time, only while the module is on.
+  const off = hiddenTypes(settings)
+  const pieces = off.has('ContentPiece') ? [] : nodes.filter((n) => n.type === 'ContentPiece')
+
+  const days = dates.map((date) => {
+    const blocks = buildSessions({ blocks: allBlocks, edges: scheduledEdges, byId, habitLogs, date })
+
+    const events: {
+      id: number; kind: 'event' | 'content'; name: string; date: string
+      time: string | null; duration: number | null; location: string | null; recurring: boolean
+    }[] = eventNodes
+      .filter((n) => {
+        const p = n.properties as Record<string, unknown>
+        return eventOccursOn(
+          {
+            date: typeof p.date === 'string' ? p.date : null,
+            frequency: typeof p.frequency === 'string' ? p.frequency : null,
+            daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
+            until: typeof p.until === 'string' ? p.until : null,
+          },
           date,
-          startTime: p.startTime,
-          endTime: p.endTime,
-          autoScheduled: true,
-        })
-        await createEdge(user.id, block.id, p.taskId, 'scheduled-for', {})
-      }
-    }
-  }
+        )
+      })
+      .map((n) => {
+        const p = n.properties as Record<string, unknown>
+        return {
+          id: n.id,
+          kind: 'event' as const,
+          name: labelOf(n),
+          // The occurrence, not the rule's start date — this is the day being shown.
+          date,
+          time: typeof p.time === 'string' ? p.time : null,
+          duration: typeof p.duration === 'number' ? p.duration : null,
+          location: typeof p.location === 'string' ? p.location : null,
+          recurring: typeof p.frequency === 'string' && p.frequency !== 'once' && p.frequency !== 'none',
+        }
+      })
 
-  // TimeBlocks for the requested date
-  const allBlocks = (await getNodes(user.id, { type: 'TimeBlock' })).filter((n) => {
-    const p = n.properties as Record<string, unknown>
-    return p.date === date
-  })
-
-  // Find scheduled-for edges where source is one of our blocks
-  const blockIds = new Set(allBlocks.map((b) => b.id))
-  const scheduledEdges = (await getEdges(user.id, { type: 'scheduled-for' })).filter((e) =>
-    blockIds.has(e.sourceId),
-  )
-
-  // Build sourceNodeId lookup: blockId -> sourceNodeId
-  const sourceByBlock = new Map<number, number>()
-  for (const edge of scheduledEdges) {
-    sourceByBlock.set(edge.sourceId, edge.targetId)
-  }
-
-  // Fetch source nodes
-  const sourceNodeIds = new Set(sourceByBlock.values())
-  const sourceNodes = new Map<number, { id: number; type: string; name: string }>()
-  for (const id of sourceNodeIds) {
-    const node = await getNodeById(user.id, id)
-    if (node) {
-      const p = node.properties as Record<string, unknown>
-      sourceNodes.set(id, {
-        id: node.id,
-        type: node.type,
-        name: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${node.type} #${node.id}`,
+    for (const n of pieces) {
+      const p = n.properties as Record<string, unknown>
+      if (p.publishDate !== date || typeof p.publishTime !== 'string') continue
+      events.push({
+        id: n.id,
+        kind: 'content',
+        name: `▶ ${labelOf(n)}`,
+        date,
+        time: p.publishTime,
+        duration: 30,
+        location: typeof p.platform === 'string' ? p.platform : null,
+        recurring: false,
       })
     }
-  }
+    events.sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
 
-  const blocks = allBlocks.map((n) => {
-    const p = n.properties as Record<string, unknown>
-    const sourceNodeId = sourceByBlock.get(n.id)
-    return {
-      id: n.id,
-      startTime: typeof p.startTime === 'string' ? p.startTime : '00:00',
-      endTime: typeof p.endTime === 'string' ? p.endTime : '01:00',
-      source: sourceNodeId ? sourceNodes.get(sourceNodeId) ?? null : null,
-    }
-  }).sort((a, b) => a.startTime.localeCompare(b.startTime))
+    return { date, blocks, events }
+  })
 
-  // Events for the requested date
-  const events = (await getNodes(user.id, { type: 'Event' }))
-    .filter((n) => {
-      const p = n.properties as Record<string, unknown>
-      return eventOccursOn(
-        {
-          date: typeof p.date === 'string' ? p.date : null,
-          frequency: typeof p.frequency === 'string' ? p.frequency : null,
-          daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
-          until: typeof p.until === 'string' ? p.until : null,
-        },
-        date,
-      )
-    })
-    .map((n) => {
-      const p = n.properties as Record<string, unknown>
-      return {
-        id: n.id,
-        name: typeof p.name === 'string' ? p.name : `Event #${n.id}`,
-        // The occurrence, not the rule's start date — this is the day being shown.
-        date,
-        time: typeof p.time === 'string' ? p.time : null,
-        duration: typeof p.duration === 'number' ? p.duration : null,
-        location: typeof p.location === 'string' ? p.location : null,
-        recurring: typeof p.frequency === 'string' && p.frequency !== 'once' && p.frequency !== 'none',
-      }
-    })
-    .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
-
-  return Response.json({ date, blocks, events })
+  return Response.json(isRange ? { days } : days[0])
 }

@@ -2,6 +2,7 @@ import { createNode, createEdge, updateNode, deleteNode, getNodeById, getNodes, 
 import { createNodeType, getSchemaVersion, nodeTypeExists } from '@/lib/db/node-types'
 import { logger } from '@/lib/log'
 import type { BatchOperation } from '@/lib/ai/tools'
+import { identityOf, needsIdentity } from '@/lib/graph/naming'
 
 export interface ExecutionResult {
   createdNodeIds: number[]
@@ -113,6 +114,13 @@ export async function executeBatch(
   for (const op of operations) {
     switch (op.kind) {
       case 'createNode': {
+        // A named thing with no name is junk the user cannot act on: it
+        // shows as an id, cannot be searched for, and nobody remembers what
+        // it was meant to be. Refused at the point of writing rather than
+        // papered over in every view that later has to render it.
+        if (needsIdentity(op.type) && !identityOf(op.properties)) {
+          throw new Error(`A ${op.type} needs a name — nothing was created.`)
+        }
         if (op.properties.name) {
           const existing = (await getNodes(userId, { type: op.type })).find(
             (n) => (n.properties as Record<string, unknown>).name === op.properties.name,

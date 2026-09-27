@@ -20,6 +20,8 @@ import { toFlowGraph, computeRadialLayout, declutter, type DeclutterNode, type D
 import { FloatingEdge } from './FloatingEdge'
 import { NodeDetailPanel } from './NodeDetailPanel'
 import { FilterBar } from './FilterBar'
+import { useTypeColors } from './useTypeColors'
+import { typeColorCss } from '@/lib/colors'
 
 const EDGE_TYPES = { floating: FloatingEdge }
 
@@ -230,7 +232,16 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   async function handleReset() {
     setResetting(true)
     try {
-      await fetch('/api/graph/reset', { method: 'POST' })
+      const res = await fetch('/api/graph/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      // Only clear the view if the graph was actually cleared. Emptying it
+      // regardless showed an empty graph over a database that still had
+      // everything in it — which reads as "it worked" and is not recoverable
+      // from without a reload.
+      if (!res.ok) return
       setNodes([])
       setEdges([])
       setViewState({ status: 'ready', data: { nodes: [], edges: [] } })
@@ -353,6 +364,9 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
 
   const isEmpty = viewState.status === 'ready' && viewState.data.nodes.length === 0
 
+  const typeColors = useTypeColors()
+  const typeColorStyle = useMemo(() => typeColorCss('.acture-graph', typeColors), [typeColors])
+
   // Build node types: BASE_NODE_TYPES + GenericNode fallback for any unknown types
   const nodeTypes = useMemo<NodeTypes>(() => {
     const extra: NodeTypes = {}
@@ -363,7 +377,12 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
   }, [nodes])
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="acture-graph flex flex-col h-full relative">
+      {/* The user's per-type hues, as custom properties every node circle
+          reads (see ./nodes/typeStyle.ts). A stylesheet rather than a style
+          attribute because it carries light and dark at once, so toggling
+          the mode repaints through the cascade. */}
+      <style>{typeColorStyle}</style>
       {selectedNodeId !== null && (
         <NodeDetailPanel
           nodeId={selectedNodeId}
@@ -449,11 +468,18 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
         >
-          <Panel position="top-left">
-            <FilterBar active={filter} onChange={setFilter} />
-          </Panel>
-          <Panel position="top-right">
-            <div className="flex items-center gap-1.5">
+          {/*
+            One panel spanning the top, not a top-left and a top-right one:
+            two independently positioned panels had no idea of each other,
+            so on medium and small widths the filters slid under the buttons.
+            In a single row the filters take what is left and scroll.
+          */}
+          <Panel position="top-left" style={{ right: 0 }} className="pointer-events-none">
+            <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1 pointer-events-auto">
+              <FilterBar active={filter} onChange={setFilter} />
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 pointer-events-auto">
               <button
                 onClick={handleRelayout}
                 title="Compact layout"
@@ -468,7 +494,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
                   <line x1="2" y1="12" x2="4" y2="12" />
                   <line x1="20" y1="12" x2="22" y2="12" />
                 </svg>
-                <span className="hidden sm:inline">Re-layout</span>
+                <span className="hidden xl:inline">Re-layout</span>
               </button>
               <button
                 onClick={() => setResetOpen(true)}
@@ -478,8 +504,9 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
                 <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                 </svg>
-                <span className="hidden sm:inline">Reset</span>
+                <span className="hidden xl:inline">Reset</span>
               </button>
+            </div>
             </div>
           </Panel>
           <Background
@@ -526,10 +553,23 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
       {resetOpen && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm">
           <div className="bg-card border border-border/60 rounded-2xl shadow-xl p-6 w-80 flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <p className="text-sm font-semibold text-foreground">Reset graph?</p>
               <p className="text-[12px] text-muted-foreground leading-relaxed">
-                This will permanently delete all nodes, edges, and pending proposals. This cannot be undone.
+                Permanently deletes everything in the graph — tasks, habits and their
+                logged history, goals, notes, events, calendar blocks and pending
+                proposals. Your settings, theme and location are kept.
+              </p>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">
+                This cannot be undone.{' '}
+                <a
+                  href="/api/export"
+                  download
+                  className="text-foreground underline underline-offset-2 hover:text-primary"
+                >
+                  Download a backup first
+                </a>
+                .
               </p>
             </div>
             <div className="flex gap-2 justify-end">
@@ -559,7 +599,7 @@ export function GraphView({ refreshKey = 0 }: GraphViewProps) {
           <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest mb-0.5">
             {hoverTooltip.type}
           </p>
-          <p className="text-[13px] font-serif font-medium text-foreground/90 mb-1">
+          <p className="text-[13px] font-medium text-foreground/90 mb-1">
             {hoverTooltip.title}
           </p>
           {hoverTooltip.fields.length > 0 && (

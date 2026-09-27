@@ -1,7 +1,11 @@
 import { getNodes, getEdges } from '@/lib/graph/queries'
+import { hiddenTypes } from '@/lib/modules'
+import { readSettings } from '@/lib/settings'
 
 const ANCHOR_TYPES = new Set(['Goal', 'Project', 'Course'])
-const EXCLUDE_TYPES = new Set(['HabitLog', 'JournalEntry'])
+// Memory and availability get their own context sections; tokens and raw
+// signals never reach the model at all.
+const EXCLUDE_TYPES = new Set(['HabitLog', 'JournalEntry', 'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'Settings'])
 const STOP_WORDS = new Set([
   'the', 'and', 'for', 'that', 'this', 'with', 'have', 'from', 'what',
   'want', 'need', 'add', 'create', 'make', 'new', 'can', 'you', 'help',
@@ -16,7 +20,15 @@ const MAX_TOTAL_NODES = 80
 const MAX_EDGES = 30
 
 export async function buildContextSnapshot(userId: number, userMessage: string): Promise<string> {
-  const allNodes = await getNodes(userId)
+  /*
+   * The snapshot is the one part of the prompt built from real rows, so it is
+   * also the one that can reintroduce what the rest of the prompt carefully
+   * left out. A user with school switched off still had every Course listed
+   * here — as an anchor type, at the top, in every single request — which is
+   * a standing invitation to file things into a section they do not have.
+   */
+  const off = hiddenTypes(await readSettings(userId))
+  const allNodes = (await getNodes(userId)).filter((n) => !off.has(n.type))
   if (allNodes.length === 0) return ''
 
   const keywords = userMessage
