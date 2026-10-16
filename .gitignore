@@ -63,3 +63,6 @@ mobile-*.png
 
 # point-in-time database copies from the Turso migration
 data/migration/
+
+# Local database backups taken before data clean-ups: personal data, never committed.
+*-backup.json

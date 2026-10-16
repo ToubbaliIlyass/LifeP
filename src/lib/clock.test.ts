@@ -22,4 +22,7 @@ test('the browser\'s zone wins, then the saved one', () => {
   assert.equal(zoneFor('Europe/Paris', 'Africa/Casablanca'), 'Europe/Paris')
   assert.equal(zoneFor('garbage', 'Africa/Casablanca'), 'Africa/Casablanca')
   assert.equal(zoneFor(undefined, null), null)
+  // Pinned in Settings beats both: the browser's own zone data can be stale.
+  assert.equal(zoneFor('Africa/Casablanca', 'Africa/Casablanca', 'Etc/UTC'), 'Etc/UTC')
+  assert.equal(zoneFor('Africa/Casablanca', null, 'nonsense'), 'Africa/Casablanca')
 })

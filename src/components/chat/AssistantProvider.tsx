@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { notifyDataChanged } from '@/lib/dataSignal'
+import { clockZone } from '@/lib/wallclock'
 
 /*
  * Every request carries the browser's time zone, so "today" and "now" in the
@@ -12,12 +13,9 @@ import { notifyDataChanged } from '@/lib/dataSignal'
 const transport = new DefaultChatTransport({
   api: '/api/chat',
   headers: (): Record<string, string> => {
-    try {
-      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      return zone ? { 'x-time-zone': zone } : {}
-    } catch {
-      return {}
-    }
+    // Pinned in Settings, or the browser's — see src/lib/wallclock.ts.
+    const zone = clockZone()
+    return zone ? { 'x-time-zone': zone } : {}
   },
 })
 

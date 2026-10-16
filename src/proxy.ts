@@ -13,7 +13,15 @@ import { NextResponse, type NextRequest } from 'next/server'
  * file convention in favour of this one, which always runs on the Node
  * runtime instead of the edge.
  */
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout']
+/*
+ * What needs a signed-in user: the app and its data. Everything else — the
+ * site, sign-in itself, and any address that does not exist — is public, so
+ * a mistyped or stale URL gets the "nothing here" page with a way home, not a
+ * sign-in screen that looks like the whole site is locked.
+ */
+const PROTECTED = ['/app', '/api']
+const isProtected = (pathname: string) =>
+  PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -44,26 +52,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  // The MCP endpoint is called by outside chatbots with no session cookie; it
-  // checks its own bearer token. Exact match, so /api/mcp/tokens (which mints
-  // those tokens) stays behind the session gate.
-  /*
-   * MCP discovery has to answer honestly to a stranger.
-   *
-   * A client that gets a 401 from /api/mcp goes looking for OAuth metadata
-   * at /.well-known/oauth-* next. Those paths do not exist here — this
-   * server takes static personal tokens — and a plain 404 is exactly the
-   * answer that tells a client so. What they used to get instead was a 307
-   * to the HTML login page, which an MCP client cannot parse and cannot
-   * recover from: Claude Desktop reported only "Connection closed", with
-   * nothing to say that the real problem was a token that never arrived.
-   */
-  const isPublic =
-    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
-    pathname === '/api/mcp' ||
-    pathname.startsWith('/.well-known/')
-
-  if (!data.user && !isPublic) {
+  if (!data.user && isProtected(pathname)) {
     // API callers get a status they can act on; browsers get the login page.
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -75,7 +64,7 @@ export async function proxy(request: NextRequest) {
 
   if (data.user && pathname === '/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/app'
     return NextResponse.redirect(url)
   }
 
@@ -85,7 +74,9 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Everything except Next's own assets and image files — those are not
-    // worth a Supabase round trip on each request.
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // worth a Supabase round trip on each request — and what installing the
+    // app fetches, which has to reach a browser that is not signed in yet
+    // (the install button is on the public site).
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -48,13 +48,22 @@ export async function setTaskStatus(userId: number, taskId: number, status: stri
   if (status === 'done' && previous !== 'done' && recurrence?.frequency) {
     const baseDate = typeof props.dueDate === 'string' ? props.dueDate : todayStr()
     const next = nextDueDate(baseDate, recurrence.frequency, recurrence.daysOfWeek ?? null)
-    const created = await createNode(userId, 'Task', {
-      ...props,
-      status: 'todo',
-      dueDate: next,
-      completedAt: undefined,
-    })
-    spawned = { id: created.id }
+    // A deadline is where a repeating to-do stops: "review every day, due
+    // Wednesday" means every day up to Wednesday, and nothing after it.
+    const deadline = typeof props.deadline === 'string' ? props.deadline : null
+    if (!deadline || next <= deadline) {
+      const created = await createNode(userId, 'Task', {
+        ...props,
+        status: 'todo',
+        dueDate: next,
+        completedAt: undefined,
+        // Each occurrence starts with its checklist unticked.
+        ...(Array.isArray(props.checklist)
+          ? { checklist: (props.checklist as Record<string, unknown>[]).map((c) => ({ ...c, done: false })) }
+          : {}),
+      })
+      spawned = { id: created.id }
+    }
   }
 
   return { task: updated, previous, spawned }

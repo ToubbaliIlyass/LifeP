@@ -39,9 +39,12 @@ export async function POST(request: Request) {
   const done = body.done !== false
 
   const settings = await readSettings(user.id)
-  const habitNodeId = await resolveHabit(user.id, settings.prayer.habitNodeId)
+  let habitNodeId = await resolveHabit(user.id, settings.prayer.habitNodeId)
+  // There is no screen for routines any more, so nobody can be asked to make
+  // one first: the first prayer ticked makes the routine the five count
+  // towards, and it is remembered from then on.
   if (habitNodeId === null) {
-    return Response.json({ error: 'No prayer habit to record against. Create one first.' }, { status: 409 })
+    habitNodeId = (await createNode(user.id, 'Habit', { name: 'Pray five prayers', frequency: 'daily', anytime: true })).id
   }
   if (habitNodeId !== settings.prayer.habitNodeId) {
     await writeSettings(user.id, { prayer: { ...settings.prayer, habitNodeId } })

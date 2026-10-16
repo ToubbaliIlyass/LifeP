@@ -327,8 +327,6 @@ export interface TodayHabit {
   name: string
   done: boolean
   minutes: number | null
-  /** The part of the day it usually happens in, when one was said. */
-  dayPart: string | null
 }
 
 /**
@@ -376,7 +374,6 @@ export function buildTodayHabits({
           return lp.habitNodeId === habit.id && lp.date === date && lp.completed === true
         }),
         minutes: typeof p.durationMinutes === 'number' ? p.durationMinutes : null,
-        dayPart: typeof p.dayPart === 'string' && p.dayPart ? p.dayPart : null,
       }
     })
     // Open ones first, so what is left is what is read.

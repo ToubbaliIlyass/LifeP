@@ -8,9 +8,6 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-source-serif);
-  --font-display: var(--font-montserrat);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,11 +48,15 @@
 
 /* ─── Light theme ─────────────────────────────────────── */
 :root {
-  --background: #fcfdfa;
+  /* White, and a sidebar one cool step under it — the two greys Things
+     itself uses. Every other light theme takes the same step from its own
+     ground (see --sidebar in each), so the sidebar is always as far from the
+     page as it is here. */
+  --background: #fefffe;
   --foreground: oklch(0.13 0.005 255);
-  --card: oklch(0.975 0.004 80);
+  --card: #fefffe;
   --card-foreground: oklch(0.13 0.005 255);
-  --popover: oklch(0.975 0.004 80);
+  --popover: #fefffe;
   --popover-foreground: oklch(0.13 0.005 255);
   --primary: oklch(0.19 0.005 255);
   --primary-foreground: oklch(0.975 0.004 80);
@@ -76,8 +77,10 @@
   --ring: oklch(0.72 0.14 72);
   --radius: 0.5rem;
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+  /* Inter, shipped with the app, so the face never depends on the browser:
+     a system-font-only stack came out as a serif in Brave. The system faces
+     stay behind it as fallbacks while Inter loads. */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
 
   --chart-1: oklch(0.72 0.14 72);
   --chart-2: oklch(0.62 0.14 155);
@@ -85,7 +88,7 @@
   --chart-4: oklch(0.65 0.17 290);
   --chart-5: oklch(0.62 0.15 340);
 
-  --sidebar: #fbfbf9;
+  --sidebar: #f4f5f7;
   --sidebar-foreground: oklch(0.13 0.005 255);
   --sidebar-primary: oklch(0.19 0.005 255);
   --sidebar-primary-foreground: oklch(0.975 0.004 80);
@@ -116,8 +119,10 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.74 0.14 72);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+  /* Inter, shipped with the app, so the face never depends on the browser:
+     a system-font-only stack came out as a serif in Brave. The system faces
+     stay behind it as fallbacks while Inter loads. */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
 
   --chart-1: oklch(0.74 0.14 72);
   --chart-2: oklch(0.65 0.14 155);
@@ -143,55 +148,10 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* Sans for reading and doing; the serif is kept for a few display
-     moments (a date, the thing to do now, a name) where it gives the page
-     its character — see font-serif in the components. */
+  /* One face for everything: Inter (see --font-sans). */
   html {
     font-family: var(--font-sans);
   }
-}
-
-/* ─── React Flow canvas overrides ────────────────────── */
-.react-flow {
-  background-color: var(--background) !important;
-}
-.dark .react-flow__background {
-  color: oklch(1 0 0 / 4%) !important;
-}
-.react-flow__edge-path,
-.react-flow__connection-path {
-  stroke: var(--border) !important;
-  stroke-width: 1.5 !important;
-}
-.react-flow__edge-textbg {
-  fill: var(--card) !important;
-}
-.react-flow__edge-text {
-  fill: var(--muted-foreground) !important;
-  font-size: 10px !important;
-}
-.react-flow__controls {
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  overflow: hidden;
-  box-shadow: 0 2px 12px oklch(0 0 0 / 0.2) !important;
-}
-.react-flow__controls-button {
-  background: var(--card) !important;
-  border-bottom-color: var(--border) !important;
-  fill: var(--muted-foreground) !important;
-}
-.react-flow__controls-button:hover {
-  background: var(--muted) !important;
-}
-.react-flow__minimap {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-}
-.react-flow__minimap-mask {
-  fill: var(--background) !important;
-  opacity: 0.7 !important;
 }
 
 /* ─── Custom scrollbar ────────────────────────────────── */
@@ -209,33 +169,6 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.5 0 0 / 0.55);
-}
-
-/* ─── Splash failsafe ─────────────────────────────────── */
-/*
-  The intro overlay is server-rendered opaque (so it covers the dashboard
-  from the very first paint) and is normally torn down by React a few
-  seconds later. That made it a single point of failure: if the client
-  bundle never finishes — a dropped chunk, a phone crawling through the
-  multi-megabyte dev build over Wi-Fi — nothing ever dismisses it and the
-  whole app is a blank coloured rectangle forever. This was a real,
-  reproduced failure: the app "showed a dark screen" on an Android phone
-  while the HTML and CSS had loaded perfectly.
-
-  So the overlay also gets a pure-CSS escape hatch that needs no
-  JavaScript at all. It animates `visibility` (not opacity) precisely so
-  it never fights the inline opacity React drives during the normal
-  animated exit — and when JS is healthy React unmounts the element long
-  before this fires, making it a no-op.
-*/
-@keyframes acture-splash-failsafe {
-  to { visibility: hidden; }
-}
-.splash-failsafe {
-  animation: acture-splash-failsafe 0s linear 8s forwards;
-}
-@media (prefers-reduced-motion: reduce) {
-  .splash-failsafe { animation-delay: 4s; }
 }
 
 /* ─── Themes ──────────────────────────────────────────── */
@@ -265,7 +198,7 @@
 /* ── Toffee: brown + bronze, on warm sand ── */
 [data-theme='toffee'] {
   --background: #faf3ec;
-  --sidebar: #f3e8dd;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #fdf8f4;
   --popover: #fdf8f4;
   --foreground: #2c1d14;
@@ -326,7 +259,7 @@
       Frosted Mint is its ground rather than an imposition. ── */
 [data-theme='grove'] {
   --background: #e9fde6;
-  --sidebar: #dbf6d7;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #f1fef0;
   --popover: #f1fef0;
   --foreground: #14261a;
@@ -386,7 +319,7 @@
 /* ── Coral: coral + ruby, on warm blush ── */
 [data-theme='coral'] {
   --background: #fff4ef;
-  --sidebar: #fbe8e0;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #fff9f7;
   --popover: #fff9f7;
   --foreground: #2e1613;
@@ -446,7 +379,7 @@
 /* ── Ember: amber + deep crimson, on amber cream ── */
 [data-theme='ember'] {
   --background: #fef8ea;
-  --sidebar: #fbefd8;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #fffcf4;
   --popover: #fffcf4;
   --foreground: #2b1f0d;
@@ -506,7 +439,7 @@
 /* ── Tide: deep blue + teal, on cool mist ── */
 [data-theme='tide'] {
   --background: #eef4f8;
-  --sidebar: #e2ecf3;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #f6fafc;
   --popover: #f6fafc;
   --foreground: #12222e;
@@ -566,7 +499,7 @@
 /* ── Orchid: plum + magenta, on pale lilac ── */
 [data-theme='orchid'] {
   --background: #f5f1f8;
-  --sidebar: #ece5f1;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #faf7fc;
   --popover: #faf7fc;
   --foreground: #241a2c;
@@ -626,7 +559,7 @@
 /* ── Moss: deep green + olive, on pale sage ── */
 [data-theme='moss'] {
   --background: #f0f4ec;
-  --sidebar: #e4ebde;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #f7faf4;
   --popover: #f7faf4;
   --foreground: #1b2418;
@@ -686,7 +619,7 @@
 /* ── Slate: no hue at all, for when colour is a distraction ── */
 [data-theme='slate'] {
   --background: #f4f4f5;
-  --sidebar: #eaeaec;
+  --sidebar: color-mix(in oklab, var(--background) 96%, black);
   --card: #fafafa;
   --popover: #fafafa;
   --foreground: #1c1c1f;

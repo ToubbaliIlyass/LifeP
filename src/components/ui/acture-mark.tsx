@@ -1,34 +1,40 @@
 /**
- * The Acture aperture mark, from public/acture_logo_aperture.svg.
+ * The Acture mark: a voice becoming a tick.
  *
- * Drawn in `currentColor` rather than the source file's black-on-white,
- * because in the app the mark always sits inside a tinted container that
- * already supplies the tile — a second, hardcoded black square would vanish
- * against a dark sidebar and fight every theme. The favicon at
- * src/app/icon.svg keeps the original colours instead, since browser chrome
- * gives it nothing to inherit.
+ * Two short sound bars run into a check — what you say, done. That is the
+ * whole app in one glyph, and it stays legible at 16px, where the old
+ * six-polygon aperture turned to a grey blot.
  *
- * Previously this was duplicated inline in page.tsx and login/page.tsx; one
- * definition means the two cannot drift apart.
+ * Drawn in `currentColor`, so it takes whatever tile or text colour it sits
+ * in. `bars` colours the sound bars on their own, for the places the mark
+ * appears on its full tile (the favicon, the landing page).
  */
-export function ActureMark({ className }: { className?: string }) {
+export function ActureMark({ className, bars }: { className?: string; bars?: string }) {
   return (
     <svg
-      viewBox="-54 -56 108 108"
+      viewBox="0 0 32 32"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={3.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       role="img"
       aria-label="Acture"
     >
-      <polygon points="0,-52 30,-40 22,-4 -22,-4 -30,-40" />
-      <polygon points="45,-8 45,26 12,42 -8,16 12,-16" />
-      <polygon points="28,48 -28,48 -38,16 -8,16 12,42" />
-      <polygon points="-45,26 -45,-8 -12,-16 8,16 -12,42" />
-      <polygon points="-30,-40 0,-52 22,-4 -8,16 -30,4" />
-      <polygon points="30,-40 45,-8 12,-16 -8,-4 22,-4" />
-      {/* The opening at the centre of the aperture. */}
-      <circle cx="0" cy="0" r="13" fill="currentColor" opacity="0.4" />
+      <path d="M5 14.5v3" stroke={bars ?? 'currentColor'} />
+      <path d="M9.5 11.5v9" stroke={bars ?? 'currentColor'} />
+      <path d="M14 16.5l4 4L27.5 10" />
     </svg>
+  )
+}
+
+/** The mark on its own tile, for where nothing around it supplies one. */
+export function ActureLogo({ className }: { className?: string }) {
+  return (
+    <span className={`inline-grid place-items-center rounded-[28%] bg-[#141413] text-white ${className ?? ''}`}>
+      <ActureMark className="w-[66%] h-[66%]" bars="#F5A524" />
+    </span>
   )
 }

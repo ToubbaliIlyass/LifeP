@@ -42,7 +42,7 @@ export async function PATCH(
     if (ops.some((op) => (op.kind === 'createNode' && PLANNED_TYPES.has(op.type)) || op.kind === 'updateNode')) {
       try {
         const settings = await readSettings(user.id)
-        const clock = clockIn(zoneFor(body.tz, settings.timeZone))
+        const clock = clockIn(zoneFor(body.tz, settings.timeZone, settings.timeZoneOverride))
         planned = (await replanDay(user.id, clock.date, clock)).placements.length
       } catch (error) {
         logger.warn('replan_after_approve_failed', { message: error instanceof Error ? error.message : String(error) })

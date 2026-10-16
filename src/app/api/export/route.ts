@@ -2,7 +2,8 @@ import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, getEdges } from '@/lib/graph/queries'
 import { getNodeTypes } from '@/lib/db/node-types'
 import { todayStr } from '@/lib/date'
-import { CANVAS_CREDENTIAL_TYPE } from '@/lib/canvas'
+/** Left behind by the Canvas integration, now removed; still never exported. */
+const CANVAS_CREDENTIAL_TYPE = 'CanvasCredential'
 
 export async function GET() {
   const user = await getCurrentUser()

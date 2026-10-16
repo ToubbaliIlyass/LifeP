@@ -82,10 +82,11 @@ function describeOps(ops: BatchOperation[]): string {
 interface ToolActivityProps {
   part: ToolPart
   onReviewProposals?: () => void
-  onOpenCalendar?: () => void
+  /** After a day is planned: go and look at it. The plan shows as times on Today. */
+  onOpenDay?: () => void
 }
 
-export function ToolActivity({ part, onReviewProposals, onOpenCalendar }: ToolActivityProps) {
+export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivityProps) {
   const name = toolName(part)
   const input = (part.input ?? {}) as Record<string, unknown>
   const pending = part.state === 'input-streaming' || part.state === 'input-available'
@@ -119,22 +120,20 @@ export function ToolActivity({ part, onReviewProposals, onOpenCalendar }: ToolAc
     }
 
     return (
-      <div className="border border-border/60 bg-muted/30 rounded-xl px-3 py-2.5 flex items-start gap-2.5">
-        <Inbox className="w-3.5 h-3.5 shrink-0 mt-0.5 text-muted-foreground" />
+      <div className="rounded-md bg-foreground/[0.05] px-3 py-2.5 flex items-start gap-2.5">
+        <Inbox className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50">
-            Awaiting your approval
-          </p>
-          <p className="text-[12.5px] font-medium text-foreground leading-snug mt-1">{summary}</p>
+          <p className="text-[12px] font-semibold text-muted-foreground">Waiting for your yes</p>
+          <p className="text-[13.5px] font-medium text-foreground leading-snug mt-0.5">{summary}</p>
           {ops.length > 0 && (
             <p className="text-[11px] text-muted-foreground/70 mt-0.5">{describeOps(ops)}</p>
           )}
           {onReviewProposals && (
             <button
               onClick={onReviewProposals}
-              className="mt-2 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              className="mt-2 text-[13px] font-semibold px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
             >
-              Review
+              Review it
             </button>
           )}
         </div>
@@ -212,12 +211,12 @@ export function ToolActivity({ part, onReviewProposals, onOpenCalendar }: ToolAc
           {out?.date && <span className="text-muted-foreground/60"> · {out.date}</span>}
           {missed > 0 && <span className="text-amber-600 dark:text-amber-400"> · {missed} didn&apos;t fit</span>}
         </p>
-        {onOpenCalendar && (
+        {onOpenDay && (
           <button
-            onClick={onOpenCalendar}
+            onClick={onOpenDay}
             className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors shrink-0"
           >
-            Open calendar
+            See Today
           </button>
         )}
       </div>

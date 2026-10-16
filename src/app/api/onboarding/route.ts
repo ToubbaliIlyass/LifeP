@@ -1,6 +1,6 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, createEdge, getNodeById } from '@/lib/graph/queries'
-import { readSettings, writeSettings, type DayPart } from '@/lib/settings'
+import { readSettings, writeSettings } from '@/lib/settings'
 import { saveRule } from '@/lib/availability'
 import { todayStr } from '@/lib/date'
 import { hiddenTypes } from '@/lib/modules'
@@ -25,8 +25,6 @@ import { hiddenTypes } from '@/lib/modules'
 
 interface Payload {
   modules?: Record<string, boolean>
-  workingHours?: { start: string; end: string }
-  dayParts?: DayPart[]
   /** Fixed, named, recurring commitments: classes, shifts, training. */
   commitments?: {
     name: string
@@ -49,7 +47,6 @@ interface Payload {
     anytime?: boolean
     /** When they usually do it, if they said. */
     usualTime?: string
-    dayPart?: string
   }[]
   goals?: { name: string; targetDate?: string | null }[]
   projects?: { name: string; goal?: number | null }[]
@@ -72,16 +69,6 @@ export async function POST(request: Request) {
   const settings = await readSettings(user.id)
   await writeSettings(user.id, {
     ...(body.modules ? { modules: { ...settings.modules, ...body.modules } } : {}),
-    ...(body.workingHours?.start && body.workingHours?.end ? { workingHours: body.workingHours } : {}),
-    ...(body.dayParts
-      ? {
-          dayParts: body.dayParts
-            .filter((p) => p.name?.trim())
-            // Seven days and no days mean the same thing; stored as none, so
-            // nothing downstream has to know both spellings.
-            .map((p) => ({ ...p, days: (p.days ?? []).filter((d) => d >= 0 && d <= 6).length === 7 ? [] : (p.days ?? []) })),
-        }
-      : {}),
     onboarding: { completed: true, completedAt: new Date().toISOString() },
   })
   const off = hiddenTypes({ modules: { ...settings.modules, ...(body.modules ?? {}) } })
@@ -167,7 +154,6 @@ export async function POST(request: Request) {
       ...(h.daysOfWeek?.length ? { daysOfWeek: h.daysOfWeek } : {}),
       ...(typeof h.durationMinutes === 'number' ? { durationMinutes: h.durationMinutes } : {}),
       ...(h.anytime ? { anytime: true } : {}),
-      ...(h.dayPart ? { dayPart: h.dayPart } : {}),
     })
     created.habits++
 

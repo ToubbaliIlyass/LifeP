@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as { date?: string; tz?: string }
   const settings = await readSettings(user.id)
-  const clock = clockIn(zoneFor(body.tz, settings.timeZone))
+  const clock = clockIn(zoneFor(body.tz, settings.timeZone, settings.timeZoneOverride))
   const date = typeof body.date === 'string' && DATE.test(body.date) ? body.date : clock.date
   if (date < clock.date) {
     return Response.json({ error: 'A day that has already gone cannot be planned' }, { status: 400 })

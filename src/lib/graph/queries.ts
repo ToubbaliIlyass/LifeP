@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { edges, nodes } from '@/lib/db/schema'
 import type { Edge, NewEdge, NewNode, Node } from '@/lib/db/schema'
@@ -32,54 +32,6 @@ export async function getEdges(userId: number, filter?: EdgeFilter): Promise<Edg
   if (filter?.targetId) conditions.push(eq(edges.targetId, filter.targetId))
   if (filter?.type) conditions.push(eq(edges.type, filter.type))
   return db.select().from(edges).where(and(...conditions)).all()
-}
-
-export interface NodeWithNeighbors {
-  node: Node
-  neighbors: Array<{ node: Node; edge: Edge; direction: 'outgoing' | 'incoming' }>
-}
-
-export async function getNodeWithNeighbors(
-  userId: number,
-  nodeId: number,
-): Promise<NodeWithNeighbors | null> {
-  const node = await db
-    .select()
-    .from(nodes)
-    .where(and(eq(nodes.id, nodeId), eq(nodes.userId, userId)))
-    .get()
-
-  if (!node) return null
-
-  const connectedEdges = await db
-    .select()
-    .from(edges)
-    .where(
-      and(
-        eq(edges.userId, userId),
-        or(eq(edges.sourceId, nodeId), eq(edges.targetId, nodeId)),
-      ),
-    )
-    .all()
-
-  // One query for every neighbour at once, rather than one query per edge —
-  // the per-edge version was tolerable against a local file and is not
-  // against a network round trip.
-  const neighborIds = [...new Set(connectedEdges.map((e) => (e.sourceId === nodeId ? e.targetId : e.sourceId)))]
-  const neighborNodes = neighborIds.length
-    ? await db.select().from(nodes).where(eq(nodes.userId, userId)).all()
-    : []
-  const byId = new Map(neighborNodes.map((n) => [n.id, n]))
-
-  const neighbors: NodeWithNeighbors['neighbors'] = []
-  for (const edge of connectedEdges) {
-    const neighborId = edge.sourceId === nodeId ? edge.targetId : edge.sourceId
-    const direction = edge.sourceId === nodeId ? 'outgoing' : 'incoming'
-    const neighborNode = byId.get(neighborId)
-    if (neighborNode) neighbors.push({ node: neighborNode, edge, direction })
-  }
-
-  return { node, neighbors }
 }
 
 export async function createNode(

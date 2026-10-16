@@ -1,3 +1,4 @@
+import { wallNow } from '@/lib/wallclock'
 /**
  * Formats a Date as YYYY-MM-DD using its LOCAL calendar date.
  *
@@ -17,7 +18,9 @@ export function localDateStr(date: Date): string {
 }
 
 export function todayStr(): string {
-  return localDateStr(new Date())
+  // The wall clock: the zone pinned in Settings, when there is one. On the
+  // server it is always the plain clock — see src/lib/wallclock.ts.
+  return localDateStr(wallNow())
 }
 
 /** Adds (or subtracts, for negative `days`) whole days to a YYYY-MM-DD date string. */

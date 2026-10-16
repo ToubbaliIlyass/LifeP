@@ -44,3 +44,24 @@ export function needsIdentity(type: string): boolean {
 export function displayName(type: string, properties: Record<string, unknown>): string {
   return identityOf(properties) ?? `Untitled ${type.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}`
 }
+
+/** A type's plural, as a heading: "Habits", "Journal", "Activities". */
+export function pluralize(type: string): string {
+  const lower = type.toLowerCase()
+  if (lower === 'journalentry') return 'Journal'
+  if (lower.endsWith('s')) return type
+  if (lower.endsWith('y')) return type.slice(0, -1) + 'ies'
+  return type + 's'
+}
+
+/**
+ * Types that are the app's own bookkeeping rather than things the user
+ * thinks of as theirs, lower-cased: logs, time blocks, settings, memory,
+ * availability, learning signals, access tokens. Anything that lists "the
+ * types the user has" — the colour picker, for one — hides exactly these.
+ */
+export const HIDDEN_NODE_TYPES = new Set([
+  'habitlog', 'timeblock', 'savedview', 'settings',
+  'memory', 'availabilityrule', 'activitysignal', 'apitoken',
+  'canvascredential',
+])

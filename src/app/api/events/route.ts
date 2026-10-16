@@ -1,60 +1,41 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
-import { getNodes } from '@/lib/graph/queries'
-import { localDateStr, addDays, eventOccursOn } from '@/lib/date'
+import { createNode } from '@/lib/graph/queries'
 
-function labelOf(p: Record<string, unknown>, id: number, type: string) {
-  return typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${type} #${id}`
-}
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
+const FREQUENCIES = new Set(['once', 'daily', 'weekdays', 'weekly'])
 
-export async function GET(request: Request) {
+/**
+ * Something you show up to: a class, an appointment, a shift.
+ *
+ * Not a to-do — nothing to tick — but the planner treats it as busy time and
+ * Today and Upcoming show it above the day's list. Made by hand here, so it
+ * is written straight away; the assistant's are queued only when they repeat.
+ *
+ * Body: { name, date, time?, duration?, location?, frequency?, daysOfWeek?, until? }
+ */
+export async function POST(request: Request) {
   const user = await getCurrentUser()
   if (!user) return unauthorized()
-  const { searchParams } = new URL(request.url)
-  const days = parseInt(searchParams.get('days') ?? '30', 10)
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const cutoff = new Date(today)
-  cutoff.setDate(cutoff.getDate() + days)
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 200) : ''
+  const date = typeof body.date === 'string' && DATE.test(body.date) ? body.date : null
+  if (!name || !date) return Response.json({ error: 'An event needs a name and a day' }, { status: 400 })
 
-  const from = localDateStr(today)
-  const to = localDateStr(cutoff)
-
-  // A recurring event is one node, so it is expanded into one entry per day
-  // it actually falls on inside the window. `id` stays the node's id — that
-  // is what editing and deleting act on — while `date` is the occurrence, so
-  // callers that group by day keep working unchanged.
-  const events = (await getNodes(user.id, { type: 'Event' })).flatMap((n) => {
-    const p = n.properties as Record<string, unknown>
-    const rule = {
-      date: typeof p.date === 'string' ? p.date : null,
-      frequency: typeof p.frequency === 'string' ? p.frequency : null,
-      daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
-      until: typeof p.until === 'string' ? p.until : null,
-    }
-    if (!rule.date) return []
-
-    const base = {
-      id: n.id,
-      name: labelOf(p, n.id, 'Event'),
-      time: typeof p.time === 'string' ? p.time : null,
-      duration: typeof p.duration === 'number' ? p.duration : null,
-      location: typeof p.location === 'string' ? p.location : null,
-      frequency: rule.frequency ?? 'once',
-      daysOfWeek: rule.daysOfWeek,
-      until: rule.until,
-    }
-
-    const out: (typeof base & { date: string; recurring: boolean })[] = []
-    for (let d = from; d <= to; d = addDays(d, 1)) {
-      if (eventOccursOn(rule, d)) {
-        out.push({ ...base, date: d, recurring: base.frequency !== 'once' })
-      }
-    }
-    return out
+  const frequency = typeof body.frequency === 'string' && FREQUENCIES.has(body.frequency) ? body.frequency : 'once'
+  const days = Array.isArray(body.daysOfWeek) ? body.daysOfWeek.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6) : []
+  const node = await createNode(user.id, 'Event', {
+    name,
+    date,
+    ...(typeof body.time === 'string' && TIME.test(body.time) ? { time: body.time } : {}),
+    duration: typeof body.duration === 'number' && body.duration > 0 ? Math.min(Math.round(body.duration), 24 * 60) : 60,
+    ...(typeof body.location === 'string' && body.location.trim() ? { location: body.location.trim() } : {}),
+    frequency,
+    // A weekly event with no day picked happens on the day it starts.
+    ...(frequency === 'weekly' ? { daysOfWeek: days.length ? days : [new Date(date + 'T00:00:00').getDay()] } : {}),
+    ...(frequency === 'weekdays' ? { daysOfWeek: [1, 2, 3, 4, 5] } : {}),
+    ...(frequency !== 'once' && typeof body.until === 'string' && DATE.test(body.until) ? { until: body.until } : {}),
   })
-
-  events.sort((a, b) => (a.date === b.date ? (a.time ?? '').localeCompare(b.time ?? '') : a.date < b.date ? -1 : 1))
-
-  return Response.json({ events, from, days })
+  return Response.json({ ok: true, id: node.id })
 }

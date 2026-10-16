@@ -16,7 +16,7 @@ import {
 } from '@/lib/schedule'
 import { blockOccursOn, firmnessOf, isDone } from '@/lib/sessions'
 import { loadAvailability } from '@/lib/availability'
-import { readSettings, type DayPart } from '@/lib/settings'
+import { readSettings } from '@/lib/settings'
 import { workTypes } from '@/lib/modules'
 import { prayerTimesFor, PRAYER_MINUTES } from '@/lib/prayers'
 
@@ -66,36 +66,8 @@ export async function planDay(
   const clock = options.clock ?? clockIn()
   const ignored = options.ignoreBlockIds ?? new Set<number>()
   const tasks = include === 'habits' ? [] : await getNodes(userId, { type: 'Task' })
-  /*
-   * The parts of the day, if this person has cut theirs up. A Task or Habit
-   * names one in its `dayPart` property and is then only ever planned inside
-   * it; anything naming a part that no longer exists is simply unconstrained
-   * again, which is kinder than refusing to plan it at all.
-   *
-   * Parts can be limited to certain days, so the lookup is resolved against
-   * the day being planned: the part named is preferred, and if it does not
-   * apply today another part of the same name that does — "deep work" can be
-   * one window on weekdays and a different one at weekends. If none of them
-   * covers today the item is unconstrained rather than unplaceable, for the
-   * same reason a deleted part is.
-   */
   const settings = await readSettings(userId)
-  const dayParts = settings.dayParts ?? []
   const dow = new Date(date + 'T00:00:00').getDay()
-  const appliesToday = (p: DayPart) => !p.days?.length || p.days.includes(dow)
-  const partById = new Map(dayParts.map((p) => [p.id, p]))
-  const windowFor = (props: Record<string, unknown>): { part: DayPart | null } => {
-    const named = typeof props.dayPart === 'string' ? props.dayPart : null
-    if (!named) return { part: null }
-    const exact = partById.get(named) ?? dayParts.find((p) => p.name.toLowerCase() === named.toLowerCase()) ?? null
-    if (exact && appliesToday(exact)) return { part: exact }
-    const sameNameToday = exact
-      ? dayParts.find((p) => p.name.toLowerCase() === exact.name.toLowerCase() && appliesToday(p))
-      : undefined
-    return { part: sameNameToday ?? null }
-  }
-  const asWindow = (part: DayPart | null) =>
-    part ? { window: { start: toMinutes(part.start), end: toMinutes(part.end) }, windowName: part.name } : {}
   // What has been learned and told about when this person can do things.
   const availability = await loadAvailability(userId)
 
@@ -146,7 +118,8 @@ export async function planDay(
             : DEFAULT_TASK_MINUTES,
       }
     })
-    .filter((t) => t.status !== 'done')
+    // Done, or parked for someday on purpose: neither is the planner's to place.
+    .filter((t) => t.status !== 'done' && t.props.someday !== true)
   const undated = taskRows.filter((t) => t.dueDate === null)
   const candidates: SchedulableTask[] = taskRows
     /*
@@ -165,10 +138,9 @@ export async function planDay(
         .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1) || a.createdAt.localeCompare(b.createdAt))
         .slice(0, UNDATED_PER_DAY),
     )
-    .map(({ id, name, dueDate, priority, minutes, props }) => ({
+    .map(({ id, name, dueDate, priority, minutes }) => ({
       id, name, dueDate, priority, minutes, kind: 'task' as const,
       optional: dueDate === null || dueDate > date,
-      ...asWindow(windowFor(props).part),
       // Only a stated preference ("I study in the mornings") can pin a task;
       // a one-off task has no history of its own to learn from.
       // Work pulled forward from a later day has no claim on a usual slot
@@ -251,7 +223,6 @@ export async function planDay(
           typeof p.estimatedMinutes === 'number' && p.estimatedMinutes > 0 ? p.estimatedMinutes : DEFAULT_TASK_MINUTES,
         kind: 'task',
         preferredStart: null,
-        ...asWindow(windowFor(p).part),
       })
     }
   }
@@ -317,7 +288,6 @@ export async function planDay(
       minutes,
       kind: 'habit',
       preferredStart,
-      ...asWindow(windowFor(p).part),
     })
   }
 
@@ -440,8 +410,13 @@ export async function replanDay(
   /** See `notBefore` on planDay. */
   notBefore?: ReadonlyMap<number, number>,
 ): Promise<ReplanResult> {
-  const settings = await readSettings(userId)
-  const hours = settings.workingHours ?? DEFAULT_DAY
+  /*
+   * A day runs midnight to midnight; there is no "working day" to set. The
+   * planner still keeps to waking hours when it has nothing better to go on
+   * (DEFAULT_DAY), and what it learns about when things really happen
+   * (src/lib/availability.ts) decides where in them.
+   */
+  const hours = DEFAULT_DAY
 
   const allNodes = await getNodes(userId)
   const byId = new Map(allNodes.map((n) => [n.id, n]))

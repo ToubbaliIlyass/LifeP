@@ -1,198 +1,146 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ChevronLeft, Inbox, Repeat } from 'lucide-react'
 import type { Proposal } from '@/lib/db/schema'
-import { notifyDataChanged } from '@/lib/dataSignal'
 import type { BatchOperation } from '@/lib/ai/tools'
+import { notifyDataChanged } from '@/lib/dataSignal'
+import { daysLabel } from '@/lib/days'
+import { clockZone } from '@/lib/wallclock'
 
-// --- Pending count badge (exported for header use) ---
-
-interface PendingBadgeProps {
-  count: number
-  onClick: () => void
+/** What a created thing is called on screen, by the type it is stored as. */
+const NOUN: Record<string, string> = {
+  Task: 'to-do', Event: 'event', Project: 'project', Goal: 'area', Habit: 'repeating to-do', Note: 'note', Milestone: 'step',
 }
 
-export function ProposalBadge({ count, onClick }: PendingBadgeProps) {
-  if (count === 0) return null
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
-    >
-      <span>{count} pending</span>
-      <Badge variant="outline" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] border-amber-400 text-amber-700">
-        {count}
-      </Badge>
-    </button>
-  )
-}
+const nameOf = (p: Record<string, unknown>) =>
+  typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : null
 
-// --- Operation detail renderer ---
-
-function OperationDetail({ op }: { op: BatchOperation }) {
-  switch (op.kind) {
-    case 'createNode':
-      return (
-        <div className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">+ {op.type}</span>
-          {' — '}
-          {JSON.stringify(op.properties)}
-        </div>
-      )
-    case 'createEdge':
-      return (
-        <div className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">→ edge &quot;{op.type}&quot;</span>
-          {' '}({op.sourceRef} → {op.targetRef})
-        </div>
-      )
-    case 'updateNode':
-      return (
-        <div className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">~ update node {op.nodeId}</span>
-          {' — '}{JSON.stringify(op.properties)}
-        </div>
-      )
-    case 'deleteNode':
-      return (
-        <div className="text-xs text-destructive font-medium">
-          ✕ delete node {op.nodeId}
-        </div>
-      )
+/** One operation, said the way a person would: "Add event “Compilers”, Tue and Thu at 10:00". */
+function describe(op: BatchOperation, ops: BatchOperation[]): { text: string; danger?: boolean } | null {
+  if (op.kind === 'createNode') {
+    const p = op.properties
+    const name = nameOf(p)
+    let when = ''
+    if (op.type === 'Event') {
+      const repeats = typeof p.frequency === 'string' && p.frequency !== 'once'
+      const days = Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : []
+      when = repeats
+        ? `, ${p.frequency === 'daily' ? 'every day' : p.frequency === 'weekdays' ? 'weekdays' : daysLabel(days)}`
+        : typeof p.date === 'string' ? `, ${p.date}` : ''
+      if (typeof p.time === 'string') when += ` at ${p.time}`
+    }
+    return { text: `Add ${NOUN[op.type] ?? op.type.toLowerCase()}${name ? ` “${name}”` : ''}${when}` }
   }
+  if (op.kind === 'createEdge') {
+    // Only links between two things this proposal makes can be named; the
+    // rest point at something already there.
+    const created = ops.filter((o): o is Extract<BatchOperation, { kind: 'createNode' }> => o.kind === 'createNode')
+    const label = (ref: string) => {
+      if (!ref.startsWith('$')) return 'something you already have'
+      const n = created[Number(ref.slice(1))]
+      return n ? `“${nameOf(n.properties) ?? NOUN[n.type] ?? 'it'}”` : 'it'
+    }
+    return { text: `Put ${label(op.sourceRef)} under ${label(op.targetRef)}` }
+  }
+  if (op.kind === 'updateNode') return { text: `Change ${nameOf(op.properties) ? `“${nameOf(op.properties)}”` : 'an item'}` }
+  if (op.kind === 'deleteNode') return { text: 'Delete an item', danger: true }
+  return null
 }
 
-// --- Single proposal card ---
-
-interface ProposalCardProps {
-  proposal: Proposal
-  onResolved: () => void
-  onApproved: () => void
-}
-
-function ProposalCard({ proposal, onResolved, onApproved }: ProposalCardProps) {
-  const [expanded, setExpanded] = useState(false)
-  const [rejecting, setRejecting] = useState(false)
-  const [reason, setReason] = useState('')
+function ProposalRow({ proposal, onResolved }: { proposal: Proposal; onResolved: (approved: boolean) => void }) {
   const [busy, setBusy] = useState(false)
   const ops = proposal.operations as BatchOperation[]
+  const [summary, ...why] = proposal.summary.split('\n\n')
+  const lines = ops.map((op) => describe(op, ops)).filter((l): l is NonNullable<typeof l> => !!l)
 
-  async function handle(action: 'approve' | 'reject') {
+  async function resolve(action: 'approve' | 'reject') {
     setBusy(true)
     await fetch(`/api/proposals/${proposal.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action,
-        reason: action === 'reject' ? reason : undefined,
-        // Approving plans today around what was approved — in the user's today.
-        tz: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return undefined } })(),
-      }),
-    })
+      // Approving plans today around what was approved — in the user's today.
+      body: JSON.stringify({ action, tz: clockZone() }),
+    }).catch(() => {})
     setBusy(false)
-    if (action === 'approve') { onApproved(); notifyDataChanged() }
-    onResolved()
+    onResolved(action === 'approve')
   }
 
-  const [shortSummary, ...reasoningParts] = proposal.summary.split('\n\n')
-  const reasoning = reasoningParts.join('\n\n').trim()
-
   return (
-    <div className="border rounded-xl p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug">{shortSummary}</p>
-          {reasoning && (
-            <p className="text-[11px] text-muted-foreground/70 mt-1 leading-relaxed">{reasoning}</p>
-          )}
-        </div>
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="text-[10px] text-muted-foreground shrink-0 mt-0.5 hover:text-foreground"
-        >
-          {expanded ? 'hide' : `${ops.length} op${ops.length !== 1 ? 's' : ''}`}
+    <li className="py-3 border-b border-border/70">
+      <p className="font-medium">{summary}</p>
+      {why.join('\n\n').trim() && <p className="mt-0.5 text-[13px] text-muted-foreground">{why.join('\n\n').trim()}</p>}
+      <ul className="mt-1.5 space-y-0.5 text-[13px]">
+        {lines.map((l, i) => (
+          <li key={i} className={`flex items-center gap-1.5 ${l.danger ? 'text-red-500' : 'text-foreground/75'}`}>
+            <span className="w-1 h-1 rounded-full bg-current shrink-0" />{l.text}
+          </li>
+        ))}
+      </ul>
+      <div className="flex gap-1.5 mt-2.5">
+        <button onClick={() => resolve('approve')} disabled={busy} className="rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-[13px] font-semibold hover:opacity-90 disabled:opacity-50">
+          Yes, add it
+        </button>
+        <button onClick={() => resolve('reject')} disabled={busy} className="rounded-md border border-border/80 px-2.5 py-1 text-[13px] font-medium hover:bg-foreground/[0.05] disabled:opacity-50">
+          No
         </button>
       </div>
-
-      {expanded && (
-        <div className="space-y-1 pl-1 border-l-2 border-muted">
-          {ops.map((op, i) => <OperationDetail key={i} op={op} />)}
-        </div>
-      )}
-
-      {rejecting ? (
-        <div className="space-y-1.5">
-          <input
-            autoFocus
-            className="w-full text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="Reason for rejecting (optional)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handle('reject')
-              if (e.key === 'Escape') setRejecting(false)
-            }}
-          />
-          <div className="flex gap-1.5">
-            <Button size="sm" variant="destructive" disabled={busy} onClick={() => handle('reject')} className="h-6 text-xs px-2">
-              Confirm reject
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setRejecting(false)} className="h-6 text-xs px-2">
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-1.5">
-          <Button size="sm" disabled={busy} onClick={() => handle('approve')} className="h-6 text-xs px-2">
-            Approve
-          </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setRejecting(true)} className="h-6 text-xs px-2">
-            Reject
-          </Button>
-        </div>
-      )}
-    </div>
+    </li>
   )
 }
 
-// --- Full proposal queue panel ---
-
-interface ProposalQueueProps {
+/**
+ * What the assistant would like to add, waiting for a yes.
+ *
+ * Only the bigger things wait here — a repeating event, a new project or
+ * area — so a misheard sentence or a misread timetable cannot quietly fill a
+ * week. Drawn as one more list, in plain words rather than the operations
+ * underneath.
+ */
+export function ProposalQueue({ onCountChange, onOpenMenu }: {
   onCountChange: (n: number) => void
-  onApproved: () => void
-}
-
-export function ProposalQueue({ onCountChange, onApproved }: ProposalQueueProps) {
-  const [proposals, setProposals] = useState<Proposal[]>([])
+  /** Back to the lists, on a phone. */
+  onOpenMenu: () => void
+}) {
+  const [proposals, setProposals] = useState<Proposal[] | null>(null)
 
   const load = useCallback(() => {
     fetch('/api/proposals')
-      .then((r) => r.json())
-      .then(({ proposals: p }: { proposals: Proposal[] }) => {
-        setProposals(p)
-        onCountChange(p.length)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { proposals: Proposal[] } | null) => {
+        if (!d) return
+        setProposals(d.proposals)
+        onCountChange(d.proposals.length)
       })
+      .catch(() => {})
   }, [onCountChange])
 
   useEffect(() => { load() }, [load])
 
   return (
-    <ScrollArea className="h-full">
-      {proposals.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground/50 text-center pt-12 italic">
-          No pending proposals
-        </p>
-      ) : (
-        <div className="p-5 space-y-3 max-w-2xl">
-          {proposals.map((p) => (
-            <ProposalCard key={p.id} proposal={p} onResolved={load} onApproved={onApproved} />
-          ))}
+    <div className="h-full overflow-y-auto">
+      <div className="w-full mx-auto max-w-[740px] px-12 max-md:px-[18px] pt-10 max-md:pt-2 pb-16 text-[14px] max-md:text-[15px]">
+        <div className="md:hidden flex items-center h-9 -mx-1.5 mb-2">
+          <button onClick={onOpenMenu} aria-label="Back to lists" className="grid place-items-center w-9 h-9 rounded-md text-muted-foreground active:bg-foreground/[0.06]">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
         </div>
-      )}
-    </ScrollArea>
+        <h1 className="flex items-center gap-2.5 text-[22px] font-bold leading-7 tracking-tight mb-2">
+          <Inbox className="w-[22px] h-[22px] text-primary" />To review
+        </h1>
+        <p className="mb-4 text-[14px] text-foreground/75">Bigger things the assistant wants to add. Nothing here happens until you say yes.</p>
+        {proposals && proposals.length === 0 && (
+          <div className="mt-8 max-w-[44ch] text-muted-foreground">
+            <b className="flex items-center gap-1.5 mb-1 font-semibold text-foreground"><Repeat className="w-4 h-4" />Nothing waiting.</b>
+            Repeating events and new projects the assistant suggests will show up here.
+          </div>
+        )}
+        <ul>
+          {proposals?.map((p) => (
+            <ProposalRow key={p.id} proposal={p} onResolved={(approved) => { if (approved) notifyDataChanged(); load() }} />
+          ))}
+        </ul>
+      </div>
+    </div>
   )
 }

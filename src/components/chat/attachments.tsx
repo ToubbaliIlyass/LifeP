@@ -107,11 +107,19 @@ export function useAttachments() {
   return { items, error, add, remove, clear }
 }
 
-export function AttachButton({ onFiles, disabled, className = '' }: { onFiles: (files: FileList) => void; disabled?: boolean; className?: string }) {
+export function AttachButton({ onFiles, disabled, className = '', bare = false, onPointerEnter }: {
+  onFiles: (files: FileList) => void
+  disabled?: boolean
+  className?: string
+  /** No shape or colours of its own: whoever places it draws those. */
+  bare?: boolean
+  onPointerEnter?: () => void
+}) {
   return (
     <label
       title="Attach a screenshot, photo or PDF"
-      className={`shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer ${disabled ? 'opacity-40 pointer-events-none' : ''} ${className}`}
+      onPointerEnter={onPointerEnter}
+      className={`shrink-0 flex items-center justify-center cursor-pointer ${bare ? '' : 'rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors'} ${disabled ? 'opacity-40 pointer-events-none' : ''} ${className}`}
     >
       <Paperclip className="w-4 h-4" />
       <input
@@ -128,15 +136,23 @@ export function AttachButton({ onFiles, disabled, className = '' }: { onFiles: (
   )
 }
 
-export function AttachmentStrip({ items, onRemove, error }: { items: Attachment[]; onRemove: (id: string) => void; error: string | null }) {
+export function AttachmentStrip({ items, onRemove, error, round = false }: {
+  items: Attachment[]
+  onRemove: (id: string) => void
+  error: string | null
+  /** Rounder previews, for a rounder container. */
+  round?: boolean
+}) {
   if (items.length === 0 && !error) return null
   return (
     <div className="mb-2">
+      {/* Room above and to the right for each remove button: a box that
+          scrolls sideways clips whatever sticks out of it, upwards too. */}
       {items.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pt-1.5 pr-1.5 pb-1">
           {items.map((a) => (
             <div key={a.id} className="relative shrink-0">
-              <FilePreview part={a.part} size="sm" />
+              <FilePreview part={a.part} size="sm" round={round} />
               <button
                 type="button"
                 onClick={() => onRemove(a.id)}
@@ -154,14 +170,15 @@ export function AttachmentStrip({ items, onRemove, error }: { items: Attachment[
   )
 }
 
-export function FilePreview({ part, size = 'md' }: { part: FileUIPart; size?: 'sm' | 'md' }) {
+export function FilePreview({ part, size = 'md', round = false }: { part: FileUIPart; size?: 'sm' | 'md'; round?: boolean }) {
+  const corner = round ? 'rounded-xl' : 'rounded-lg'
   const box = size === 'sm' ? 'h-14 max-w-[140px]' : 'h-28 max-w-[220px]'
   if (part.mediaType.startsWith('image/')) {
     // eslint-disable-next-line @next/next/no-img-element -- a data URL, nothing for next/image to optimise
-    return <img src={part.url} alt={part.filename ?? 'attachment'} className={`${box} w-auto rounded-lg border border-border/60 object-cover`} />
+    return <img src={part.url} alt={part.filename ?? 'attachment'} className={`${box} w-auto ${corner} border border-border/60 object-cover`} />
   }
   return (
-    <div className={`${size === 'sm' ? 'h-14' : 'h-12'} flex items-center gap-2 px-3 rounded-lg border border-border/60 bg-muted/40 max-w-[220px]`}>
+    <div className={`${size === 'sm' ? 'h-14' : 'h-12'} flex items-center gap-2 px-3 ${corner} border border-border/60 bg-muted/40 max-w-[220px]`}>
       <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
       <span className="text-[12px] truncate">{part.filename ?? 'document.pdf'}</span>
     </div>

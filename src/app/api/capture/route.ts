@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   if (!text) return Response.json({ error: 'Nothing to capture' }, { status: 400 })
 
   const settings = await readSettings(user.id)
-  const clock = clockIn(zoneFor(typeof body.tz === 'string' ? body.tz : null, settings.timeZone))
+  const clock = clockIn(zoneFor(typeof body.tz === 'string' ? body.tz : null, settings.timeZone, settings.timeZoneOverride))
   const openTasks = (await getNodes(user.id, { type: 'Task' }))
     .filter((t) => (t.properties as Record<string, unknown>).status !== 'done')
     .map((t) => ({ id: t.id, name: String((t.properties as Record<string, unknown>).name ?? '') }))

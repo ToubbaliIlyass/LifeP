@@ -180,7 +180,10 @@ export interface SpeechInput {
   /** Only ever true in `record` mode: the clip is being sent off. */
   transcribing: boolean
   start: () => void
+  /** Ends listening and keeps what was said. */
   stop: () => void
+  /** Ends listening and throws it away: nothing transcribed, nothing reported. */
+  cancel: () => void
   reset: () => void
 }
 
@@ -212,6 +215,14 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
   const sessionRef = useRef('')
   /** Set only when the user presses stop, so auto-restart can tell the difference. */
   const stoppedByUser = useRef(false)
+
+  /**
+   * Set by `cancel`, cleared by `start`. Recording starts asynchronously (the
+   * microphone has to be granted first) and ends asynchronously (the clip is
+   * assembled, then sent off), so a cancel can land at either end of either
+   * wait — and each of them checks this before carrying on.
+   */
+  const cancelledRef = useRef(false)
 
   // `record` mode plumbing.
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -253,6 +264,8 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
     if (!canRecord()) { setError('This browser cannot record audio.'); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Cancelled while the microphone was being granted: do not start at all.
+      if (cancelledRef.current) { for (const track of stream.getTracks()) track.stop(); return }
       // Opus in WebM where it is offered (Chromium, Firefox), MP4/AAC on
       // Safari, which supports neither. An empty string lets MediaRecorder
       // pick, which is what Safari needs.
@@ -271,6 +284,7 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
 
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
         chunksRef.current = []
+        if (cancelledRef.current) return // thrown away, not sent off
         if (blob.size < 1024) return // a tap rather than a sentence
 
         setTranscribing(true)
@@ -281,6 +295,7 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
           form.append('language', navigator.language || 'en')
           const res = await fetch('/api/transcribe', { method: 'POST', body: form })
           const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string }
+          if (cancelledRef.current) return
           if (!res.ok || !data.text) {
             setError(data.error ?? 'Could not make out that recording.')
             return
@@ -427,6 +442,7 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
   // ── the two-mode surface ─────────────────────────────────
 
   const start = useCallback(() => {
+    cancelledRef.current = false
     setError(null)
     stoppedByUser.current = false
     committedRef.current = ''
@@ -448,6 +464,21 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
     recognition.current?.stop()
     setListening(false)
   }, [capability])
+
+  const cancel = useCallback(() => {
+    cancelledRef.current = true
+    stoppedByUser.current = true
+    if (recorderRef.current) {
+      // `onstop` still runs, to free the microphone, and sees the cancel.
+      recorderRef.current.stop()
+    } else if (recognition.current) {
+      teardown(recognition.current)
+      recognition.current = null
+    }
+    setListening(false)
+    setTranscribing(false)
+    setInterimText('')
+  }, [teardown])
 
   const reset = useCallback(() => {
     committedRef.current = ''
@@ -485,6 +516,7 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
     transcribing,
     start,
     stop,
+    cancel,
     reset,
   }
 }

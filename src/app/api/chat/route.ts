@@ -10,7 +10,6 @@ import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes } from '@/lib/graph/queries'
 import { memoryContext } from '@/lib/memory'
 import { loadAvailability } from '@/lib/availability'
-import { daysLabel } from '@/lib/days'
 import { logger } from '@/lib/log'
 import { clockIn, zoneFor } from '@/lib/clock'
 import { fromMinutes } from '@/lib/schedule'
@@ -89,34 +88,15 @@ export async function POST(request: Request) {
 
   // The user's clock, from the zone their browser sends — the server's own
   // is UTC once deployed, which put "today" on the wrong day near midnight.
-  const clock = clockIn(zoneFor(request.headers.get('x-time-zone'), settings.timeZone))
+  const clock = clockIn(zoneFor(request.headers.get('x-time-zone'), settings.timeZone, settings.timeZoneOverride))
   const weekday = new Date(clock.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
   const dateContext = `\n\n## Current date\nToday is ${weekday} ${clock.date}, and it is ${fromMinutes(clock.minutes)} where the user is. Always use this exact date for "today". Derive "tomorrow", "next week", etc. from this date. Never use dates from your training data as defaults.`
 
   const availabilitySummary = availability.summary()
 
-  /*
-   * The parts the user has cut their day into. Without these the model can
-   * only set `dayPart` by guessing an id, so it never set one at all — and a
-   * sixteen-hour day went on being treated as one interchangeable stretch.
-   */
-  const parts = (settings.dayParts ?? []).filter((p) => p.name)
-  const dayPartContext =
-    parts.length > 0
-      ? '\n\n## Parts of the user\'s day\n' +
-        'Set `dayPart` on a Task or Habit to one of these ids when it clearly belongs to that part of the day; leave it out when it does not matter. Anything with a dayPart is only ever planned inside it.\n' +
-        parts
-          .map((p) => {
-            const days = p.days?.length && p.days.length < 7 ? `, ${daysLabel(p.days)} only` : ''
-            return `- ${p.id} — ${p.name} (${p.start}–${p.end}${days})`
-          })
-          .join('\n')
-      : ''
-
   const personalContext =
     (memories ? `\n\n${memories}` : '') +
-    (availabilitySummary ? `\n\n${availabilitySummary}` : '') +
-    dayPartContext
+    (availabilitySummary ? `\n\n${availabilitySummary}` : '')
 
   const history = dropOldAttachments(messages.slice(-MAX_HISTORY_MESSAGES))
 

@@ -1,5 +1,3 @@
-import { CONTENT_PROMPT } from '@/lib/content'
-
 /**
  * What the app is made of, and what each part owns.
  *
@@ -59,81 +57,15 @@ export interface ModuleDef {
 }
 
 /*
- * A module's own slice of the assistant's prompt.
+ * Empty on purpose.
  *
- * These used to live in the one big SYSTEM_PROMPT, which is why a user with
- * no school still had Courses, Assignments and Exams described to the model
- * in every single request — and got them created. A section is only ever sent
- * while its module is on, so the types it names cannot be invented.
+ * Acture is one loop — say it, it becomes to-dos, they get a time — and the
+ * sections that used to register here (School, the content hub) were other
+ * apps living inside it. The registry stays because everything that reads it
+ * is already written to cope with a section being absent, which is exactly
+ * what "none" is; their nodes are still in the database, untouched.
  */
-const SCHOOL_PROMPT = `
-
-## School (enabled for this user)
-**Course** -- { name, code, semester, credits }
-**Assignment** -- { name, courseNodeId, dueDate (YYYY-MM-DD), status (todo/submitted/graded), grade }
-**Exam** -- { name, courseNodeId, date (YYYY-MM-DD), time (HH:MM), location, status (upcoming/taken/graded), grade }
-All three are structural: create with batchPropose, never createNode.
-- Link Assignments and Exams to their Course via the courseNodeId property AND a "part-of" edge. A new Assignment or Exam ALWAYS gets that edge.
-- When the user mentions submitting: update Assignment status to "submitted" (auto). A grade: update the grade property (auto). Sitting an exam: update Exam status to "taken" (auto).
-- A syllabus or timetable in an attachment becomes Courses, Assignments and Exams here.`
-
-const HEALTH_PROMPT = `
-
-## Health (enabled for this user)
-**HealthMetric** -- { label (e.g. "run", "weight", "sleep"), value (number), unit (e.g. "min", "kg", "hrs"), date (YYYY-MM-DD) } -- a logged data point.
-When the user mentions one ("ran 5k", "weighed myself"), log it directly with createNode -- no proposal needed, same tier as Notes.`
-
-const JOURNAL_PROMPT = `
-
-## Journal (enabled for this user)
-**JournalEntry** -- { date (YYYY-MM-DD), content, mood (great/good/okay/bad/awful) }.
-Write one with the **writeJournal** tool, never createNode: a journal is one page per date, and writeJournal joins what they say to that day's entry instead of starting a second one.
-- Reflection belongs here ("today was hard", "felt good after the gym", "worried about Thursday"); what they *did* belongs in logActivity. Something that is both gets both.
-- Write it in their voice, close to their own words -- not a report about them.
-- Set mood only when they make it plain. Do not interrogate them for one.`
-
-export const MODULES: ModuleDef[] = [
-  {
-    id: 'content',
-    label: 'Content hub',
-    blurb: 'Track videos, posts and episodes from idea to published.',
-    nodeTypes: ['ContentSeries', 'ContentPiece'],
-    // A series is a container; the piece is the thing with a date on it.
-    work: ['ContentPiece'],
-    tab: 'content',
-    prompt: CONTENT_PROMPT,
-    proposeTypes: ['ContentSeries'],
-  },
-  {
-    id: 'school',
-    label: 'School',
-    blurb: 'Courses, assignments and exams, with due dates and grades.',
-    nodeTypes: ['Course', 'Assignment', 'Exam'],
-    // A course is a container. An exam is work even though it is sat rather
-    // than done: it has a date, it needs preparing for, and it must not be
-    // planned over.
-    work: ['Assignment', 'Exam'],
-    tab: 'school',
-    prompt: SCHOOL_PROMPT,
-    proposeTypes: ['Course', 'Assignment', 'Exam'],
-  },
-  {
-    id: 'health',
-    label: 'Health',
-    blurb: 'Log weight, runs, sleep and anything else you measure.',
-    nodeTypes: ['HealthMetric'],
-    tab: 'health',
-    prompt: HEALTH_PROMPT,
-  },
-  {
-    id: 'journal',
-    label: 'Journal',
-    blurb: 'Dated entries with a mood, kept alongside everything else.',
-    nodeTypes: ['JournalEntry'],
-    tab: 'journal',
-    prompt: JOURNAL_PROMPT,
-  },
-]
+export const MODULES: ModuleDef[] = []
 
 export type ModuleSettings = Record<string, boolean>
 
@@ -148,12 +80,12 @@ export type ModuleAware = { modules?: ModuleSettings } | null | undefined
  * Whether a module is on.
  *
  * Absent means off for everything except the ones that predate modules being
- * a choice — School, Health and Journal were always there, so a user who has
+ * a choice — School was always there, so a user who has
  * never seen the module screen keeps them rather than silently losing their
  * courses on the next deploy. Onboarding writes an explicit answer for each,
  * after which this default never applies again.
  */
-const ON_UNLESS_SAID_OTHERWISE = new Set(['school', 'health', 'journal'])
+const ON_UNLESS_SAID_OTHERWISE = new Set<string>()
 
 export function moduleEnabled(settings: ModuleAware, id: string): boolean {
   const modules = (settings?.modules ?? {}) as ModuleSettings
@@ -197,7 +129,7 @@ export function modulePrompts(settings: ModuleAware): string {
  * Dated work owned by the enabled modules.
  *
  * Asked by Today, the unscheduled rail and the planner. Modules whose types
- * are all records — Health, Journal — contribute nothing here, which is the
+ * are only records contribute nothing here, which is the
  * point.
  */
 export function workTypes(settings: ModuleAware): Set<string> {

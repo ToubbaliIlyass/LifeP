@@ -8,8 +8,7 @@ import { saveMemories, MEMORY_CATEGORIES } from '@/lib/memory'
 import { identityOf, needsIdentity } from '@/lib/graph/naming'
 import { saveRule } from '@/lib/availability'
 import { logActivity } from '@/lib/day-log'
-import { hiddenTypes, moduleProposeTypes, moduleEnabled, type ModuleAware } from '@/lib/modules'
-import { writeJournalEntry, MOODS } from '@/lib/journal'
+import { hiddenTypes, moduleProposeTypes, type ModuleAware } from '@/lib/modules'
 import { replanDay } from '@/lib/schedule-day'
 import { dayView } from '@/lib/day-view'
 import { clockIn, type UserClock } from '@/lib/clock'
@@ -371,28 +370,6 @@ export function buildTools(
       execute: async (input) => logActivity(user.id, input),
     }),
 
-    /*
-     * A journal entry is written through here rather than createNode, for two
-     * reasons: a journal is one page per date, so a second thought about
-     * today has to join today's entry instead of starting a rival one; and
-     * the panel writes the same way, so what the user types and what they
-     * tell the assistant end up in the same place.
-     */
-    ...(moduleEnabled(settings, 'journal') ? {
-      writeJournal: tool({
-        description:
-          'Write the user\'s journal for a day. Use when they reflect on how something went or how they feel — "today was rough", "good session, felt strong", "I am anxious about the exam" — not for facts about what they did (that is logActivity). Appends to that day\'s entry by default, so several thoughts in one day join one page. Set mood when they make it plain. Do not announce it; mention it only if asked.',
-        inputSchema: z.object({
-          content: z.string().min(1).describe('What to write, in their voice, not a summary about them'),
-          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('YYYY-MM-DD; omit for today'),
-          mood: z.enum(MOODS).optional(),
-          replace: z.boolean().optional().describe('true only when they are correcting what the entry says'),
-        }),
-        execute: async ({ content, date, mood, replace }) =>
-          writeJournalEntry(user.id, { content, date, mood, append: replace !== true }),
-      }),
-    } : {}),
-
     rememberAvailability: tool({
       description:
         'Quietly record a GENERAL RULE about the user\'s week, so scheduling respects it. Use for open-ended statements like "I work 9-5 on weekdays" (busy), "evenings are my free time" (free), "I go to the gym at 7am" (prefer, activity "gym"). NOT for a specific named commitment — a shift, a class, a lecture, a standing meeting — which is a recurring Event created with batchPropose so it lands on the calendar where it can be seen and changed. The test: if it would have a name on a calendar, it is an Event, not a rule. Same-day ranges only. Give the same `note` when restating a fact you have recorded before ("CLE shift") — a matching note replaces the old rule instead of adding a second one, which is how a corrected day stops the old day being blocked. Do NOT tell the user you saved it.',
@@ -423,27 +400,6 @@ export function buildTools(
         }
         await removeNode(user.id, id)
         return { removed: true }
-      },
-    }),
-
-    proposeNodeType: tool({
-      description:
-        'Propose promoting a recurring Concept pattern into a named node type. Use this when you observe 5 or more Concept nodes with a similar structure that would benefit from a dedicated type. The user approves → the new type is registered and usable going forward.',
-      inputSchema: z.object({
-        name: z.string().describe('PascalCase type name e.g. EnergyLog, MoodEntry, BookNote'),
-        typeSchema: z.record(z.string(), z.unknown()).describe('Expected properties and their value types as strings'),
-        examples: z.array(z.number()).describe('IDs of existing Concept nodes that exemplify this pattern'),
-        reason: z.string().describe('Why this pattern deserves its own type'),
-      }),
-      execute: async ({ name, typeSchema, examples, reason }) => {
-        const schemaVersion = await getSchemaVersion(user.id)
-        const proposal = await createProposal(
-          user.id,
-          `Promote pattern to new type: ${name}`,
-          [{ kind: 'proposeNodeType', name, typeSchema, examples, reason }],
-          schemaVersion,
-        )
-        return { proposed: true, proposalId: proposal.id, summary: proposal.summary }
       },
     }),
   }

@@ -1,5 +1,4 @@
 import { getNodes, createNode, updateNode } from '@/lib/graph/queries'
-import { DEFAULT_DAY } from '@/lib/schedule'
 import type { Madhab } from '@/lib/prayer-times'
 
 /**
@@ -19,27 +18,6 @@ export interface SweepSummary {
   proposed: number
   tidied: number
   remaining: number
-}
-
-/** A named stretch of the day, e.g. "Deep work" 09:00–13:00. */
-export interface DayPart {
-  /** Stable across renames: what a Task or Habit stores to say where it goes. */
-  id: string
-  name: string
-  start: string
-  end: string
-  /**
-   * The days it applies to, 0=Sun … 6=Sat. Empty or absent means every day,
-   * the same convention availability rules use (src/lib/availability.ts) and
-   * what every part written before this field existed still means.
-   *
-   * It is here because most people have two days: "deep work 09:00–13:00"
-   * is a description of a Tuesday and a lie about a Sunday, and a planner
-   * that believed the lie would refuse to place Sunday's work at all — a
-   * part is a hard window, and nothing that names one is ever planned
-   * outside it. Two parts may share a name and split the week between them.
-   */
-  days?: number[]
 }
 
 export interface Settings {
@@ -67,18 +45,6 @@ export interface Settings {
    * - auto:    it places them directly, no approval
    */
   scheduleMode: 'off' | 'suggest' | 'auto'
-  /** The window auto-scheduling is allowed to place things in, 24h HH:MM. */
-  workingHours: { start: string; end: string }
-  /**
-   * The day, cut into the parts it is actually made of.
-   *
-   * `workingHours` is one stretch — 07:00 to 23:00 for most people — and
-   * treating sixteen hours as interchangeable is why planning felt wrong:
-   * deep work was offered a slot at nine in the evening and a workout one at
-   * breakfast. A part is a named window, and anything that names it is only
-   * ever planned inside it. Empty means the whole day, as before.
-   */
-  dayParts: DayPart[]
   /**
    * Whether the setup interview has been done.
    *
@@ -153,6 +119,13 @@ export interface Settings {
    */
   timeZone: string | null
   /**
+   * A zone the user pinned by hand, overriding the browser's. Browsers ship
+   * their own zone data and it can lag reality — Morocco going back to UTC+0
+   * left the browser an hour ahead of the wall — so this wins everywhere:
+   * on screen (src/lib/wallclock.ts) and on the server (zoneFor).
+   */
+  timeZoneOverride: string | null
+  /**
    * Simple mode: Today, Calendar and Goals in the sidebar, the rest behind
    * "More"; Today down to capture and the day itself; the specialist
    * settings folded away. On by default — the full app had grown past what
@@ -169,8 +142,6 @@ export const DEFAULT_SETTINGS: Settings = {
   mode: 'system',
   weather: { enabled: false, lat: null, lon: null, place: null },
   scheduleMode: 'suggest',
-  workingHours: DEFAULT_DAY,
-  dayParts: [],
   onboarding: { completed: false, completedAt: null },
   typeColors: {},
   canvas: { enabled: false, baseUrl: null, lastSync: null, lastError: null },
@@ -180,6 +151,7 @@ export const DEFAULT_SETTINGS: Settings = {
   resurfaceDays: 21,
   prayer: { enabled: false, method: 'morocco', madhab: 'standard', habitNodeId: null },
   timeZone: null,
+  timeZoneOverride: null,
   simple: true,
 }
 

@@ -52,8 +52,17 @@ export function clockIn(zone?: string | null, at: Date = new Date()): UserClock 
   }
 }
 
-/** The zone a request speaks for: the browser's if it sent one, else the saved one. */
-export function zoneFor(requested: string | null | undefined, saved: string | null | undefined): string | null {
+/**
+ * The zone a request speaks for: the one pinned in Settings, then the one the
+ * browser sent, then the one saved with the location. Pinned comes first
+ * because a browser's own zone data can be out of date — see wallclock.ts.
+ */
+export function zoneFor(
+  requested: string | null | undefined,
+  saved: string | null | undefined,
+  pinned?: string | null,
+): string | null {
+  if (isTimeZone(pinned)) return pinned
   if (isTimeZone(requested)) return requested
   if (isTimeZone(saved)) return saved
   return null
