@@ -110,9 +110,15 @@ export const FAQ = [
   { q: 'Does it talk back?', a: 'No. You can speak to it, but it always answers in writing, right where you are.' },
   { q: 'Where does my stuff go?', a: 'Your lists live in Acture’s own database. What you say or attach is sent to an AI model to be read, and that is all it is used for.' },
   { q: 'Will it buzz my phone?', a: 'Not yet. Reminders fire while Acture is open; there are no push notifications.' },
-  { q: 'Is there an app?', a: 'Yes, and it is the same Acture. Install it from your browser on a Mac, an iPhone or an Android phone: its own icon and window, straight to your lists. No store, and it updates itself.' },
+  { q: 'Is there an app?', a: 'Yes, and it is the same Acture. On a Mac, download it below. On an iPhone or Android phone, add it from your browser: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
   { q: 'Who can use it?', a: 'Right now it is a private instance: you sign in with a Google account that has been let in. It is free while it is being built.' },
 ]
+
+/** The Mac app, from the latest GitHub release — the links never change between versions. */
+export const MAC_DOWNLOAD = {
+  silicon: 'https://github.com/ToubbaliIlyass/LifeP/releases/latest/download/Acture-arm64.dmg',
+  intel: 'https://github.com/ToubbaliIlyass/LifeP/releases/latest/download/Acture-x64.dmg',
+}
 
 export const CHAPTERS = [
   null,
@@ -123,7 +129,7 @@ export const CHAPTERS = [
   { k: '05 · Evening', l: 'The check-in', h: 'Once a day, it asks how it went.', p: 'Two minutes of talking teaches it more than a week of clicks.' },
   { k: '06 · The list', l: 'The list', h: 'Still a really good list.', p: 'Projects with headings, habits with streaks, deadlines apart from the day. Keyboard-first, or just start typing.' },
   { k: '07 · Yours', l: 'Make it yours', h: 'Nine palettes. Light or dark.', p: 'And the five prayers on Today, if you want them, worked out on your device from where you are.' },
-  { k: '08 · Everywhere', l: 'Every device', h: 'On your Mac, iPhone and Android.', p: 'No store, no download. Add it from your browser and it gets its own icon and window.', devices: true },
+  { k: '08 · Everywhere', l: 'Every device', h: 'On your Mac, iPhone and Android.', p: 'Download the Mac app, or add Acture from your browser on any device. Its own icon, its own window.', devices: true },
 ] as const
 
 // ── Motion ────────────────────────────────────────────────────────────
@@ -152,13 +158,19 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
   const narrow = W < 900
 
   // ── Where the device sits in each phase: a desktop window, a phone, the app icon.
-  const dw = narrow ? Math.min(420, W - 32) : Math.min(900, W * 0.56), dh = narrow ? VH * 0.52 : Math.min(580, VH * 0.72)
+  // On a phone the device sits under the bar (never behind it) and the
+  // chapter's words directly under the device, so the two never meet.
+  const NARROW_TOP = 84
+  const dw = narrow ? Math.min(420, W - 32) : Math.min(900, W * 0.56)
+  const dh = narrow ? Math.max(240, Math.min(420, VH * 0.46)) : Math.min(580, VH * 0.72)
   const Lx = W * 0.36, Rx = W * 0.64, mid = VH * 0.5
   type Base = Omit<Pose, 'rx' | 'ry' | 'rz' | 'sc'>
   const desk = (cx: number, cy: number, extra?: Partial<Base>): Base => ({ cx, cy, w: dw, h: dh, r: 14, bez: 0, side: narrow ? 0 : dw > 760 ? 200 : 0, chrome: 1, icon: 0, ...extra })
-  const phone = (cx: number, cy: number): Base => ({ cx, cy, w: Math.min(300, W - 60), h: Math.min(620, VH * (narrow ? 0.56 : 0.84)), r: 46, bez: 10, side: 0, chrome: 0, icon: 0 })
+  const phone = (cx: number, cy: number): Base => narrow
+    ? { cx, cy: NARROW_TOP + dh / 2, w: Math.min(250, W - 80), h: dh, r: 40, bez: 9, side: 0, chrome: 0, icon: 0 }
+    : { cx, cy, w: Math.min(300, W - 60), h: Math.min(620, VH * 0.84), r: 46, bez: 10, side: 0, chrome: 0, icon: 0 }
   const icon = (cy: number): Base => ({ cx: W / 2, cy, w: 112, h: 112, r: 30, bez: 0, side: 0, chrome: 0, icon: 1 })
-  const NY = VH * 0.33
+  const NY = NARROW_TOP + dh / 2
   const heroTopPx = narrow ? 108 : VH < 760 ? 96 : 128
   const heroBottom = heroTopPx + (narrow ? 310 : 290)
   const y0 = Math.max(VH * 0.6, heroBottom + 24)
@@ -281,7 +293,8 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
   const dotsP = c > 4 ? 1 : c === 4 ? seg(0.12, 0.58) : 0
   const curveP = c > 4 ? 1 : c === 4 ? seg(0.58, 0.74) : 0
   const lw = narrow ? Math.min(W - 32, 420) : Math.min(420, Pz.w * 0.62)
-  const learn = { x: Pz.cx - lw / 2 + (narrow ? 0 : Pz.w * 0.12), y: Pz.cy - (narrow ? 20 : 30), w: lw, op: lop, ty: (1 - seg(0.06, 0.16)) * 30, dotsP, curveP }
+  // On a phone, inside the window's lower part, clear of the words under it.
+  const learn = { x: Pz.cx - lw / 2 + (narrow ? 0 : Pz.w * 0.12), y: narrow ? Pz.cy - Pz.h / 2 + 56 : Pz.cy - 30, w: lw, op: lop, ty: (1 - seg(0.06, 0.16)) * 30, dotsP, curveP }
 
   // ── The whiteboard photo (chapter 2), flying into the island.
   const ph = c === 2 ? ease(seg(0.12, 0.42)) : 0
@@ -297,11 +310,13 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
       ...ch!, op,
       left: narrow ? 20 : leftSide ? Math.max(24, W * 0.07) : W * 0.93 - tw,
       width: narrow ? W - 40 : tw,
-      top: narrow ? VH * 0.63 : pose.cy,
+      top: narrow ? NARROW_TOP + dh + 20 : pose.cy,
       tf: `translateY(${narrow ? 0 : -50}%) translateY(${(1 - inn) * 26 - out * 26}px)`,
       align: (narrow ? 'center' : 'left') as CSSProperties['textAlign'],
       fs: narrow ? 'clamp(28px,7vw,36px)' : 'clamp(34px,3.6vw,52px)',
       fg: dk ? '#f4f3f0' : '#1b1c1f', pc: dk ? '#bdbab4' : '#4a4a48', kc: dk ? '#818cf8' : '#b45309',
+      // The per-device steps need room a short phone does not have.
+      showDevices: 'devices' in ch! && !!ch!.devices && (!narrow || VH >= 720),
     }
   })
 
@@ -313,7 +328,9 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
     c, lp, narrow, dark, th, dv, Pz, rows, rowIn, eRows, todayCount, isl, proj, projDone, keycaps, learn, photo, texts, palIdx,
     hero: { op: heroOp, ty: -seg(0, 0.6) * 60, top: heroTopPx },
     end: { op: endOp, top: Pz.cy + 90 },
-    chap: { on: c >= 1 && c <= 8, n: String(chapN).padStart(2, '0'), l: CHAPTERS[chapN]!.l, pct: lp * 100 },
+    // On a phone the chapter's own label says where you are; the counter
+    // would only sit on top of its words.
+    chap: { on: !narrow && c >= 1 && c <= 8, n: String(chapN).padStart(2, '0'), l: CHAPTERS[chapN]!.l, pct: lp * 100 },
     sideToday: c === 6 ? 'transparent' : dark ? 'rgba(255,255,255,.09)' : 'rgba(0,0,0,.08)',
     sideProj: c === 6 ? 'rgba(0,0,0,.08)' : 'transparent',
     showProject: c === 6, quickFind: c === 6 && pk === 5,
