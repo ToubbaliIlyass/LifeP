@@ -16,6 +16,9 @@ export const viewport: Viewport = {
   // Lets env(safe-area-inset-*) resolve, so the floating controls can keep
   // clear of the home indicator instead of sitting under it.
   viewportFit: 'cover',
+  // Android: the keyboard shrinks the page rather than covering it, so what
+  // sits at the foot of the screen (the assistant's island) rises above it.
+  interactiveWidget: 'resizes-content',
   // The window's own colour when installed: the page's ground, light or dark.
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#fefffe' },

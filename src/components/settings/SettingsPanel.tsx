@@ -1,5 +1,6 @@
 'use client'
 
+import { NotificationsControl } from './NotificationsControl'
 import { useCallback, useEffect, useState } from 'react'
 import { Check, ChevronLeft, Download, LogOut, MapPin, Moon, SlidersHorizontal, Sun, Upload } from 'lucide-react'
 import { THEMES, applyTheme, applyMode, storedMode, storedTheme } from '@/lib/themes'
@@ -263,6 +264,10 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
               )
             })}
           </div>
+        </Section>
+
+        <Section title="Notifications" hint="Reminders you set on to-dos and events — at a time, before something starts, or snoozed — as notifications with Done and Snooze.">
+          <NotificationsControl />
         </Section>
 
         <Section title="Prayer times" hint="Puts the five on Today at their times, worked out on your device from your location. Ticking all five completes the day’s prayer.">

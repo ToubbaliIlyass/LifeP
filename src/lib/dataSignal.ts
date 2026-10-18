@@ -18,16 +18,32 @@ import { useEffect } from 'react'
  */
 const TOPIC = 'acture:data-changed'
 
+/*
+ * Other tabs and windows on this device hear about it at once, over a
+ * BroadcastChannel; other devices find out through src/lib/useLiveSync.ts.
+ */
+let channel: BroadcastChannel | null | undefined
+function tabs(): BroadcastChannel | null {
+  if (channel === undefined) channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(TOPIC)
+  return channel
+}
+
 /** Call after any write that could change what needs attention today. */
 export function notifyDataChanged() {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new Event(TOPIC))
+  tabs()?.postMessage('changed')
 }
 
-/** Run `callback` whenever anything writes. */
+/** Run `callback` whenever anything writes — here, or in another tab. */
 export function useDataChanged(callback: () => void) {
   useEffect(() => {
+    const ch = tabs()
     window.addEventListener(TOPIC, callback)
-    return () => window.removeEventListener(TOPIC, callback)
+    ch?.addEventListener('message', callback)
+    return () => {
+      window.removeEventListener(TOPIC, callback)
+      ch?.removeEventListener('message', callback)
+    }
   }, [callback])
 }

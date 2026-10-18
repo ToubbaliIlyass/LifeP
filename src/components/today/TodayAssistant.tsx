@@ -466,8 +466,10 @@ export function TodayAssistant({ onNavigate, dock = false }: {
           {mode === 'compose' ? (
             <div className="w-[var(--island-w,560px)] px-1.5">{bar}</div>
           ) : (
-            <div className="w-[var(--island-w,620px)]">
-              <div className="flex items-center gap-1 pl-4 pr-2 pt-2">
+            // A column that never outgrows the screen: the conversation in the
+            // middle scrolls, the bar on top and the box below stay put.
+            <div className="w-[var(--island-w,620px)] max-h-[var(--island-max,80vh)] flex flex-col">
+              <div className="shrink-0 flex items-center gap-1 pl-4 pr-2 pt-2">
                 <span className="flex-1 text-[12px] font-medium text-muted-foreground/80">Assistant</span>
                 {busy ? (
                   <button onClick={stop} className="text-[12px] px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60">
@@ -498,7 +500,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
                 failure={failure}
                 onNavigate={onNavigate}
               />
-              <div className="px-1.5">{bar}</div>
+              <div className="shrink-0 px-1.5">{bar}</div>
             </div>
           )}
         </Island>
@@ -585,6 +587,29 @@ function Island({ mode, canClose, onClose, shellRef: shell, children }: {
   const drawn = useRef(false)
   /** The list's width, which the island takes when open. */
   const [lane, setLane] = useState<number | null>(null)
+  /**
+   * How tall it may be: the part of the screen that can actually be seen,
+   * less a margin. On a phone the keyboard takes half of it, and an island
+   * sized for the whole screen had its top — Clear and Close — pushed out of
+   * sight with no way to reach them. So the conversation inside gives way
+   * (it scrolls) and the bar and the box stay on screen.
+   */
+  const [room, setRoom] = useState<number | null>(null)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    const measure = () => {
+      const visible = vv?.height ?? window.innerHeight
+      // How far the island's foot sits above the bottom of the page.
+      const foot = shell.current?.parentElement?.getBoundingClientRect().bottom ?? window.innerHeight
+      const gap = Math.max(0, window.innerHeight - foot)
+      setRoom(Math.max(160, Math.round(visible - gap - 20)))
+    }
+    measure()
+    vv?.addEventListener('resize', measure)
+    window.addEventListener('resize', measure)
+    return () => { vv?.removeEventListener('resize', measure); window.removeEventListener('resize', measure) }
+  }, [shell])
 
   useLayoutEffect(() => {
     const parent = shell.current?.parentElement
@@ -656,6 +681,7 @@ function Island({ mode, canClose, onClose, shellRef: shell, children }: {
         // Open, the inside is drawn at the list's width (less the border);
         // wider lists — stretched — stop at the width of an unstretched one.
         ['--island-w' as string]: lane ? `${Math.min(lane, OPEN_MAX) - 2}px` : undefined,
+        ['--island-max' as string]: room ? `${room}px` : undefined,
         width: size?.w ?? 'max-content',
         height: size?.h ?? 'auto',
         // Concentric with what is inside: 24 inside the 1px border, which
@@ -695,7 +721,7 @@ function Thread({ messages, thinking, busy, failure, onNavigate }: {
   }, [tail])
 
   return (
-    <div ref={scroller} className="max-h-[min(52vh,460px)] overflow-y-auto overscroll-contain px-4 pt-2 pb-4 space-y-4 [scrollbar-width:thin]">
+    <div ref={scroller} className="min-h-0 flex-1 max-h-[min(52vh,460px)] overflow-y-auto overscroll-contain px-4 pt-2 pb-4 space-y-4 [scrollbar-width:thin]">
       {messages.map((m, i) => (
         <Message key={m.id} message={m} onNavigate={onNavigate} chat live={busy && i === messages.length - 1} />
       ))}

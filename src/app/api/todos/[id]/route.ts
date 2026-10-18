@@ -1,3 +1,5 @@
+import { applyReminderChanges } from '@/lib/reminders'
+import { nowFor } from '@/lib/reminders-server'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createEdge, deleteEdge, getEdges, getNodeById, getNodes, updateNode } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
@@ -81,6 +83,9 @@ export async function PATCH(
   if (typeof body.order === 'number') props.order = body.order
   if (Array.isArray(body.tags)) put(props, 'tags', body.tags.length ? body.tags : null)
 
+  // A to-do or a habit: when it reminds you. See src/lib/reminders.ts.
+  if (node.type === 'Task' || node.type === 'Habit') applyReminderChanges(props, body, await nowFor(user.id, body))
+
   if (isList) {
     // A project's headings, whole: the screen sends the list as it now stands.
     if (node.type === 'Project' && Array.isArray(body.headings)) {
@@ -114,7 +119,6 @@ export async function PATCH(
     }
     if (typeof body.evening === 'boolean') put(props, 'evening', body.evening)
     if ('priority' in body) props.priority = body.priority === 'high' || body.priority === 'low' ? body.priority : 'medium'
-    if ('reminder' in body) put(props, 'reminder', typeof body.reminder === 'string' && /^\d{2}:\d{2}$/.test(body.reminder) ? body.reminder : null)
     const deadline = day(body.deadline)
     if (deadline !== undefined) put(props, 'deadline', deadline)
     if (Array.isArray(body.checklist)) put(props, 'checklist', body.checklist.length ? body.checklist : null)

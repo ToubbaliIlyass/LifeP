@@ -4,11 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { DayEvent, Todo, TodoList, TodosPayload } from '@/lib/todos'
 import { useUndo } from '@/components/undo/UndoProvider'
 import { useDataChanged } from '@/lib/dataSignal'
+import { useLiveSync } from '@/lib/useLiveSync'
 import { todayStr } from '@/lib/date'
-import { clockZone, wallNow } from '@/lib/wallclock'
+import { clockZone } from '@/lib/wallclock'
 import { safeGet, safeSet } from '@/lib/storage'
 import { parseEntry } from '@/lib/quick-entry'
 import { Bell, X } from 'lucide-react'
+import { dueReminders, remindersIn, SNOOZES, snoozeUntil, type Reminder } from '@/lib/reminders'
+import { momentNow, pushIsOn, systemNotification } from '@/lib/push'
 
 /** The to-do being typed, before it has a row of its own. */
 export const DRAFT_ID = -999
@@ -100,32 +103,33 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   const takeOpenRequest = useCallback(() => { const id = openRef.current; openRef.current = null; return id }, [])
 
   /*
-   * Reminders, while Acture is open: a to-do with a time on its day says so
-   * when that minute comes — as a system notification if the browser allows
-   * one, and always as a card in the corner. Remembered per day on this
-   * device, so a reload does not remind twice.
+   * Reminders, while Acture is open: whatever src/lib/reminders.ts says is
+   * due slides in as a card in the corner — Done, Snooze, or put away — and,
+   * where push is not set up on this device, as a system notification too
+   * (with push on, the server sends that one; see src/lib/push.ts). Each is
+   * remembered on this device once shown, so a reload does not repeat it.
+   * One missed while the app was closed still shows when it next opens, for
+   * the rest of that day.
    */
-  const [ringing, setRinging] = useState<Todo[]>([])
+  const [ringing, setRinging] = useState<Reminder[]>([])
   const todosRef = useRef<Todo[]>([])
   useEffect(() => { todosRef.current = data?.todos ?? [] }, [data])
+  const eventsRef = useRef<DayEvent[]>([])
+  useEffect(() => { eventsRef.current = data?.events ?? [] }, [data])
   const draftRef = useRef<Todo | null>(null)
   useEffect(() => { draftRef.current = draft }, [draft])
   useEffect(() => {
     const check = () => {
-      const now = wallNow()
-      const day = todayStr()
-      const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      for (const t of todosRef.current) {
-        if (t.done || !t.reminder || t.when !== day || t.reminder > hhmm) continue
-        const key = `acture-reminded:${t.id}:${day}:${t.reminder}`
-        if (safeGet('local', key)) continue
-        safeSet('local', key, '1')
-        setRinging((r) => [...r.filter((x) => x.id !== t.id), t])
-        try {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification(t.title || 'To-do', { body: `Reminder · ${t.reminder}`, tag: key })
-          }
-        } catch { /* some browsers only notify from a service worker; the card still shows */ }
+      const now = momentNow()
+      const all = remindersIn({ todos: todosRef.current, events: eventsRef.current })
+      const shown = (r: Reminder) => !!safeGet('local', `acture-reminded:${r.key}`)
+      // Anything from earlier today counts: a missed reminder still says so.
+      const due = dueReminders(all, now, new Set(all.filter(shown).map((r) => r.key)), 24 * 60)
+        .filter((r) => r.at.slice(0, 10) === now.slice(0, 10))
+      for (const r of due) {
+        safeSet('local', `acture-reminded:${r.key}`, '1')
+        setRinging((list) => [...list.filter((x) => !(x.kind === r.kind && x.id === r.id)), r])
+        if (!pushIsOn()) systemNotification(r)
       }
     }
     check()
@@ -154,6 +158,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { load() }, [load])
   // The assistant, a plan, an approval elsewhere: whatever changed, redraw.
   useDataChanged(load)
+  // And whatever changed on another device, a moment later.
+  useLiveSync(load)
 
   // Today rolls over at midnight without anyone touching the page.
   useEffect(() => {
@@ -339,6 +345,13 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     destroy(list.id, `Deleted “${list.title || (list.kind === 'area' ? 'Untitled area' : 'Untitled project')}”. Its to-dos were kept.`)
   }, [destroy])
 
+  /** Puts a reminder off: it comes back at the moment chosen, from now. */
+  const snooze = useCallback((r: Reminder, minutes: number | null) => {
+    const until = snoozeUntil(momentNow(), minutes)
+    if (r.kind === 'todo') { patch(r.id, { snoozedUntil: until }); return }
+    void fetch(`/api/events/${r.id}`, json('PATCH', { snoozedUntil: until })).then(() => loadRef.current())
+  }, [patch])
+
   const value = useMemo<TodosContextValue>(() => ({
     ready: data !== null,
     date: data?.date ?? todayStr(),
@@ -354,25 +367,35 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     <TodosContext.Provider value={value}>
       {children}
       {ringing.length > 0 && (
-        <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(320px,calc(100vw-2rem))]" role="status" aria-live="polite">
-          {ringing.map((t) => (
-            <div key={t.id} className="flex items-start gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
-              <Bell className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-medium truncate">{t.title || 'New to-do'}</p>
-                <p className="text-[12.5px] text-muted-foreground tabular-nums">Reminder · {t.reminder}</p>
+        <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))]" role="status" aria-live="polite">
+          {ringing.map((r) => {
+            const todo = r.kind === 'todo' ? data?.todos.find((t) => t.id === r.id) : undefined
+            const away = () => setRinging((list) => list.filter((x) => x.key !== r.key))
+            return (
+              <div key={r.key} className="rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
+                <div className="flex items-start gap-3">
+                  <Bell className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-medium truncate">{r.title}</p>
+                    <p className="text-[12.5px] text-muted-foreground tabular-nums">{r.body}</p>
+                  </div>
+                  <button onClick={away} aria-label="Put away" className="shrink-0 grid place-items-center w-6 h-6 -mr-1 rounded-md text-muted-foreground hover:text-foreground">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pl-7">
+                  {todo && !todo.done && (
+                    <button onClick={() => { toggle(todo); away() }} className="rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-[12.5px] font-semibold hover:opacity-90">Done</button>
+                  )}
+                  {SNOOZES.map((s) => (
+                    <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[12.5px] font-medium hover:bg-foreground/[0.05]">
+                      {s.minutes === null ? s.label : `Snooze ${s.label}`}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button
-                onClick={() => { toggle(t); setRinging((r) => r.filter((x) => x.id !== t.id)) }}
-                className="shrink-0 rounded-md border border-border/80 px-2 py-0.5 text-[12.5px] font-medium hover:bg-foreground/[0.05]"
-              >
-                Done
-              </button>
-              <button onClick={() => setRinging((r) => r.filter((x) => x.id !== t.id))} aria-label="Dismiss" className="shrink-0 grid place-items-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </TodosContext.Provider>

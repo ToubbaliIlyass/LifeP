@@ -1,5 +1,5 @@
 import type { Viewport } from 'next'
-import { inter } from '../fonts'
+import { interSite } from '../fonts'
 import { RegisterServiceWorker } from '@/components/install/RegisterServiceWorker'
 import '../globals.css'
 
@@ -38,7 +38,7 @@ export default function SiteLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${interSite.variable} antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: modeScript }} />
       </head>

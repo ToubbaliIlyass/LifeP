@@ -67,3 +67,10 @@ export function zoneFor(
   if (isTimeZone(saved)) return saved
   return null
 }
+
+/** Now on the user's wall clock, as reminders write it: YYYY-MM-DDTHH:MM. See src/lib/reminders.ts. */
+export function momentIn(zone: string | null): string {
+  const c = clockIn(zone)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${c.date}T${p(Math.floor(c.minutes / 60))}:${p(c.minutes % 60)}`
+}
