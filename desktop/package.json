@@ -33,7 +33,7 @@
     },
     "dmg": {
       "title": "Acture",
-      "artifactName": "Acture-${version}-${arch}.dmg"
+      "artifactName": "Acture-${arch}.dmg"
     }
   }
 }
