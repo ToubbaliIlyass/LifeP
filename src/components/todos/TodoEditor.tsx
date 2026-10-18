@@ -1,13 +1,22 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { ArrowRight, Archive, CalendarDays, Clock, Flag, MapPin, Moon, Plus, Repeat, Star, Trash2, X } from 'lucide-react'
+import { ArrowRight, Archive, Bell, CalendarDays, Clock, Flag, MapPin, Moon, Plus, Repeat, Star, Trash2, X } from 'lucide-react'
 import type { ChecklistItem, Todo, TodoList } from '@/lib/todos'
 import { relDate, repeatLabel } from '@/lib/todo-views'
 import { parseEntry, saysMore } from '@/lib/quick-entry'
+import { lead } from '@/lib/reminders'
 import { EVENING_TONE, SOMEDAY_TONE, TodoCheck } from './parts'
 
-export type PopKind = 'when' | 'time' | 'deadline' | 'move' | 'repeat'
+export type PopKind = 'when' | 'time' | 'deadline' | 'move' | 'repeat' | 'remind'
+
+/** What a to-do's reminder says on its button and in its row: "17:00", "10 min before", "Fri 09:00". */
+export function reminderLabel(t: Pick<Todo, 'reminder' | 'remindBefore' | 'remindAt' | 'time'>, today: string): string | null {
+  if (t.remindBefore) return `${lead(t.remindBefore).replace(/minutes?/, 'min')} before`
+  if (t.remindAt) return `${relDate(t.remindAt.slice(0, 10), today)} ${t.remindAt.slice(11)}`
+  if (t.reminder) return t.reminder
+  return null
+}
 
 const newId = () => Math.random().toString(36).slice(2, 9)
 
@@ -294,6 +303,13 @@ export function TodoEditor({
               )}
             </>
           ) : null}
+          {(isTask || todo.type === 'Habit') && !isDraft && (
+            // When it reminds you: at its time, before it, or any moment.
+            <button type="button" className={pill(!!reminderLabel(todo, today), 'text-amber-600 dark:text-amber-400')} onClick={(e) => onPop('remind', e.currentTarget)}>
+              <Bell className="w-[15px] h-[15px]" />
+              <span className="truncate tabular-nums">{reminderLabel(todo, today) ?? 'Remind'}</span>
+            </button>
+          )}
           {isTask && (
             // Priority: marked, or not. "!!" in a new to-do's line sets it too.
             <button type="button" className={pill(todo.priority === 'high', 'text-red-500')} aria-pressed={todo.priority === 'high'} onClick={() => onPatch({ priority: todo.priority === 'high' ? null : 'high' })}>

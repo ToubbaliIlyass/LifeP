@@ -16,7 +16,10 @@ import { addDays } from '@/lib/date'
 import { clockZone } from '@/lib/wallclock'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { DRAFT_ID, useTodos } from './TodosProvider'
-import { AutoTextarea, TodoEditor, type PopKind } from './TodoEditor'
+import { AutoTextarea, TodoEditor, reminderLabel, type PopKind } from './TodoEditor'
+import { askForNotifications } from '@/lib/notify'
+import { lead as leadTime } from '@/lib/reminders'
+import { wallNow } from '@/lib/wallclock'
 import { EventEditor } from './EventEditor'
 import { EVENING_TONE, ProgressRing, SOMEDAY_TONE, TodoCheck, VIEW_META } from './parts'
 
@@ -345,8 +348,9 @@ export function TodoView({
       )
     }
     // A reminder at the to-do's own time is one chip, not two.
-    if (t.reminder && !t.done && t.reminder !== t.time) m.push(<span key="bell" className={`${DATE_CHIP} inline-flex items-center gap-0.5`}><Bell className="w-[10px] h-[10px]" />{t.reminder}</span>)
-    if (t.reminder && !t.done && t.reminder === t.time) m.push(<Bell key="bell" aria-label="Reminds you" className="w-[11px] h-[11px] shrink-0 text-muted-foreground" />)
+    const bell = reminderLabel(t, today)
+    if (bell && !t.done && !(t.reminder === t.time && !t.remindBefore && !t.remindAt)) m.push(<span key="bell" className={`${DATE_CHIP} inline-flex items-center gap-0.5`}><Bell className="w-[10px] h-[10px]" />{bell}</span>)
+    if (bell && !t.done && t.reminder === t.time && !t.remindBefore && !t.remindAt) m.push(<Bell key="bell" aria-label="Reminds you" className="w-[11px] h-[11px] shrink-0 text-muted-foreground" />)
     if (t.type !== 'Task') return m
     if (t.priority === 'high' && !t.done) m.push(<span key="prio" aria-label="High priority" className="shrink-0 font-bold text-red-500 leading-none">!!</span>)
     if (ctx !== 'today' && !t.done && t.when && t.when <= today) {
@@ -1141,7 +1145,7 @@ export function TodoView({
             const guess = parseWhen(jump, today)
             const apply = () => {
               if (!guess) return
-              if (guess.reminder && typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission()
+              if (guess.reminder) askForNotifications()
               set(guess.someday ? { someday: true } : { when: guess.when ?? today, evening: guess.evening, ...(guess.reminder ? { time: guess.reminder, reminder: guess.reminder } : {}) })
               setJump('')
             }
@@ -1185,7 +1189,7 @@ export function TodoView({
       const remind = t.reminder !== null && t.reminder === t.time
       // Picking a time reminds you then, as in Things; untick to keep it quiet.
       const at = (time: string) => {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission()
+        askForNotifications()
         patch(t.id, { time, reminder: t.time && !remind ? t.reminder : time })
       }
       return (
@@ -1240,6 +1244,65 @@ export function TodoView({
             <>
               <hr className="my-1.5 mx-1 border-border/70" />
               <button className={MENU} onClick={() => set({ deadline: null })}><X className="w-[18px] h-[18px]" />Remove deadline</button>
+            </>
+          )}
+        </Pop>
+      )
+    }
+    if (pop.kind === 'remind') {
+      // One reminder at a time: choosing one clears the others.
+      const choose = (r: Partial<Todo>) => {
+        askForNotifications()
+        set({ reminder: null, remindBefore: null, remindAt: null, snoozedUntil: null, ...r })
+      }
+      const on = (r: Partial<Todo>) => Object.entries(r).every(([k, v]) => t[k as keyof Todo] === v)
+      const item = (label: string, r: Partial<Todo>, Icon: React.ComponentType<{ className?: string }> = Bell) => (
+        <button key={label} className={`${MENU} ${on(r) ? 'text-primary font-semibold' : ''}`} onClick={() => choose(r)}>
+          <Icon className="w-[18px] h-[18px]" />{label}
+        </button>
+      )
+      const day = t.when ?? today
+      const [nowDate, nowTime] = [today, `${String(wallNow().getHours()).padStart(2, '0')}:${String(wallNow().getMinutes()).padStart(2, '0')}`]
+      return (
+        <Pop rect={pop.rect} onClose={close}>
+          <PopHead>Remind me{t.time ? ` · it’s at ${t.time}` : ''}</PopHead>
+          {t.time ? (
+            <>
+              {item(`At ${t.time}`, { reminder: t.time })}
+              {[10, 30, 60, 1440].map((m) => item(`${leadTime(m)} before`, { remindBefore: m }, Clock))}
+            </>
+          ) : (
+            <p className="px-2.5 pb-1.5 text-[12.5px] text-muted-foreground">Give it a time to be reminded before it.</p>
+          )}
+          <label className={`${MENU} cursor-pointer`}>
+            <Clock className="w-[18px] h-[18px]" />
+            <span className="flex-1">{t.type === 'Habit' ? 'Each day at' : t.when ? `${relDate(day, today)} at` : 'Today at'}</span>
+            <input
+              type="time"
+              defaultValue={t.reminder ?? ''}
+              aria-label="Remind at a time"
+              onChange={(e) => { if (e.target.value) choose({ reminder: e.target.value, ...(t.type === 'Task' && !t.when ? { when: today } : {}) }) }}
+              className="text-[13px] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
+            />
+          </label>
+          {t.type === 'Task' && (
+            <label className={`${MENU} cursor-pointer`}>
+              <CalendarDays className="w-[18px] h-[18px]" />
+              <span className="flex-1">On</span>
+              <input
+                type="datetime-local"
+                defaultValue={t.remindAt ?? ''}
+                min={`${nowDate}T${nowTime}`}
+                aria-label="Remind on a day and time"
+                onChange={(e) => { if (e.target.value) choose({ remindAt: e.target.value.slice(0, 16) }) }}
+                className="text-[12.5px] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
+              />
+            </label>
+          )}
+          {(t.reminder || t.remindBefore || t.remindAt || t.snoozedUntil) && (
+            <>
+              <hr className="my-1.5 mx-1 border-border/70" />
+              <button className={MENU} onClick={() => choose({})}><X className="w-[18px] h-[18px]" />No reminder</button>
             </>
           )}
         </Pop>

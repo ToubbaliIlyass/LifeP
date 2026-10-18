@@ -65,6 +65,12 @@ export interface Todo {
   repeatDays: number[] | null
   /** HH:MM on its day, to be reminded at. */
   reminder: string | null
+  /** Minutes before its time on its day — "10 minutes before". See src/lib/reminders.ts. */
+  remindBefore?: number | null
+  /** A moment on any day, YYYY-MM-DDTHH:MM in the user's zone. */
+  remindAt?: string | null
+  /** Snoozed: reminds again at this moment, YYYY-MM-DDTHH:MM. */
+  snoozedUntil?: string | null
   /** Marked as mattering more — or less — than the rest. */
   priority: 'high' | 'low' | null
   /** Days in a row, for habits. */
@@ -115,6 +121,12 @@ export interface DayEvent {
   daysOfWeek: number[] | null
   /** The day it was first on — what an edit changes, for a repeating one. */
   firstDate: string | null
+  /** HH:MM on each day it is on, to be reminded at. */
+  reminder?: string | null
+  /** Minutes before it starts. */
+  remindBefore?: number | null
+  /** Snoozed: reminds again at this moment. */
+  snoozedUntil?: string | null
 }
 
 export interface TodosPayload {
@@ -133,6 +145,18 @@ const PRAYER_ORDER = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
 const props = (n: Node) => n.properties as Record<string, unknown>
+
+const HHMM = /^\d{2}:\d{2}$/
+const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
+/** The reminder fields a node may carry, each read only if well formed. See src/lib/reminders.ts. */
+export function reminderFields(p: Record<string, unknown>) {
+  return {
+    reminder: HHMM.test(String(p.reminder ?? '')) ? String(p.reminder) : null,
+    remindBefore: typeof p.remindBefore === 'number' && p.remindBefore > 0 && p.remindBefore <= 7 * 24 * 60 ? Math.round(p.remindBefore) : null,
+    remindAt: MOMENT.test(String(p.remindAt ?? '')) ? String(p.remindAt) : null,
+    snoozedUntil: MOMENT.test(String(p.snoozedUntil ?? '')) ? String(p.snoozedUntil) : null,
+  }
+}
 
 function minutesToTime(total: number): string {
   const wrapped = ((total % 1440) + 1440) % 1440
@@ -282,7 +306,7 @@ export function buildTodos({
         order: typeof p.order === 'number' ? p.order : n.id,
         repeats: typeof recurrence?.frequency === 'string' ? recurrence.frequency : null,
         repeatDays: daysFor(recurrence?.frequency, (recurrence as { daysOfWeek?: unknown } | undefined)?.daysOfWeek),
-        reminder: /^\d{2}:\d{2}$/.test(String(p.reminder ?? '')) ? String(p.reminder) : null,
+        ...reminderFields(p),
         priority: p.priority === 'high' || p.priority === 'low' ? p.priority : null,
         streak: null,
       })
@@ -318,7 +342,7 @@ export function buildTodos({
         order: typeof p.order === 'number' ? p.order : n.id,
         repeats: frequency,
         repeatDays: daysFor(frequency, daysOfWeek),
-        reminder: null,
+        ...reminderFields(p),
         priority: null,
         streak,
       })
@@ -377,6 +401,9 @@ export function buildTodos({
       frequency: str(p.frequency) === 'none' ? 'once' : str(p.frequency) ?? 'once',
       daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
       firstDate: str(p.date),
+      reminder: reminderFields(p).reminder,
+      remindBefore: reminderFields(p).remindBefore,
+      snoozedUntil: reminderFields(p).snoozedUntil,
     }
   }
   for (let i = 0; i <= UPCOMING_DAYS; i++) {

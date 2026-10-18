@@ -20,8 +20,10 @@ import { NextResponse, type NextRequest } from 'next/server'
  * sign-in screen that looks like the whole site is locked.
  */
 const PROTECTED = ['/app', '/api']
+/** Under /api, but guarded by their own secret rather than a session: the reminders job. */
+const OPEN_API = ['/api/reminders/dispatch']
 const isProtected = (pathname: string) =>
-  PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  !OPEN_API.includes(pathname) && PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })

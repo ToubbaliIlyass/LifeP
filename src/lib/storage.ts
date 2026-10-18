@@ -41,3 +41,11 @@ export function safeSet(kind: Kind, key: string, value: string): void {
     // Ignored: a preference we can't persist is not worth an error.
   }
 }
+
+export function safeRemove(kind: Kind, key: string): void {
+  try {
+    store(kind)?.removeItem(key)
+  } catch {
+    // Ignored, as for safeSet.
+  }
+}

@@ -1,3 +1,5 @@
+import { applyReminderChanges } from '@/lib/reminders'
+import { nowFor } from '@/lib/reminders-server'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { deleteNode, getNodeById, updateNode } from '@/lib/graph/queries'
 
@@ -44,6 +46,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     else if (body.frequency === 'weekdays') p.daysOfWeek = [1, 2, 3, 4, 5]
     else delete p.daysOfWeek
   }
+
+  // When it reminds you: at a time on each day it is on, or before it starts.
+  applyReminderChanges(p, body, await nowFor(user.id, body))
 
   await updateNode(user.id, node.id, p)
   return Response.json({ ok: true })

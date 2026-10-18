@@ -1,10 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { MapPin, Trash2 } from 'lucide-react'
+import { Bell, MapPin, Trash2 } from 'lucide-react'
 import type { DayEvent } from '@/lib/todos'
 import { DAY_LABELS, DAY_NAMES, DAY_ORDER } from '@/lib/days'
 import { toMinutes } from '@/lib/schedule'
+import { askForNotifications } from '@/lib/notify'
+
+/** When an event reminds you, as one choice: "start" is at its time, a number is minutes before. */
+const REMIND = [['', 'No reminder'], ['start', 'When it starts'], ['10', '10 minutes before'], ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before']] as const
 
 const FIELD = 'w-full rounded-md bg-foreground/[0.05] px-2 py-1 text-[13.5px] leading-5 outline-none focus:ring-1 focus:ring-primary'
 const LABEL = 'block mb-0.5 text-[11.5px] font-medium text-muted-foreground'
@@ -22,14 +26,19 @@ export function EventEditor({ event, onDone }: { event: DayEvent; onDone: (chang
   const [frequency, setFrequency] = useState(event.frequency)
   const [days, setDays] = useState<number[]>(event.daysOfWeek ?? [new Date(event.date + 'T00:00:00').getDay()])
   const [busy, setBusy] = useState(false)
+  const [remind, setRemind] = useState<string>(event.remindBefore ? String(event.remindBefore) : event.reminder && event.reminder === event.time ? 'start' : '')
   const repeating = event.frequency !== 'once'
+  /** The reminder as the route takes it: one of the two fields, the other cleared. */
+  const reminderBody = () => remind === 'start' ? { reminder: time || null, remindBefore: null }
+    : remind ? { reminder: null, remindBefore: Number(remind) }
+    : { reminder: null, remindBefore: null }
 
   async function send(method: 'PATCH' | 'DELETE') {
     setBusy(true)
     const res = await fetch(`/api/events/${event.id}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      ...(method === 'PATCH' ? { body: JSON.stringify({ name, date, time: time || null, duration, location, frequency, daysOfWeek: days }) } : {}),
+      ...(method === 'PATCH' ? { body: JSON.stringify({ name, date, time: time || null, duration, location, frequency, daysOfWeek: days, ...reminderBody() }) } : {}),
     }).catch(() => null)
     setBusy(false)
     onDone(!!res?.ok)
@@ -87,6 +96,14 @@ export function EventEditor({ event, onDone }: { event: DayEvent; onDone: (chang
             )
           })}
         </div>
+      )}
+      {time && (
+        <label className="flex items-center gap-1.5 rounded-md bg-foreground/[0.05] px-2">
+          <Bell className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+          <select value={remind} onChange={(e) => { setRemind(e.target.value); if (e.target.value) askForNotifications() }} aria-label="Remind me" className="flex-1 min-w-0 bg-transparent py-1 text-[13.5px] outline-none">
+            {REMIND.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </label>
       )}
       <label className="flex items-center gap-1.5 rounded-md bg-foreground/[0.05] px-2">
         <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />

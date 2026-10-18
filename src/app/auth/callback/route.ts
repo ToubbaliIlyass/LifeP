@@ -36,5 +36,9 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  return NextResponse.redirect(`${origin}/app`)
+  // Where it goes next: the app, or — signing in for the Mac app, which
+  // cannot do it in its own window — the page that hands the session to it.
+  // Only that one page is accepted, so this cannot be pointed elsewhere.
+  const next = searchParams.get('next') === '/auth/desktop/finish' ? '/auth/desktop/finish' : '/app'
+  return NextResponse.redirect(`${origin}${next}`)
 }

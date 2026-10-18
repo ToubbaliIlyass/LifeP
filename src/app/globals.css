@@ -689,3 +689,12 @@
 @media (prefers-reduced-motion: reduce) {
   .acture-voice-bar { animation: none; transform: scaleY(0.6); }
 }
+
+/* The landing page's story (src/components/landing/StoryLanding.tsx): the
+   mic's pulse while listening, and Quick Find's caret. */
+@keyframes acture-ping {
+  75%, 100% { transform: scale(1.7); opacity: 0; }
+}
+@keyframes acture-blink {
+  50% { opacity: 0; }
+}
