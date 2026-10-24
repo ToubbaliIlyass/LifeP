@@ -1,5 +1,6 @@
 import { getNodes, createNode, updateNode } from '@/lib/graph/queries'
 import type { Madhab } from '@/lib/prayer-times'
+import type { WorldKind } from '@/lib/identity'
 
 /**
  * User settings, stored as a single Settings node rather than a new table.
@@ -132,6 +133,13 @@ export interface Settings {
    * one person could use day to day. Off shows everything, as before.
    */
   simple: boolean
+  /**
+   * Becoming: who the to-dos are making you, drawn as a world that grows with
+   * every one finished — a night sky, a path or a small city (see
+   * src/lib/identity.ts). Off by default: it is there for the people it
+   * helps, and a to-do list should never feel like a game nobody asked for.
+   */
+  world: { enabled: boolean; kind: WorldKind }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -153,6 +161,7 @@ export const DEFAULT_SETTINGS: Settings = {
   timeZone: null,
   timeZoneOverride: null,
   simple: true,
+  world: { enabled: false, kind: 'sky' },
 }
 
 async function settingsNode(userId: number) {

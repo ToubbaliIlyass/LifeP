@@ -7,6 +7,7 @@ import {
   FAQ, Icon, Mark, PAL, Ring, STORY_VH, Wave, clamp, eo, frame, lerp,
   type Frame, type Row, type Theme,
 } from './story-engine'
+import { WhyStory } from './WhyStory'
 
 /*
  * The landing page: one scroll, and a day happens.
@@ -17,6 +18,10 @@ import {
  * chapters, each one something Acture really does. What moves and when is
  * decided in story-engine.tsx; this file draws it, and wires the doors to the
  * real app: Open Acture, and Start today — Google sign-in, through Supabase.
+ *
+ * The day ends by flying into the app's icon until its dark tile is the
+ * whole screen, and the second story takes over on that same dark: why it
+ * works, and the world it can grow (WhyStory.tsx).
  */
 
 const INTRO_END = 5.8
@@ -129,6 +134,8 @@ export function StoryLanding() {
   const [faqOpen, setFaqOpen] = useState(0)
   const [faqSeen, setFaqSeen] = useState(false)
   const [signingIn, setSigningIn] = useState(false)
+  /** The second story has the screen: the bar goes dark with it. */
+  const [whyActive, setWhyActive] = useState(false)
   const storyRef = useRef<HTMLElement>(null)
   const navMarkRef = useRef<HTMLSpanElement>(null)
   const faqRef = useRef<HTMLDivElement>(null)
@@ -198,10 +205,11 @@ export function StoryLanding() {
 
   const W = size.w, VH = size.vh
   const F: Frame = frame(W, VH, sp, lt)
-  const { dark } = F
+  // Dark for the evening, for the icon filling the screen, and for the story after it.
+  const dark = F.dark || F.dv.grow > 0.6 || whyActive
   const it = lt - 2.15
   const fadeUp = (t0: number) => { const p = eo((it - t0) / 0.6); return { opacity: p, transform: `translateY(${((1 - p) * 14).toFixed(1)}px)` } }
-  const heroLine = 'You’ll lie to your to-do list. Acture learns anyway.'
+  const heroLine = 'Say what needs doing. Watch who you become.'
   const heroWords = heroLine.split(' ')
   const inStory = sp > 0 && sp < 1
 
@@ -223,6 +231,7 @@ export function StoryLanding() {
           {W >= 760 && (
             <>
               <a href="#ch1" className="hover:opacity-75" style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 12px', borderRadius: 999, fontSize: 14, fontWeight: 500, color: navMute, textDecoration: 'none' }}>What it does</a>
+              <a href="#why" className="hover:opacity-75" style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 12px', borderRadius: 999, fontSize: 14, fontWeight: 500, color: navMute, textDecoration: 'none' }}>Why it works</a>
               <a href="#faq" className="hover:opacity-75" style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 12px', borderRadius: 999, fontSize: 14, fontWeight: 500, color: navMute, textDecoration: 'none' }}>Questions</a>
               <span style={{ width: 1, height: 16, margin: '0 6px', background: navBd }} />
             </>
@@ -252,13 +261,13 @@ export function StoryLanding() {
                 })}
               </h1>
               <p style={{ ...fadeUp(1.75), margin: '16px 0 0', maxWidth: 540, fontSize: 'clamp(16px,1.6vw,19px)', lineHeight: 1.5, color: '#4a4a48', textWrap: 'pretty' }}>
-                A calm to-do list you talk to. It plans your day, then learns when you really get things done.
+                A calm to-do list you talk to. It plans your day, learns when you really get things done and, if you like, turns every finished thing into a star, a step or a street.
               </p>
               <div style={{ ...fadeUp(1.9), display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 24 }}>
                 <a href="/app" className="hover:opacity-[.88]" style={BTN_DARK}>Open Acture</a>
                 <a href="/login" className="hover:!bg-[#f7f7f5]" style={BTN_LIGHT}>Start today</a>
               </div>
-              <p style={{ ...fadeUp(2.1), margin: '12px 0 0', fontSize: 13, color: '#6b6a66' }}>Scroll, and watch a day happen.</p>
+              <p style={{ ...fadeUp(2.1), margin: '12px 0 0', fontSize: 13, color: '#6b6a66' }}>Scroll: first a day, then why it works.</p>
             </div>
 
             {/* The chapters' words */}
@@ -275,16 +284,6 @@ export function StoryLanding() {
                 )}
               </div>
             ))}
-
-            {/* The end of the story */}
-            <div style={{ position: 'absolute', left: 0, right: 0, top: F.end.top, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '0 24px', opacity: F.end.op, transform: `translateY(${(1 - F.end.op) * 20}px)`, pointerEvents: F.end.op > 0.5 ? 'auto' : 'none' }}>
-              <h2 style={{ margin: 0, maxWidth: 760, fontSize: 'clamp(36px,5.6vw,68px)', fontWeight: 700, letterSpacing: '-0.045em', lineHeight: 1, background: 'linear-gradient(90deg,#000,#6a6a6a)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', textWrap: 'balance', paddingBottom: 4 }}>Your to-dos won’t say themselves.</h2>
-              <p style={{ margin: '14px 0 0', fontSize: 16.5, color: '#4a4a48' }}>Free while it’s being built. Approved accounts sign in with Google.</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 22 }}>
-                <a href="/app" className="hover:opacity-[.88]" style={BTN_DARK}>Open Acture</a>
-                <a href="#faq" className="hover:!bg-[#f7f7f5]" style={BTN_LIGHT}>Questions ↓</a>
-              </div>
-            </div>
 
             {/* The whiteboard photo */}
             <div aria-hidden style={{ position: 'absolute', left: 0, top: 0, zIndex: 4, width: 210, transform: F.photo.tf, transformOrigin: 'center', opacity: F.photo.op, pointerEvents: 'none' }}>
@@ -334,6 +333,19 @@ export function StoryLanding() {
             </div>
           </div>
         </section>
+
+        {/* ── The second story: why it works, and the world ── */}
+        <WhyStory
+          W={W}
+          VH={VH}
+          onActive={setWhyActive}
+          buttons={(
+            <>
+              <a href="/app" className="hover:opacity-[.88]" style={{ ...BTN_DARK, background: '#fefffe', color: '#1b1c1f' }}>Open Acture</a>
+              <a href="#faq" className="hover:!bg-white/[.06]" style={{ ...BTN_LIGHT, background: 'transparent', color: '#f4f3f0', border: '1px solid rgba(255,255,255,.18)' }}>Questions ↓</a>
+            </>
+          )}
+        />
 
         {/* ── Questions ── */}
         <section id="faq" style={{ padding: 'clamp(80px,10vw,128px) 24px', background: '#f7f7f5', borderTop: '1px solid #ebe9e5', scrollMarginTop: 80 }}>
@@ -387,7 +399,6 @@ export function StoryLanding() {
               </button>
             )}
             <p style={{ margin: '12px 0 0', fontSize: 13.5, color: '#8f8c86' }}>Continue with Google. It takes a second.</p>
-
           </div>
 
           <footer style={{ position: 'relative', maxWidth: 1120, margin: 'clamp(96px,12vw,140px) auto 0', paddingTop: 40, borderTop: '1px solid rgba(255,255,255,.1)' }}>
@@ -397,7 +408,7 @@ export function StoryLanding() {
                 <span style={{ fontSize: 14, lineHeight: 1.55, color: '#a6a39e' }}>Things, but it listens. A calm to-do list you talk to, that learns when you really get things done.</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '36px 64px' }}>
-                <FooterCol title="The app" links={[['What it does', '#ch1'], ['Questions', '#faq']]} />
+                <FooterCol title="The app" links={[['What it does', '#ch1'], ['Why it works', '#why'], ['Questions', '#faq']]} />
                 <FooterCol title="Get in" links={[['Open Acture', '/app'], ['Start today', '/login']]} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14, maxWidth: 240 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6f6c67' }}>Good to know</span>
@@ -564,7 +575,7 @@ function Device({ F }: { F: Frame }) {
           </div>
         </div>
         {/* The app icon, at the very end */}
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#141413', opacity: dv.iconOp, pointerEvents: 'none' }}><Mark size={Math.max(40, dv.w)} /></div>
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#141413', opacity: dv.iconOp, pointerEvents: 'none' }}><span style={{ display: 'inline-flex', opacity: dv.markOp }}><Mark size={Math.max(40, Math.min(dv.w, 112))} /></span></div>
       </div>
     </div>
   )

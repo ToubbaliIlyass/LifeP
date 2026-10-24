@@ -14,6 +14,7 @@ import { Sidebar } from '@/components/todos/Sidebar'
 import { TodoView } from '@/components/todos/TodoView'
 import { QuickFind } from '@/components/todos/QuickFind'
 import { CheckIn } from '@/components/todos/CheckIn'
+import { WorldView } from '@/components/world/WorldView'
 import { todayStr } from '@/lib/date'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { safeGet, safeSet } from '@/lib/storage'
@@ -133,7 +134,7 @@ export default function Home() {
 
   /** Capture, from anywhere: a list with the assistant under it, listening. */
   const capture = useCallback(() => {
-    setView((v) => (v === 'proposals' || v === 'settings' ? 'today' : v))
+    setView((v) => (v === 'proposals' || v === 'settings' || v === 'world' ? 'today' : v))
     startListening()
   }, [])
 
@@ -237,19 +238,20 @@ export default function Home() {
         onQuickFind={() => setFinding('')}
         onCapture={(how) => {
           setMobileNavOpen(false)
-          setView((v) => (v === 'proposals' || v === 'settings' ? 'today' : v))
+          setView((v) => (v === 'proposals' || v === 'settings' || v === 'world' ? 'today' : v))
           if (how === 'type') startTyping()
           else startListening()
         }}
         onAttach={(files) => {
           setMobileNavOpen(false)
-          setView((v) => (v === 'proposals' || v === 'settings' ? 'today' : v))
+          setView((v) => (v === 'proposals' || v === 'settings' || v === 'world' ? 'today' : v))
           attachFiles(files)
         }}
         view={view}
         onSelect={select}
         pendingCount={pendingCount}
         open={mobileNavOpen}
+        world={settings?.world?.enabled ? settings.world.kind : null}
       />
 
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -260,6 +262,9 @@ export default function Home() {
         )}
         {view === 'proposals' ? (
           <ProposalQueue onCountChange={setPendingCount} onOpenMenu={() => setMobileNavOpen(true)} />
+        ) : view === 'world' ? (
+          // Becoming: who the to-dos are making you, as a world that grows.
+          <WorldView settings={settings} onSettingsChanged={setSettings} onOpenMenu={() => setMobileNavOpen(true)} />
         ) : view === 'settings' ? (
           // Drawn as one more list, with its own title in the list's column.
           <SettingsPanel
