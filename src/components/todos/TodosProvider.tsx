@@ -224,8 +224,9 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
       } : d))
     const send = (on: boolean) =>
       todo.type === 'Prayer' ? fetch('/api/prayers', json('POST', { prayer: todo.prayerKey, done: on }))
-        : todo.type === 'Habit' ? fetch(`/api/habits/${todo.id}`, json('PATCH', { completed: on }))
-        : fetch(`/api/todos/${todo.id}`, json('PATCH', { done: on }))
+        // The zone goes along: when it was ticked is learned from (src/lib/availability.ts).
+        : todo.type === 'Habit' ? fetch(`/api/habits/${todo.id}`, json('PATCH', { completed: on, tz: clockZone() }))
+        : fetch(`/api/todos/${todo.id}`, json('PATCH', { done: on, tz: clockZone() }))
 
     set(done)
     run(async () => {

@@ -3,7 +3,8 @@ import { nowFor } from '@/lib/reminders-server'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createEdge, deleteEdge, getEdges, getNodeById, getNodes, updateNode } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
-import { blockStartFor, nowMinutes, recordSignal } from '@/lib/availability'
+import { blockStartFor, forgetDone, recordDone, seriesOf } from '@/lib/availability'
+import { clockFor } from '@/lib/clock-server'
 import { setTaskStatus } from '@/lib/tasks'
 import { moveTaskTime, setTaskTime } from '@/lib/task-time'
 
@@ -169,18 +170,21 @@ export async function PATCH(
   if (node.type === 'Task' && typeof body.done === 'boolean') {
     const change = await setTaskStatus(user.id, id, body.done ? 'done' : 'todo')
     spawned = change?.spawned ?? null
-    // When it actually got done is what the planner learns from: the slot it
-    // was planned in if there was one, otherwise right now.
-    if (change && body.done && change.previous !== 'done') {
-      const today = todayStr()
-      await recordSignal(user.id, {
-        kind: 'done',
-        itemType: 'Task',
-        itemId: id,
-        name: typeof props.name === 'string' ? props.name : `Task #${id}`,
-        date: today,
-        minute: (await blockStartFor(user.id, id, today)) ?? nowMinutes(),
-      })
+    // When it actually got done is what the planner learns from, and what
+    // the to-do's rhythm shows — see recordDone.
+    if (change && body.done !== (change.previous === 'done')) {
+      const clock = await clockFor(user.id, body.tz)
+      const tick = { itemType: 'Task', itemId: seriesOf(node), sourceId: id, date: clock.date }
+      if (body.done) {
+        await recordDone(user.id, {
+          ...tick,
+          name: typeof props.name === 'string' ? props.name : `Task #${id}`,
+          minute: clock.minutes,
+          plannedMinute: await blockStartFor(user.id, id, typeof props.dueDate === 'string' ? props.dueDate : clock.date),
+        })
+      } else {
+        await forgetDone(user.id, tick)
+      }
     }
   }
 

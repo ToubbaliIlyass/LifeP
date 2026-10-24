@@ -10,6 +10,8 @@ import { useTodos } from './TodosProvider'
 import { ProgressRing, VIEW_META } from './parts'
 import { AttachButton } from '@/components/chat/attachments'
 import { ASSISTANT_TRIGGER } from '@/components/today/TodayAssistant'
+import { WORLD_META } from '@/components/world/meta'
+import type { WorldKind } from '@/lib/identity'
 
 /** What dropping a to-do on a list means, in fields. */
 function dropChanges(todo: Todo, target: string, today: string): Partial<Todo> | 'complete' | null {
@@ -43,7 +45,7 @@ const ROW = 'flex items-center gap-2 max-md:gap-3 w-full px-2 py-[3.5px] max-md:
  * areas and projects. Every list is also somewhere to drop a to-do.
  */
 export function Sidebar({
-  view, onSelect, pendingCount, open, slim, onQuickFind, onCapture, onAttach,
+  view, onSelect, pendingCount, open, slim, onQuickFind, onCapture, onAttach, world,
 }: {
   view: string
   onSelect: (view: string) => void
@@ -58,6 +60,8 @@ export function Sidebar({
   onCapture: (how: 'listen' | 'type') => void
   /** Opens the assistant with these attached. */
   onAttach: (files: FileList) => void
+  /** Becoming, when it is switched on: which world it draws. */
+  world: WorldKind | null
 }) {
   const { todos, lists, date, patch, toggle, dragId, dragIds, setDragIds, plusDragging, setPlusDragging, startDraft, createList } = useTodos()
   const [over, setOver] = useState<string | null>(null)
@@ -165,6 +169,15 @@ export function Sidebar({
           {standard('someday')}
           <div className="h-3" />
           {standard('logbook')}
+          {world && (() => {
+            const { Icon } = WORLD_META[world]
+            return (
+              <a href="#world" onClick={follow('world')} className={rowClass('world', 'font-medium')}>
+                <Icon className="w-4 h-4 shrink-0 text-violet-500" />
+                <span className="flex-1 truncate">Becoming</span>
+              </a>
+            )
+          })()}
           <div className="h-3" />
 
           {projects.filter((p) => !p.areaId || !areaIds.has(p.areaId)).map(project)}

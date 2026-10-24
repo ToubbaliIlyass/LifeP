@@ -1,7 +1,7 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodes, createNode, updateNode, getNodeById } from '@/lib/graph/queries'
-import { todayStr } from '@/lib/date'
-import { blockStartFor, nowMinutes, recordSignal } from '@/lib/availability'
+import { blockStartFor, forgetDone, recordDone } from '@/lib/availability'
+import { clockFor } from '@/lib/clock-server'
 
 export async function PATCH(
   request: Request,
@@ -13,25 +13,29 @@ export async function PATCH(
   const habitNodeId = parseInt(idStr, 10)
   if (isNaN(habitNodeId)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
-  const body = await request.json() as { completed: boolean; date?: string }
-  const date = body.date ?? todayStr()
+  const body = await request.json() as { completed: boolean; date?: string; tz?: string }
+  const clock = await clockFor(user.id, body.tz)
+  const date = body.date ?? clock.date
+  const tick = { itemType: 'Habit', itemId: habitNodeId, sourceId: habitNodeId, date }
 
   if (body.completed) {
     const habit = await getNodeById(user.id, habitNodeId)
-    // Without a planned slot, "now" only means something for today —
-    // back-filling last Tuesday says nothing about the time of day.
-    const minute = (await blockStartFor(user.id, habitNodeId, date)) ?? (date === todayStr() ? nowMinutes() : null)
+    const planned = await blockStartFor(user.id, habitNodeId, date)
+    // Ticked today, the clock says when. Back-filling last Tuesday says
+    // nothing about the time of day: only its slot, if it had one, as a guess.
+    const minute = date === clock.date ? clock.minutes : planned
     if (habit && minute !== null) {
       const hp = habit.properties as Record<string, unknown>
-      await recordSignal(user.id, {
-        kind: 'done',
-        itemType: 'Habit',
-        itemId: habitNodeId,
+      await recordDone(user.id, {
+        ...tick,
         name: typeof hp.name === 'string' ? hp.name : `Habit #${habitNodeId}`,
-        date,
         minute,
+        plannedMinute: planned,
+        approximate: date !== clock.date,
       })
     }
+  } else {
+    await forgetDone(user.id, tick)
   }
 
   // Find existing HabitLog for this habit + date

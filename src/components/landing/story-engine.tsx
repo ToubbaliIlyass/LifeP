@@ -110,15 +110,10 @@ export const FAQ = [
   { q: 'Does it talk back?', a: 'No. You can speak to it, but it always answers in writing, right where you are.' },
   { q: 'Where does my stuff go?', a: 'Your lists live in Acture’s own database. What you say or attach is sent to an AI model to be read, and that is all it is used for.' },
   { q: 'Will it buzz my phone?', a: 'Not yet. Reminders fire while Acture is open; there are no push notifications.' },
-  { q: 'Is there an app?', a: 'Yes, and it is the same Acture. On a Mac, download it below. On an iPhone or Android phone, add it from your browser: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
+  { q: 'Is there an app?', a: 'Yes, and it is the same Acture. Install it from Chrome, on a computer or an Android phone: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
+  { q: 'Is it a game now?', a: 'Only if you want it to be. Becoming is off until you switch it on in Settings. Then you name who you’re becoming, every to-do you finish counts as a vote for them, and you choose how to see it: a night sky, a path or a small city. No points to lose, nobody to beat, and a missed day takes nothing away.' },
   { q: 'Who can use it?', a: 'Right now it is a private instance: you sign in with a Google account that has been let in. It is free while it is being built.' },
 ]
-
-/** The Mac app, from the latest GitHub release — the links never change between versions. */
-export const MAC_DOWNLOAD = {
-  silicon: 'https://github.com/ToubbaliIlyass/LifeP/releases/latest/download/Acture-arm64.dmg',
-  intel: 'https://github.com/ToubbaliIlyass/LifeP/releases/latest/download/Acture-x64.dmg',
-}
 
 export const CHAPTERS = [
   null,
@@ -129,7 +124,7 @@ export const CHAPTERS = [
   { k: '05 · Evening', l: 'The check-in', h: 'Once a day, it asks how it went.', p: 'Two minutes of talking teaches it more than a week of clicks.' },
   { k: '06 · The list', l: 'The list', h: 'Still a really good list.', p: 'Projects with headings, habits with streaks, deadlines apart from the day. Keyboard-first, or just start typing.' },
   { k: '07 · Yours', l: 'Make it yours', h: 'Nine palettes. Light or dark.', p: 'And the five prayers on Today, if you want them, worked out on your device from where you are.' },
-  { k: '08 · Everywhere', l: 'Every device', h: 'On your Mac, iPhone and Android.', p: 'Download the Mac app, or add Acture from your browser on any device. Its own icon, its own window.', devices: true },
+  { k: '08 · Everywhere', l: 'Every device', h: 'Install it from Chrome.', p: 'On your computer or your Android phone. Its own icon, its own window, always up to date.', devices: true },
 ] as const
 
 // ── Motion ────────────────────────────────────────────────────────────
@@ -175,13 +170,20 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
   const heroBottom = heroTopPx + (narrow ? 310 : 290)
   const y0 = Math.max(VH * 0.6, heroBottom + 24)
   const bases: Base[] = narrow
-    ? [desk(W / 2, Math.max(VH * 0.64, heroBottom + 24) + dh / 2), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), phone(W / 2, VH * 0.34), icon(VH * 0.26)]
-    : [desk(W / 2, y0 + dh / 2, { w: Math.min(1040, W - 96), side: 200 }), desk(Rx, mid), desk(Rx, mid), desk(Rx, mid), desk(Lx, mid), desk(Rx, mid), desk(Lx, VH * 0.46), desk(Rx, VH * 0.47), phone(Rx, mid), icon(VH * 0.3)]
+    ? [desk(W / 2, Math.max(VH * 0.64, heroBottom + 24) + dh / 2), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), phone(W / 2, VH * 0.34), icon(VH * 0.42)]
+    : [desk(W / 2, y0 + dh / 2, { w: Math.min(1040, W - 96), side: 200 }), desk(Rx, mid), desk(Rx, mid), desk(Rx, mid), desk(Lx, mid), desk(Rx, mid), desk(Lx, VH * 0.46), desk(Rx, VH * 0.47), phone(Rx, mid), icon(VH * 0.45)]
   const ANG = [[14, 0, 0, 0.97], [0, -6, 0, 1], [4, 3, -1, 1], [0, 0, 0, 1.02], [2, 7, 0, 1], [12, 0, 0, 0.97], [0, 0, 0, 1], [0, 0, 0, 1], [0, -8, -2, 1], [0, 0, 0, 1]]
   const am = narrow ? 0.45 : 1
   const POSES: Pose[] = bases.map((p, i) => ({ ...p, rx: ANG[i][0] * am, ry: i === 9 ? ANG[i][1] : ANG[i][1] * am, rz: ANG[i][2] * am, sc: ANG[i][3] }))
   const A = POSES[c], B = POSES[Math.min(NCH - 1, c + 1)], k = c < NCH - 1 ? ease(seg(0.7, 1)) : 0
   const Pz = Object.fromEntries((Object.keys(A) as (keyof Pose)[]).map((key) => [key, lerp(A[key], B[key], k)])) as unknown as Pose
+  // The end: the icon grows until its dark tile is the whole screen, and the
+  // mark on it fades — the dark the next story (WhyStory) starts on.
+  const grow = c === NCH - 1 ? ease(seg(0.2, 0.8)) : 0
+  if (grow > 0) {
+    Pz.cx = lerp(Pz.cx, W / 2, grow); Pz.cy = lerp(Pz.cy, VH / 2, grow)
+    Pz.w = lerp(Pz.w, W + 4, grow); Pz.h = lerp(Pz.h, VH + 4, grow); Pz.r = lerp(Pz.r, 0, grow)
+  }
 
   // ── Theme: dark for the evening, the nine palettes for "make it yours".
   const dark = c === 5
@@ -205,9 +207,10 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
     iop: c === 0 ? clamp((it - 1.5) / 0.5) : 1,
     frame: phoneness > 0.05 ? '#1c1d20' : th.bg,
     outline: phoneness > 0.05 || Pz.icon > 0.05 ? 'none' : '1px solid ' + (dark ? 'rgba(255,255,255,.1)' : '#dcdad5'),
-    shadow: dark ? '0 40px 100px -30px rgba(0,0,0,.7)' : '0 1px 2px rgba(0,0,0,.04), 0 40px 100px -30px rgba(40,30,10,.32)',
+    shadow: grow > 0.9 ? 'none' : dark ? '0 40px 100px -30px rgba(0,0,0,.7)' : '0 1px 2px rgba(0,0,0,.04), 0 40px 100px -30px rgba(40,30,10,.32)',
     chromeH: 38 * Pz.chrome, chromeOp: Pz.chrome, sideW: Pz.side, sideOp: clamp(Pz.side / 160), notchOp: phoneness * (1 - Pz.icon),
     contentOp: 1 - Pz.icon, iconOp: Pz.icon, plusOp: phoneness * (1 - Pz.icon),
+    markOp: 1 - ease(seg(0.5, 0.9)) * (c === NCH - 1 ? 1 : 0), grow,
     pad: Pz.w < 560 ? (phoneness > 0.5 ? '44px 18px 120px' : '20px 18px 120px') : '28px 36px 140px',
   }
 
@@ -321,13 +324,11 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
   })
 
   const heroOp = c === 0 ? 1 - seg(0.2, 0.55) : 0
-  const endOp = c === 9 ? seg(0.15, 0.4) : 0
   const chapN = Math.max(1, Math.min(8, c))
 
   return {
     c, lp, narrow, dark, th, dv, Pz, rows, rowIn, eRows, todayCount, isl, proj, projDone, keycaps, learn, photo, texts, palIdx,
     hero: { op: heroOp, ty: -seg(0, 0.6) * 60, top: heroTopPx },
-    end: { op: endOp, top: Pz.cy + 90 },
     // On a phone the chapter's own label says where you are; the counter
     // would only sit on top of its words.
     chap: { on: !narrow && c >= 1 && c <= 8, n: String(chapN).padStart(2, '0'), l: CHAPTERS[chapN]!.l, pct: lp * 100 },

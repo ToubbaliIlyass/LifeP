@@ -55,6 +55,8 @@ export interface ActivitySignal {
    * keeps turning out to be wrong.
    */
   plannedMinute?: number | null
+  /** On a 'done' signal: the node that was ticked — one occurrence of a repeating task, or the habit. */
+  sourceId?: number
 }
 
 /** Unmatched activity reported this often is worth offering as a habit. */
@@ -145,6 +147,58 @@ export async function recordSignal(userId: number, signal: ActivitySignal): Prom
     })
   } catch {
     // Ignored on purpose — see above.
+  }
+}
+
+/**
+ * The id a to-do's history is kept under.
+ *
+ * A repeating task is a new node each time round (src/lib/tasks.ts), so
+ * keyed by its own id every occurrence started with no past at all, and
+ * "when does this usually get done" could never be answered for one. Each
+ * occurrence carries the first one's id as `seriesId`; a habit, or a task
+ * that never repeated, is its own series.
+ */
+export function seriesOf(node: { id: number; properties: unknown }): number {
+  const p = (node.properties ?? {}) as Record<string, unknown>
+  return typeof p.seriesId === 'number' ? p.seriesId : node.id
+}
+
+/**
+ * A tick, as evidence of when something really happens.
+ *
+ * The minute is when it was ticked, not the slot it was planned in. Using
+ * the slot meant ticking off a gym planned for 07:00 at seven in the evening
+ * taught the planner "07:00", every time, and plan and reality could never
+ * be seen to disagree. The slot is kept beside it as `plannedMinute`, which
+ * is exactly the gap divergences() looks for. A tick remembered hours late
+ * is still the user's own word on when; the evening check-in corrects it.
+ *
+ * Replaces an earlier tick of the same thing, so ticking, unticking and
+ * ticking again counts once.
+ */
+export async function recordDone(
+  userId: number,
+  done: { itemType: string; itemId: number; sourceId: number; name: string; date: string; minute: number | null; plannedMinute: number | null; approximate?: boolean },
+): Promise<void> {
+  await forgetDone(userId, done)
+  await recordSignal(userId, { kind: 'done', ...done })
+}
+
+/** Takes a tick back: an accidental one must not become someone's usual time. */
+export async function forgetDone(
+  userId: number,
+  { itemType, itemId, sourceId, date }: { itemType: string; itemId: number; sourceId: number; date: string },
+): Promise<void> {
+  try {
+    for (const n of await getNodes(userId, { type: 'ActivitySignal' })) {
+      const s = n.properties as Partial<ActivitySignal>
+      if (s.kind !== 'done' || s.itemId !== itemId || s.sourceId !== sourceId) continue
+      // A task occurrence is ticked once, whatever the day; a habit once a day.
+      if (itemType !== 'Habit' || s.date === date) await deleteNode(userId, n.id)
+    }
+  } catch {
+    // A side effect, like recordSignal.
   }
 }
 

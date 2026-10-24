@@ -14,6 +14,8 @@ export type { Settings } from '@/lib/settings'
 import type { Settings } from '@/lib/settings'
 import { FIXED_ZONES, setClockZone, wallNow } from '@/lib/wallclock'
 import { notifyDataChanged } from '@/lib/dataSignal'
+import { WORLD_KINDS } from '@/lib/identity'
+import { WORLD_META } from '@/components/world/meta'
 
 interface SettingsPanelProps {
   onSettingsChanged: (settings: Settings) => void
@@ -293,6 +295,31 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
               </label>
             </div>
           )}
+        </Section>
+
+        <Section title="Becoming" hint="Name who you’re becoming — a runner, a writer, a good friend — and every to-do you finish counts as a vote for them, drawn as a world that grows. Optional, and gentle: nothing is ever lost for a missed day.">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={!!settings.world?.enabled} onChange={(e) => save({ world: { ...(settings.world ?? { kind: 'sky' }), enabled: e.target.checked } })} className="accent-[var(--primary)]" />
+            Show my world in the sidebar
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+            {WORLD_KINDS.map((k) => {
+              const { name, Icon, blurb } = WORLD_META[k]
+              const active = (settings.world?.kind ?? 'sky') === k
+              return (
+                <button
+                  key={k}
+                  onClick={() => save({ world: { ...(settings.world ?? { enabled: false }), kind: k } })}
+                  aria-pressed={active}
+                  className={`text-left rounded-lg border p-2.5 ${active ? 'border-primary bg-primary/[0.06]' : 'border-border/70 hover:bg-foreground/[0.04]'}`}
+                >
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium"><Icon className="w-3.5 h-3.5 text-violet-500" />{name}{active && <Check className="w-3 h-3 text-primary" />}</span>
+                  <span className="block mt-1 text-[12px] leading-snug text-muted-foreground">{blurb}</span>
+                </button>
+              )
+            })}
+          </div>
+          <a href="#world" className="inline-block mt-3 text-[13px] font-medium text-primary hover:underline">Open Becoming →</a>
         </Section>
 
         <Section title="Location and time" hint="Where you are, for prayer times, and the clock your day is planned by. Asked once and kept across your devices.">

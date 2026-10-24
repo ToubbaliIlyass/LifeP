@@ -15,7 +15,7 @@ import {
   type SchedulableTask,
 } from '@/lib/schedule'
 import { blockOccursOn, firmnessOf, isDone } from '@/lib/sessions'
-import { loadAvailability } from '@/lib/availability'
+import { loadAvailability, seriesOf } from '@/lib/availability'
 import { readSettings } from '@/lib/settings'
 import { workTypes } from '@/lib/modules'
 import { prayerTimesFor, PRAYER_MINUTES } from '@/lib/prayers'
@@ -103,6 +103,8 @@ export async function planDay(
       const p = t.properties as Record<string, unknown>
       return {
         id: t.id,
+        series: seriesOf(t),
+        repeating: !!(p.recurrence as { frequency?: unknown } | undefined)?.frequency,
         props: p,
         createdAt: t.createdAt,
         name:
@@ -138,15 +140,16 @@ export async function planDay(
         .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1) || a.createdAt.localeCompare(b.createdAt))
         .slice(0, UNDATED_PER_DAY),
     )
-    .map(({ id, name, dueDate, priority, minutes }) => ({
+    .map(({ id, series, repeating, name, dueDate, priority, minutes }) => ({
       id, name, dueDate, priority, minutes, kind: 'task' as const,
       optional: dueDate === null || dueDate > date,
-      // Only a stated preference ("I study in the mornings") can pin a task;
-      // a one-off task has no history of its own to learn from.
+      // A one-off task has no history of its own to learn from, so only a
+      // stated preference ("I study in the mornings") can pin it. A repeating
+      // one does — every time round is one series — and follows it like a habit.
       // Work pulled forward from a later day has no claim on a usual slot
       // ahead of what is due today.
       preferredStart: dueDate === null || dueDate > date ? null
-        : availability.rules.some((r) => r.kind === 'prefer') ? availability.usualStart(id, name, dow) : null,
+        : repeating || availability.rules.some((r) => r.kind === 'prefer') ? availability.usualStart(series, name, dow) : null,
     }))
 
   /*
