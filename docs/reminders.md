@@ -22,8 +22,6 @@ live site.
 
 Where push works: Chrome, Edge and Firefox on Mac/Windows/Android; Safari on
 macOS 13+; iPhone/iPad 16.4+ **only in the app added to the Home Screen**.
-The Mac desktop app (`desktop/`) shows reminders natively while it is
-running, from the same in-app check.
 
 ## One-time setup on the live site
 

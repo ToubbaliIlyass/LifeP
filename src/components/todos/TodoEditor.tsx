@@ -7,6 +7,7 @@ import { relDate, repeatLabel } from '@/lib/todo-views'
 import { parseEntry, saysMore } from '@/lib/quick-entry'
 import { lead } from '@/lib/reminders'
 import { EVENING_TONE, SOMEDAY_TONE, TodoCheck } from './parts'
+import { RhythmCard } from './Rhythm'
 
 export type PopKind = 'when' | 'time' | 'deadline' | 'move' | 'repeat' | 'remind'
 
@@ -281,6 +282,17 @@ export function TodoEditor({
             className="flex-1 min-w-[90px] bg-transparent outline-none text-[13px] py-0.5 placeholder:text-muted-foreground/50"
           />
         </div>}
+
+        {/* Something that comes back has a rhythm worth seeing; a one-off has one tick. */}
+        {!isDraft && (todo.type === 'Habit' || (isTask && !!todo.repeats)) && (
+          <RhythmCard
+            id={todo.id}
+            kind={todo.type === 'Habit' ? 'Habit' : 'Task'}
+            done={todo.done}
+            time={todo.time}
+            onPlanAt={todo.someday || todo.done ? undefined : (time) => onPatch({ time })}
+          />
+        )}
 
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-border/60">
           {isTask || isEvent ? (

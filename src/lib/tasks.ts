@@ -56,6 +56,8 @@ export async function setTaskStatus(userId: number, taskId: number, status: stri
         ...props,
         status: 'todo',
         dueDate: next,
+        // One history for every time round — see seriesOf in src/lib/availability.ts.
+        seriesId: typeof props.seriesId === 'number' ? props.seriesId : taskId,
         completedAt: undefined,
         // Each occurrence starts with its checklist unticked.
         ...(Array.isArray(props.checklist)

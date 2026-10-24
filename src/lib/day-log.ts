@@ -1,7 +1,7 @@
 import { createEdge, createNode, deleteNode, getEdges, getNodeById, getNodes, updateNode } from '@/lib/graph/queries'
 import { eventOccursOn, todayStr } from '@/lib/date'
 import { toMinutes, fromMinutes, DEFAULT_HABIT_MINUTES, DEFAULT_TASK_MINUTES } from '@/lib/schedule'
-import { recordSignal } from '@/lib/availability'
+import { recordSignal, seriesOf } from '@/lib/availability'
 import { setTaskStatus } from '@/lib/tasks'
 import { buildSessions, blockOccursOn, batchLabel } from '@/lib/sessions'
 import { displayName } from '@/lib/graph/naming'
@@ -270,7 +270,7 @@ export async function logActivity(userId: number, input: LogInput): Promise<LogR
     itemType: item?.type ?? 'Activity',
     // 0 is "matched nothing": still evidence of when the day has room, and
     // collected by name so a repeated activity can be offered as a habit.
-    itemId: item?.id ?? 0,
+    itemId: item ? seriesOf(item) : 0,
     name,
     date,
     minute: start,

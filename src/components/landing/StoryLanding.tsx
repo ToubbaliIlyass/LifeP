@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { install, useInstall } from '@/components/install/InstallApp'
 import {
-  FAQ, Icon, MAC_DOWNLOAD, Mark, PAL, Ring, STORY_VH, Wave, clamp, eo, frame, lerp,
+  FAQ, Icon, Mark, PAL, Ring, STORY_VH, Wave, clamp, eo, frame, lerp,
   type Frame, type Row, type Theme,
 } from './story-engine'
 
@@ -224,7 +224,6 @@ export function StoryLanding() {
             <>
               <a href="#ch1" className="hover:opacity-75" style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 12px', borderRadius: 999, fontSize: 14, fontWeight: 500, color: navMute, textDecoration: 'none' }}>What it does</a>
               <a href="#faq" className="hover:opacity-75" style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 12px', borderRadius: 999, fontSize: 14, fontWeight: 500, color: navMute, textDecoration: 'none' }}>Questions</a>
-              <a href="#download" className="hover:opacity-75" style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 12px', borderRadius: 999, fontSize: 14, fontWeight: 500, color: navMute, textDecoration: 'none' }}>Download</a>
               <span style={{ width: 1, height: 16, margin: '0 6px', background: navBd }} />
             </>
           )}
@@ -270,9 +269,8 @@ export function StoryLanding() {
                 <p style={{ margin: '14px 0 0', fontSize: 16.5, lineHeight: 1.5, color: tx.pc, textWrap: 'pretty' }}>{tx.p}</p>
                 {tx.showDevices && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, fontSize: F.narrow ? 13 : 14, color: tx.pc }}>
-                    <span><b style={{ color: tx.fg }}>Mac</b> · Download the app below, or Chrome/Edge: Install.</span>
-                    <span><b style={{ color: tx.fg }}>iPhone &amp; iPad</b> · Safari: Share → Add to Home Screen.</span>
-                    <span><b style={{ color: tx.fg }}>Android</b> · Chrome: Install, or ⋮ → Install app.</span>
+                    <span><b style={{ color: tx.fg }}>Mac &amp; Windows</b> · Chrome: Install, in the address bar.</span>
+                    <span><b style={{ color: tx.fg }}>Android</b> · Chrome: ⋮ → Install app.</span>
                   </div>
                 )}
               </div>
@@ -390,23 +388,6 @@ export function StoryLanding() {
             )}
             <p style={{ margin: '12px 0 0', fontSize: 13.5, color: '#8f8c86' }}>Continue with Google. It takes a second.</p>
 
-            {/* The Mac app */}
-            <div id="download" style={{ scrollMarginTop: 96, marginTop: 56, width: '100%', maxWidth: 520, boxSizing: 'border-box', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', padding: 'clamp(20px,4vw,28px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 17, fontWeight: 700 }}><Mark size={28} />Acture for Mac</span>
-              <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, color: '#bdbab4', maxWidth: 380 }}>Its own window in the Dock, native reminder notifications, and the mic, one key away.</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, width: '100%' }}>
-                <a href={MAC_DOWNLOAD.silicon} download className="hover:opacity-90" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, boxSizing: 'border-box', borderRadius: 10, background: '#F5A524', color: '#1b1c1f', padding: '0 18px', fontSize: 15.5, fontWeight: 650, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                  <AppleLogo /> Download for Mac
-                </a>
-                <a href={MAC_DOWNLOAD.intel} download className="hover:!bg-white/[.06]" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 44, boxSizing: 'border-box', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', color: '#f4f3f0', padding: '0 16px', fontSize: 15, fontWeight: 500, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                  Intel Mac
-                </a>
-              </div>
-              <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: '#8f8c86', maxWidth: 400 }}>
-                For Macs with Apple silicon (M1 and later); Intel Macs use the other one. macOS 12 or later.
-                The first time, right-click Acture in Applications → Open.
-              </p>
-            </div>
           </div>
 
           <footer style={{ position: 'relative', maxWidth: 1120, margin: 'clamp(96px,12vw,140px) auto 0', paddingTop: 40, borderTop: '1px solid rgba(255,255,255,.1)' }}>
@@ -417,7 +398,7 @@ export function StoryLanding() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '36px 64px' }}>
                 <FooterCol title="The app" links={[['What it does', '#ch1'], ['Questions', '#faq']]} />
-                <FooterCol title="Get in" links={[['Open Acture', '/app'], ['Start today', '/login'], ['Mac app', '#download']]} />
+                <FooterCol title="Get in" links={[['Open Acture', '/app'], ['Start today', '/login']]} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14, maxWidth: 240 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6f6c67' }}>Good to know</span>
                   <span style={{ color: '#a6a39e', lineHeight: 1.5 }}>Private instance, free while it’s being built. What you say or attach is read by OpenAI models, and that’s all it’s used for. Export everything as one JSON file.</span>
@@ -586,15 +567,6 @@ function Device({ F }: { F: Frame }) {
         <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#141413', opacity: dv.iconOp, pointerEvents: 'none' }}><Mark size={Math.max(40, dv.w)} /></div>
       </div>
     </div>
-  )
-}
-
-/** Apple's mark, for the download button. */
-function AppleLogo() {
-  return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ marginTop: -2 }}>
-      <path d="M16.37 12.6c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.79 1.3 10.34.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.38.81 1.4-.02 2.29-1.27 3.14-2.53.99-1.45 1.4-2.86 1.42-2.93-.03-.01-2.72-1.04-2.75-4.14zM13.8 4.98c.71-.86 1.19-2.06 1.06-3.25-1.02.04-2.26.68-3 1.54-.66.76-1.23 1.98-1.08 3.15 1.14.09 2.3-.58 3.02-1.44z" />
-    </svg>
   )
 }
 

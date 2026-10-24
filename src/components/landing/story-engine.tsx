@@ -110,15 +110,9 @@ export const FAQ = [
   { q: 'Does it talk back?', a: 'No. You can speak to it, but it always answers in writing, right where you are.' },
   { q: 'Where does my stuff go?', a: 'Your lists live in Acture’s own database. What you say or attach is sent to an AI model to be read, and that is all it is used for.' },
   { q: 'Will it buzz my phone?', a: 'Not yet. Reminders fire while Acture is open; there are no push notifications.' },
-  { q: 'Is there an app?', a: 'Yes, and it is the same Acture. On a Mac, download it below. On an iPhone or Android phone, add it from your browser: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
+  { q: 'Is there an app?', a: 'Yes, and it is the same Acture. Install it from Chrome, on a computer or an Android phone: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
   { q: 'Who can use it?', a: 'Right now it is a private instance: you sign in with a Google account that has been let in. It is free while it is being built.' },
 ]
-
-/** The Mac app, from the latest GitHub release — the links never change between versions. */
-export const MAC_DOWNLOAD = {
-  silicon: 'https://github.com/ToubbaliIlyass/LifeP/releases/latest/download/Acture-arm64.dmg',
-  intel: 'https://github.com/ToubbaliIlyass/LifeP/releases/latest/download/Acture-x64.dmg',
-}
 
 export const CHAPTERS = [
   null,
@@ -129,7 +123,7 @@ export const CHAPTERS = [
   { k: '05 · Evening', l: 'The check-in', h: 'Once a day, it asks how it went.', p: 'Two minutes of talking teaches it more than a week of clicks.' },
   { k: '06 · The list', l: 'The list', h: 'Still a really good list.', p: 'Projects with headings, habits with streaks, deadlines apart from the day. Keyboard-first, or just start typing.' },
   { k: '07 · Yours', l: 'Make it yours', h: 'Nine palettes. Light or dark.', p: 'And the five prayers on Today, if you want them, worked out on your device from where you are.' },
-  { k: '08 · Everywhere', l: 'Every device', h: 'On your Mac, iPhone and Android.', p: 'Download the Mac app, or add Acture from your browser on any device. Its own icon, its own window.', devices: true },
+  { k: '08 · Everywhere', l: 'Every device', h: 'Install it from Chrome.', p: 'On your computer or your Android phone. Its own icon, its own window, always up to date.', devices: true },
 ] as const
 
 // ── Motion ────────────────────────────────────────────────────────────

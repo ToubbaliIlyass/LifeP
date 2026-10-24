@@ -12,10 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Other build directories (NEXT_DIST_DIR) and the Mac app, which is its
-    // own project with its own dependencies (desktop/package.json).
+    // Other build directories (NEXT_DIST_DIR).
     ".next-*/**",
-    "desktop/**",
   ]),
 ]);
 
