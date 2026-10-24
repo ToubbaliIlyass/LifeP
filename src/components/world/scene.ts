@@ -1,8 +1,11 @@
 import * as THREE from 'three'
 import { colorOf, type WorldKind, type WorldPayload } from '@/lib/identity'
-import {
-  BLOCK, FLOOR_H, PATH_STEP, SKY_R, cityLayout, pathLayout, pathPoint, rng, skyLayout,
-} from '@/lib/world-layout'
+import { SKY_R, cityLayout, rng, skyLayout } from '@/lib/world-layout'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { mythicPath, skyDome as paintedSky, toyTown } from './dioramas'
 
 /**
  * The world, drawn: one three.js scene for whichever of the three the user
@@ -13,14 +16,18 @@ import {
  * off should download a byte of it.
  *
  * Each world keeps its own time of day — the sky at night, the path at
- * golden hour, the town at blue hour — rather than following light or dark
- * mode: they are places, and places have their own light.
+ * golden hour, the town on a bright cartoon afternoon — rather than
+ * following light or dark mode: they are places, and places have their own
+ * light. The path and the town are the same builds the landing page shows
+ * (dioramas.ts), here made from the user's own votes.
  */
 
 export interface WorldScene {
   show(kind: WorldKind, data: WorldPayload): void
-  /** The path only: 0 stands at today, 1 walks back to the first step. */
+  /** Kept for callers; the spiral path needs no walking back — drag and zoom instead. */
   lookBack(t: number): void
+  /** How much of the right edge and the bottom the page's own panels cover, in px: the world is framed in the rest. */
+  setInsets(right: number, bottom: number): void
   dispose(): void
 }
 
@@ -98,9 +105,11 @@ interface Built {
   group: THREE.Group
   labels: { text: string; color: string; at: THREE.Vector3; far?: number; small?: boolean }[]
   /** Called every frame with the elapsed seconds; moves the camera. */
-  frame: (t: number, cam: THREE.PerspectiveCamera, yaw: number, pitch: number, follow: number) => void
+  frame: (t: number, cam: THREE.PerspectiveCamera, yaw: number, pitch: number, zoom: number) => void
   fog?: THREE.Fog
   lookBack?: (t: number) => void
+  /** How it is drawn: tone mapping, and how much the bright things glow. */
+  look: { toneMapping: THREE.ToneMapping; bloom: number; threshold: number }
 }
 
 // ── Sky: each identity a constellation ───────────────────────────────
@@ -166,7 +175,10 @@ function buildSky(data: WorldPayload, hues: number[], seeds: number[], still: bo
   const look = new THREE.Vector3()
   return {
     group, labels,
-    frame: (t, cam, yaw, pitch) => {
+    look: { toneMapping: THREE.ACESFilmicToneMapping, bloom: 0.75, threshold: 0.6 },
+    frame: (t, cam, yaw, pitch, zoom) => {
+      // Zooming into a sky is narrowing the lens.
+      cam.fov = Math.max(24, Math.min(90, (cam.aspect < 0.75 ? 66 : 58) * zoom))
       const drift = still ? 0 : Math.sin(t * 0.04) * 0.05
       const az = yaw + drift, el = 0.42 + pitch
       cam.position.set(0, 0, 0)
@@ -176,221 +188,72 @@ function buildSky(data: WorldPayload, hues: number[], seeds: number[], still: bo
   }
 }
 
-// ── Path: a step for every vote ──────────────────────────────────────
+/** How far back to stand so a box `rx` wide and `ry` tall around the target fits the screen. */
+function fit(cam: THREE.PerspectiveCamera, rx: number, ry: number) {
+  const half = Math.tan((cam.fov * Math.PI) / 360)
+  // The share of the screen left free by the page's panels (see setInsets).
+  const [fw, fh] = (cam.userData.room as [number, number] | undefined) ?? [1, 1]
+  return Math.max(ry / (half * fh), rx / (half * cam.aspect * fw))
+}
 
-function buildPath(data: WorldPayload, hues: number[], seeds: number[], still: boolean): Built {
+// ── Path: a stair up a sky temple's peak ─────────────────────────────
+
+function buildPath(data: WorldPayload, hues: number[], still: boolean): Built {
+  const world = mythicPath(data.votes, hues)
+  world.grow(1, 0)
   const group = new THREE.Group()
-  const horizon = '#f2b48a'
-  group.add(skyDome('#3a4f86', horizon, '#6b7d4f'))
-  const fog = new THREE.Fog(horizon, 14, 70)
-  group.add(new THREE.HemisphereLight('#ffe2c4', '#4b6b3c', 1.3))
-  const sun = new THREE.DirectionalLight('#ffd2a1', 2.2)
-  sun.position.set(-30, 18, -40)
-  group.add(sun)
-
-  const P = pathLayout(data.votes, seeds)
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(400, 64), new THREE.MeshLambertMaterial({ color: '#7d9a57' }))
-  ground.rotation.x = -Math.PI / 2
-  ground.userData.follow = 'xz'
-  group.add(ground)
-
-  // The path itself: a sandy ribbon, the stretch ahead of today a little paler.
-  const ribbon = (from: number, to: number, color: string, opacity: number) => {
-    const pos: number[] = [], idx: number[] = []
-    const n0 = Math.max(0, Math.floor(from / PATH_STEP)), n1 = Math.min(P.line.length / 2 - 1, Math.ceil(to / PATH_STEP))
-    for (let i = n0, k = 0; i <= n1; i++, k++) {
-      const { p, heading } = pathPoint(P.line, i * PATH_STEP)
-      const w = 0.62
-      pos.push(p[0] - Math.cos(heading) * w, 0.012, p[2] + Math.sin(heading) * w, p[0] + Math.cos(heading) * w, 0.012, p[2] - Math.sin(heading) * w)
-      if (i < n1) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2)
-    }
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-    g.setIndex(idx)
-    g.computeVertexNormals()
-    return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity, side: THREE.DoubleSide }))
-  }
-  group.add(ribbon(0, P.end + 0.4, '#dcc59a', 1))
-  group.add(ribbon(P.end + 0.4, P.end + 16, '#e8d6b0', 0.45))
-
-  // The steps.
-  const stoneGeo = new THREE.CylinderGeometry(0.2, 0.25, 0.09, 7)
-  const stones = new THREE.InstancedMesh(stoneGeo, new THREE.MeshStandardMaterial({ roughness: 0.75 }), Math.max(1, P.stones.length))
-  stones.count = P.stones.length
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), v = new THREE.Vector3()
-  P.stones.forEach((st, i) => {
-    q.setFromEuler(e.set(0, st.rot, 0))
-    m.compose(v.set(st.p[0], 0.05, st.p[2]), q, s.set(1, 1, 1))
-    stones.setMatrixAt(i, m)
-    stones.setColorAt(i, st.group < 0 ? col('#c9c2b3') : mix(colorOf(st.group, hues), '#e9e2d2', Math.min(0.45, st.age / 120)))
-  })
-  group.add(stones)
-
-  // Trees, in the colours of who planted them.
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.09, 0.9, 5), new THREE.MeshLambertMaterial({ color: '#6b4a34' }), Math.max(1, P.trees.length))
-  const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.55, 0), new THREE.MeshLambertMaterial({ flatShading: true }), Math.max(1, P.trees.length))
-  trunk.count = crown.count = P.trees.length
-  P.trees.forEach((t, i) => {
-    m.compose(v.set(t.p[0], 0.45 * t.scale, t.p[2]), q.identity(), s.setScalar(t.scale))
-    trunk.setMatrixAt(i, m)
-    m.compose(v.set(t.p[0], 1.15 * t.scale, t.p[2]), q.setFromEuler(e.set(0, i, 0)), s.set(t.scale, t.scale * 1.25, t.scale))
-    crown.setMatrixAt(i, m)
-    crown.setColorAt(i, t.group < 0 ? col('#5d8a4c') : mix(colorOf(t.group, hues), '#4f8a4a', 0.3))
-  })
-  group.add(trunk, crown)
-
-  // Lanterns every 25 steps, the steps from this week glowing, and the one ahead.
-  const gp: number[] = [], gc: number[] = [], gs: number[] = [], gt: number[] = []
-  const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 1.1, 0.06), new THREE.MeshLambertMaterial({ color: '#3b2f2a' }), Math.max(1, P.lanterns.length))
-  posts.count = P.lanterns.length
-  P.lanterns.forEach((l, i) => {
-    m.compose(v.set(l.p[0], 0.55, l.p[2]), q.identity(), s.set(1, 1, 1))
-    posts.setMatrixAt(i, m)
-    gp.push(l.p[0], 1.15, l.p[2]); push3(gc, col('#ffcf7a')); gs.push(0.9); gt.push(still ? 0 : 0.08)
-  })
-  group.add(posts)
-  for (const st of P.stones) {
-    if (st.age >= 7) continue
-    gp.push(st.p[0], 0.13, st.p[2]); push3(gc, st.group < 0 ? col('#fff2d6') : col(colorOf(st.group, hues)), 0.7); gs.push(st.age === 0 ? 0.32 : 0.2); gt.push(still ? 0 : 0.3)
-  }
-  const ahead = pathPoint(P.line, P.end + (data.votes.length ? 0.62 : 0))
-  gp.push(ahead.p[0], 0.12, ahead.p[2]); push3(gc, col('#ffffff'), 0.9); gs.push(0.6); gt.push(still ? 0 : 0.6)
-  group.add(glowPoints({ pos: gp, color: gc, size: gs, twinkle: gt, atten: true, far: 70 }))
-
-  // Low hills, kept off the path.
-  const hr = rng(77), hillGeo = new THREE.SphereGeometry(1, 20, 10)
-  const hillMat = new THREE.MeshLambertMaterial({ color: '#6f8d4e' })
-  for (let i = 0, hills = Math.min(300, 24 + Math.round(P.end / 6)); i < hills; i++) {
-    const sAt = hr() * (P.end + 30) - 10, side = (hr() < 0.5 ? -1 : 1) * (14 + hr() * 30)
-    const { p, heading } = pathPoint(P.line, Math.max(0, sAt))
-    const hill = new THREE.Mesh(hillGeo, hillMat)
-    hill.position.set(p[0] + Math.cos(heading) * side, -1, p[2] - Math.sin(heading) * side)
-    // Never over the path: as wide as the gap to it allows.
-    const reach = Math.min(8 + hr() * 14, Math.abs(side) - 5)
-    hill.scale.set(reach, 2 + hr() * 5, reach)
-    group.add(hill)
-  }
-
-  const labels: Built['labels'] = []
-  if (data.votes.length) labels.push({ text: 'Today', color: '#ffffff', at: new THREE.Vector3(P.stones.at(-1)!.p[0], 0.9, P.stones.at(-1)!.p[2]), far: 40, small: true })
-  for (const l of P.lanterns) if (l.n % 100 === 0) labels.push({ text: String(l.n), color: '#ffe3ad', at: new THREE.Vector3(l.p[0], 1.6, l.p[2]), far: 45, small: true })
-
-  let back = 0, backTarget = 0
-  const at = new THREE.Vector3(), eye = new THREE.Vector3()
+  const sky = paintedSky('#141413')
+  ;(sky.material as THREE.ShaderMaterial).uniforms.uPath.value = 1
+  sky.userData.follow = 'xyz'
+  group.add(sky, world.group)
+  const fog = new THREE.Fog('#f2c4a4', 60, 220)
+  const H = world.height, target = new THREE.Vector3(0, H * 0.55, 0)
   return {
-    group, labels, fog,
-    lookBack: (t) => { backTarget = Math.max(0, Math.min(1, t)) },
-    frame: (t, cam, yaw, pitch, follow) => {
-      back += (backTarget - back) * follow
-      // A short path is seen from a little way off, so the first steps are in view.
-      const here = Math.max(P.end + 5, 13) - back * Math.max(0, P.end - 6)
-      const a = pathPoint(P.line, here), b = pathPoint(P.line, Math.max(0, here - 10))
-      const sway = still ? 0 : Math.sin(t * 0.15) * 0.04
-      const ang = a.heading + Math.PI + yaw + sway
-      at.set(b.p[0], 0.4, b.p[2])
-      const dist = Math.hypot(a.p[0] - b.p[0], a.p[2] - b.p[2]) + 0.01
-      eye.set(at.x - Math.sin(ang) * dist, 3.4 + pitch * 8, at.z - Math.cos(ang) * dist)
-      cam.position.copy(eye)
-      cam.lookAt(at)
+    group, fog,
+    labels: world.labels.map((l) => ({ text: l.text, color: l.color, at: new THREE.Vector3(...l.at), small: true })),
+    look: { toneMapping: THREE.NoToneMapping, bloom: 0.25, threshold: 0.86 },
+    frame: (t, cam, yaw, pitch, zoom) => {
+      world.grow(1, still ? 0 : t)
+      cam.fov = 46
+      const dist = fit(cam, 15, H * 0.55 + 9) * zoom
+      const a = 0.75 + (still ? 0 : t * 0.02) + yaw, el = Math.max(-0.05, Math.min(1.2, 0.22 + pitch))
+      cam.position.set(Math.sin(a) * dist * Math.cos(el), target.y + Math.sin(el) * dist, Math.cos(a) * dist * Math.cos(el))
+      cam.lookAt(target)
+      fog.near = dist * 1.05; fog.far = dist * 3.4
     },
   }
 }
 
-// ── City: a floor for every vote ─────────────────────────────────────
+// ── City: a sunny cartoon town ───────────────────────────────────────
 
 function buildCity(data: WorldPayload, hues: number[], seeds: number[], still: boolean): Built {
+  const world = toyTown(data.votes, hues, seeds)
+  world.grow(1, 0)
   const group = new THREE.Group()
-  const n = data.identities.length
-  const C = cityLayout(data.votes, n, seeds)
-  group.add(skyDome('#141a3d', '#e59a7c', '#14162a'))
-  const fog = new THREE.Fog('#4b3f63', C.extent * 1.6, C.extent * 4 + 60)
-  group.add(new THREE.HemisphereLight('#9fb3ff', '#2a2340', 1.2))
-  const moon = new THREE.DirectionalLight('#ffd9c2', 1.1)
-  moon.position.set(40, 60, 25)
-  group.add(moon)
-
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(600, 64), new THREE.MeshLambertMaterial({ color: '#1b1d2e' }))
-  ground.rotation.x = -Math.PI / 2
-  group.add(ground)
-
-  // The blocks: pavement, and the park in the middle.
-  const slab = new THREE.BoxGeometry(BLOCK, 0.14, BLOCK)
-  const park = new THREE.Mesh(slab, new THREE.MeshLambertMaterial({ color: '#2f5a3c' }))
-  park.position.y = 0.07
-  group.add(park)
-  const pave = new THREE.InstancedMesh(slab, new THREE.MeshLambertMaterial({ color: '#34374d' }), Math.max(1, C.blocks.length))
-  pave.count = C.blocks.length
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), v = new THREE.Vector3()
-  C.blocks.forEach((b, i) => { pave.setMatrixAt(i, m.compose(v.set(b.x, 0.07, b.z), q, s.set(1, 1, 1))) })
-  group.add(pave)
-
-  // The buildings, a floor at a time, their bodies dark and tinted.
-  const floors = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.05 }), Math.max(1, C.floors.length))
-  floors.count = C.floors.length
-  const gp: number[] = [], gc: number[] = [], gs: number[] = [], gt: number[] = []
-  const r = rng(99)
-  const warm = col('#ffd9a0')
-  const tops = new Map<number, (typeof C.floors)[number]>()
-  C.floors.forEach((f, i) => {
-    floors.setMatrixAt(i, m.compose(v.set(f.p[0], f.p[1] + 0.14, f.p[2]), q, s.set(f.w, FLOOR_H * 0.94, f.d)))
-    floors.setColorAt(i, mix(f.group < 0 ? '#8d8a99' : colorOf(f.group, hues), '#1f2236', 0.7))
-    tops.set(f.building, f)
-    // Windows: every one lit on floors from this week, about half on the rest.
-    const lit = mix(warm, f.group < 0 ? warm : col(colorOf(f.group, hues)), 0.3)
-    for (const side of [0, 1, 2, 3]) {
-      const along = side % 2 === 0 ? f.w : f.d
-      const count = Math.max(1, Math.floor(along / 0.55))
-      for (let k = 0; k < count; k++) {
-        const on = f.age < 7 || r() < 0.45
-        if (!on) continue
-        const off = (k + 0.5) / count - 0.5
-        const x = side === 0 ? off * f.w : side === 2 ? -off * f.w : side === 1 ? f.w / 2 + 0.02 : -f.w / 2 - 0.02
-        const z = side === 1 ? off * f.d : side === 3 ? -off * f.d : side === 0 ? f.d / 2 + 0.02 : -f.d / 2 - 0.02
-        gp.push(f.p[0] + x, f.p[1] + 0.16, f.p[2] + z)
-        push3(gc, lit, f.age < 7 ? 1 : 0.55)
-        gs.push(f.age < 7 ? 0.42 : 0.3)
-        gt.push(still ? 0 : f.age === 0 ? 0.35 : 0.04)
-      }
-    }
-  })
-  group.add(floors)
-
-  // A red light on top of the building that grew last, as on any town's tallest crane.
-  const newest = C.floors.at(-1)
-  if (newest) {
-    const top = tops.get(newest.building)!
-    gp.push(top.p[0], top.p[1] + 0.5, top.p[2]); push3(gc, col('#ff4d4d')); gs.push(0.9); gt.push(still ? 0 : 0.9)
-  }
-
-  // Streetlights round every block, and trees in the park.
-  for (const b of [{ x: 0, z: 0 }, ...C.blocks]) {
-    for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, -1], [1, 0], [0, 1], [-1, 0]]) {
-      gp.push(b.x + dx * (BLOCK / 2 + 0.6), 0.9, b.z + dz * (BLOCK / 2 + 0.6)); push3(gc, col('#ffc77a'), 0.8); gs.push(0.55); gt.push(0)
-    }
-  }
-  const tr = rng(5)
-  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.7, 0), new THREE.MeshLambertMaterial({ color: '#3f7a4c', flatShading: true }), 9)
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + tr()
-    crowns.setMatrixAt(i, m.compose(v.set(Math.cos(a) * (2 + tr() * 2.2), 0.95, Math.sin(a) * (2 + tr() * 2.2)), q, s.setScalar(0.8 + tr() * 0.6)))
-  }
-  group.add(crowns)
-  gp.push(0, 0.4, 0); push3(gc, col('#9fd8ff')); gs.push(1.6); gt.push(still ? 0 : 0.2)
-  group.add(glowPoints({ pos: gp, color: gc, size: gs, twinkle: gt, atten: true, far: C.extent * 4 + 60 }))
-
-  const labels = C.labels.map((l) => ({
-    text: l.group < 0 ? 'The everyday' : data.identities[l.group].name,
-    color: l.group < 0 ? '#ece6d8' : colorOf(l.group, hues),
-    at: new THREE.Vector3(...l.p),
-  }))
-  const radius = Math.max(24, C.extent * 2.2)
+  const sky = paintedSky('#141413')
+  ;(sky.material as THREE.ShaderMaterial).uniforms.uTown.value = 1
+  sky.userData.follow = 'xyz'
+  group.add(sky, world.group)
+  const fog = new THREE.Fog('#d3ecff', 60, 220)
+  const [cx, cz] = world.center, reach = Math.max(12, world.reach)
+  const target = new THREE.Vector3(cx, 1.5, cz)
+  const names = cityLayout(data.votes, hues.length, seeds).labels
   return {
-    group, labels, fog,
-    frame: (t, cam, yaw, pitch) => {
-      const a = (still ? 0.6 : 0.6 + t * 0.025) + yaw
-      const el = 0.62 + pitch
-      cam.position.set(Math.sin(a) * radius * Math.cos(el), radius * Math.sin(el), Math.cos(a) * radius * Math.cos(el))
-      cam.lookAt(0, 1.5, 0)
+    group, fog,
+    labels: names.map((l) => ({
+      text: l.group < 0 ? 'The everyday' : data.identities[l.group]?.name ?? '',
+      color: l.group < 0 ? '#ffffff' : colorOf(l.group, hues),
+      at: new THREE.Vector3(...l.p),
+    })),
+    look: { toneMapping: THREE.NoToneMapping, bloom: 0.1, threshold: 0.94 },
+    frame: (t, cam, yaw, pitch, zoom) => {
+      world.grow(1, still ? 0 : t)
+      cam.fov = 26
+      const dist = fit(cam, reach, reach * 0.62) * zoom
+      const a = 0.75 + (still ? 0 : t * 0.02) + yaw, el = Math.max(0.12, Math.min(1.35, 0.68 + pitch))
+      cam.position.set(cx + Math.sin(a) * dist * Math.cos(el), target.y + Math.sin(el) * dist, cz + Math.cos(a) * dist * Math.cos(el))
+      cam.lookAt(target)
+      fog.near = dist * 1.15; fog.far = dist * 3
     },
   }
 }
@@ -398,10 +261,12 @@ function buildCity(data: WorldPayload, hues: number[], seeds: number[], still: b
 // ── The scene ─────────────────────────────────────────────────────────
 
 export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElement): WorldScene {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'low-power' })
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.05
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 2000)
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -414,28 +279,55 @@ export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElem
     const box = canvas.parentElement?.getBoundingClientRect()
     w = Math.max(1, Math.round(box?.width ?? 1)); h = Math.max(1, Math.round(box?.height ?? 1))
     renderer.setSize(w, h, false)
+    composer?.setPixelRatio(renderer.getPixelRatio())
+    composer?.setSize(w, h)
     camera.aspect = w / h
     camera.fov = w < 560 ? 66 : 58
     camera.updateProjectionMatrix()
   }
+  // Glow on what is lit — stars, lanterns, windows — as the landing page does.
+  const composer: EffectComposer = new EffectComposer(renderer)
+  composer.addPass(new RenderPass(scene, camera))
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.55, 0.75)
+  composer.addPass(bloom)
+  composer.addPass(new OutputPass())
   const ro = new ResizeObserver(resize)
   if (canvas.parentElement) ro.observe(canvas.parentElement)
   resize()
 
-  // Drag to look around; it eases back a little when let go.
-  let yaw = 0, pitch = 0, yawT = 0, pitchT = 0, dragging: { x: number; y: number } | null = null
-  const down = (e: PointerEvent) => { dragging = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId) }
+  // Drag to turn round it, scroll or pinch to come closer. The turn drifts
+  // back a little when let go; how close you came stays.
+  const insetT = { right: 0, bottom: 0 }, inset = { right: 0, bottom: 0 }
+  let yaw = 0, pitch = 0, yawT = 0, pitchT = 0, zoom = 1, zoomT = 1, dragging: { x: number; y: number } | null = null
+  const touches = new Map<number, { x: number; y: number }>()
+  let pinch = 0
+  const down = (e: PointerEvent) => {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    canvas.setPointerCapture(e.pointerId)
+    if (touches.size === 1) dragging = { x: e.clientX, y: e.clientY }
+    if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); dragging = null }
+  }
   const move = (e: PointerEvent) => {
+    if (!touches.has(e.pointerId)) return
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (touches.size === 2) {
+      const [a, b] = [...touches.values()], d = Math.hypot(a.x - b.x, a.y - b.y)
+      if (pinch) zoomT = Math.max(0.4, Math.min(1.8, zoomT * (pinch / d)))
+      pinch = d
+      return
+    }
     if (!dragging) return
-    yawT -= (e.clientX - dragging.x) * 0.004
-    pitchT = Math.max(-0.25, Math.min(0.3, pitchT + (e.clientY - dragging.y) * 0.002))
+    yawT -= (e.clientX - dragging.x) * 0.005
+    pitchT = Math.max(-0.5, Math.min(0.6, pitchT + (e.clientY - dragging.y) * 0.003))
     dragging = { x: e.clientX, y: e.clientY }
   }
-  const up = () => { dragging = null }
+  const up = (e: PointerEvent) => { touches.delete(e.pointerId); pinch = 0; dragging = null }
+  const wheel = (e: WheelEvent) => { e.preventDefault(); zoomT = Math.max(0.4, Math.min(1.8, zoomT * Math.exp(e.deltaY * 0.0012))) }
   canvas.addEventListener('pointerdown', down)
   canvas.addEventListener('pointermove', move)
   canvas.addEventListener('pointerup', up)
   canvas.addEventListener('pointercancel', up)
+  canvas.addEventListener('wheel', wheel, { passive: false })
 
   // Only drawn while it can be seen.
   let visible = true
@@ -454,8 +346,15 @@ export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElem
     const follow = 1 - Math.exp(-dt * 5)
     yaw += (yawT - yaw) * follow
     pitch += (pitchT - pitch) * follow
-    if (!dragging) { yawT *= Math.exp(-dt * 0.3); pitchT *= Math.exp(-dt * 0.6) }
-    built.frame(t, camera, yaw, pitch, follow)
+    zoom += (zoomT - zoom) * follow
+    inset.right += (insetT.right - inset.right) * follow
+    inset.bottom += (insetT.bottom - inset.bottom) * follow
+    if (!dragging) { yawT *= Math.exp(-dt * 0.15); pitchT *= Math.exp(-dt * 0.4) }
+    // Framed in what the panels leave, and centred there.
+    camera.userData.room = [Math.max(0.3, (w - inset.right) / w), Math.max(0.3, (h - inset.bottom) / h)]
+    built.frame(t, camera, yaw, pitch, zoom)
+    camera.setViewOffset(w, h, inset.right / 2, inset.bottom / 2, w, h)
+    camera.updateProjectionMatrix()
     for (const o of built.group.children) {
       if (o.userData.follow === 'xyz') o.position.copy(camera.position)
       else if (o.userData.follow === 'xz') o.position.set(camera.position.x, 0, camera.position.z)
@@ -463,13 +362,13 @@ export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElem
     const scale = renderer.getPixelRatio() * h / (2 * Math.tan((camera.fov * Math.PI) / 360))
     built.group.traverse((o) => {
       const mat = (o as THREE.Points).material as THREE.ShaderMaterial | undefined
-      if (mat?.uniforms?.uTime) {
-        mat.uniforms.uTime.value = still ? 0 : t
-        mat.uniforms.uPR.value = renderer.getPixelRatio()
-        mat.uniforms.uScale.value = scale
-      }
+      // Not every shader has all three: the waterfall only keeps time.
+      const u = mat?.uniforms
+      if (u?.uTime) u.uTime.value = still ? 0 : t
+      if (u?.uPR) u.uPR.value = renderer.getPixelRatio()
+      if (u?.uScale) u.uScale.value = scale
     })
-    renderer.render(scene, camera)
+    composer.render()
     for (const l of labels) {
       v.copy(l.at)
       const dist = v.distanceTo(camera.position)
@@ -501,10 +400,14 @@ export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElem
       clear()
       const hues = data.identities.map((i) => i.hue)
       const seeds = data.identities.map((i) => i.id)
-      built = kind === 'sky' ? buildSky(data, hues, seeds, still) : kind === 'path' ? buildPath(data, hues, seeds, still) : buildCity(data, hues, seeds, still)
+      built = kind === 'sky' ? buildSky(data, hues, seeds, still) : kind === 'path' ? buildPath(data, hues, still) : buildCity(data, hues, seeds, still)
       scene.add(built.group)
       scene.fog = built.fog ?? null
+      renderer.toneMapping = built.look.toneMapping
+      bloom.strength = built.look.bloom
+      bloom.threshold = built.look.threshold
       yaw = yawT = pitch = pitchT = 0
+      zoom = zoomT = 1
       labels = built.labels.map((l) => {
         const el = document.createElement('div')
         el.textContent = l.text
@@ -514,6 +417,7 @@ export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElem
       })
     },
     lookBack(t) { built?.lookBack?.(t) },
+    setInsets(right, bottom) { insetT.right = right; insetT.bottom = bottom },
     dispose() {
       cancelAnimationFrame(raf)
       clear()
@@ -523,6 +427,8 @@ export function createWorldScene(canvas: HTMLCanvasElement, labelLayer: HTMLElem
       canvas.removeEventListener('pointermove', move)
       canvas.removeEventListener('pointerup', up)
       canvas.removeEventListener('pointercancel', up)
+      canvas.removeEventListener('wheel', wheel)
+      composer.dispose(); bloom.dispose()
       renderer.dispose()
     },
   }

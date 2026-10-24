@@ -83,14 +83,14 @@ function LearnChart({ dotsP, curveP }: { dotsP: number; curveP: number }) {
 }
 
 /** The opening: the mark drawn from a voice, then flown into the bar. */
-function Splash({ lt, W, VH, target }: { lt: number; W: number; VH: number; target: { x: number; y: number } | null }) {
+function Splash({ lt, W, VH, k, target }: { lt: number; W: number; VH: number; k: number; target: { x: number; y: number } | null }) {
   const it = lt - 2.15
-  const tx = target ? target.x : W / 2, ty = target ? target.y : 45
-  const fly = eo((it - 0.85) / 0.55), endS = 26 / 96
+  const tx = target ? target.x : W / 2, ty = target ? target.y : 45 * k
+  const fly = eo((it - 0.85) / 0.55), endS = (26 / 96) * k
   const back = (x: number) => { x = clamp(x); return 1 + 2.7 * Math.pow(x - 1, 3) + 1.7 * Math.pow(x - 1, 2) }
   const pop = back(lt / 0.55), morph = eo((lt - 0.05) / 0.5)
   const wp = eo((lt - 2.35) / 0.45), off = wp * 84 * (1 - fly)
-  const sS = lerp(lerp(0.15, 1, pop), endS, fly), sx = lerp(W / 2 - off, tx, fly), sy = lerp(VH * 0.42, ty, fly)
+  const sS = lerp(lerp(0.15, 1, pop) * k, endS, fly), sx = lerp(W / 2 - off, tx, fly), sy = lerp(VH * 0.42, ty, fly)
   const lin = clamp((lt - 0.35) / 0.3), cp = eo((lt - 1.4) / 0.5), ck = eo((lt - 1.95) / 0.4)
   const pg = clamp((lt - 2.3) / 0.65), bump = 1 + 0.07 * Math.sin(Math.PI * clamp((lt - 2.2) / 0.32))
   const bars = [4, 8, 12, 16, 20, 24, 28].map((x, i) => {
@@ -125,6 +125,19 @@ function Splash({ lt, W, VH, target }: { lt: number; W: number; VH: number; targ
 const BTN_DARK: CSSProperties = { display: 'inline-flex', alignItems: 'center', flex: 'none', whiteSpace: 'nowrap', height: 44, boxSizing: 'border-box', borderRadius: 10, background: '#1b1c1f', color: '#fefffe', padding: '0 18px', fontSize: 16, fontWeight: 600, textDecoration: 'none' }
 const BTN_LIGHT: CSSProperties = { display: 'inline-flex', alignItems: 'center', flex: 'none', whiteSpace: 'nowrap', height: 44, boxSizing: 'border-box', borderRadius: 10, border: '1px solid #dcdad5', background: '#fff', color: '#1b1c1f', padding: '0 18px', fontSize: 16, fontWeight: 500, textDecoration: 'none' }
 
+/**
+ * How much bigger to draw everything on a large screen. The page is laid
+ * out for a laptop-sized window; on a 27" display or a TV that left it a
+ * small island with oceans either side. Above about 1440×900 the whole
+ * story is drawn at that size and scaled up evenly, so it fills the screen
+ * the way it fills a laptop's. Never scaled down: smaller screens have
+ * their own layouts.
+ */
+export function stageScale(w: number, h: number) {
+  const k = Math.min(w / 1440, h / 900)
+  return k < 1.06 ? 1 : Math.min(2.2, k)
+}
+
 export function StoryLanding() {
   const [size, setSize] = useState({ w: 1280, vh: 800 })
   const [sp, setSp] = useState(0)
@@ -138,6 +151,9 @@ export function StoryLanding() {
   const [whyActive, setWhyActive] = useState(false)
   const storyRef = useRef<HTMLElement>(null)
   const navMarkRef = useRef<HTMLSpanElement>(null)
+  const heroRef = useRef<HTMLDivElement>(null)
+  /** How tall the hero really is, wrapped as it is: the window opens below it, never over it. */
+  const [heroH, setHeroH] = useState<number | null>(null)
   const faqRef = useRef<HTMLDivElement>(null)
   const installState = useInstall()
 
@@ -151,6 +167,17 @@ export function StoryLanding() {
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
+  }, [])
+
+  // The hero's height changes with the width, and once the web font arrives.
+  useLayoutEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+    const measure = () => setHeroH(el.offsetHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [])
 
   // How far through the story the page has scrolled, 0→1.
@@ -203,13 +230,16 @@ export function StoryLanding() {
     if (error) { setSigningIn(false); window.location.href = '/login' }
   }, [])
 
-  const W = size.w, VH = size.vh
-  const F: Frame = frame(W, VH, sp, lt)
+  // The story's own coordinates: the window's, divided by how much it is scaled up.
+  const k = stageScale(size.w, size.vh)
+  const W = size.w / k, VH = size.vh / k
+  const F: Frame = frame(W, VH, sp, lt, heroH)
+  const zoomed: CSSProperties = k === 1 ? {} : { zoom: k }
   // Dark for the evening, for the icon filling the screen, and for the story after it.
   const dark = F.dark || F.dv.grow > 0.6 || whyActive
   const it = lt - 2.15
   const fadeUp = (t0: number) => { const p = eo((it - t0) / 0.6); return { opacity: p, transform: `translateY(${((1 - p) * 14).toFixed(1)}px)` } }
-  const heroLine = 'Say what needs doing. Watch who you become.'
+  const heroLine = 'Say it. Do it. Become it.'
   const heroWords = heroLine.split(' ')
   const inStory = sp > 0 && sp < 1
 
@@ -224,7 +254,7 @@ export function StoryLanding() {
 
       {/* ── The bar ── */}
       <nav aria-label="Main" style={{ position: 'fixed', left: 0, right: 0, top: 0, zIndex: 40, display: 'flex', justifyContent: 'center', padding: '0 16px', pointerEvents: 'none' }}>
-        <div style={{ opacity: clamp((it - 1.05) / 0.4), pointerEvents: 'auto', marginTop: 20, display: 'flex', alignItems: 'center', gap: 4, height: 48, boxSizing: 'border-box', borderRadius: 999, border: `1px solid ${navBd}`, background: dark ? 'rgba(20,20,21,.7)' : 'rgba(254,255,254,.82)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', padding: '0 7px 0 12px', boxShadow: '0 8px 32px rgba(0,0,0,.06)', color: navFg, transition: 'background .6s, border-color .6s, color .6s' }}>
+        <div style={{ opacity: clamp((it - 1.05) / 0.4), pointerEvents: 'auto', marginTop: Math.round(20 * k), transform: k === 1 ? undefined : `scale(${k})`, transformOrigin: 'top center', display: 'flex', alignItems: 'center', gap: 4, height: 48, boxSizing: 'border-box', borderRadius: 999, border: `1px solid ${navBd}`, background: dark ? 'rgba(20,20,21,.7)' : 'rgba(254,255,254,.82)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', padding: '0 7px 0 12px', boxShadow: '0 8px 32px rgba(0,0,0,.06)', color: navFg, transition: 'background .6s, border-color .6s, color .6s' }}>
           <a href="#top" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 10, fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em', textDecoration: 'none', color: navFg }}>
             <span ref={navMarkRef} style={{ display: 'inline-flex', opacity: it >= 1.4 ? 1 : 0 }}><Mark size={26} /></span>Acture
           </a>
@@ -243,31 +273,32 @@ export function StoryLanding() {
         </div>
       </nav>
 
-      {lt < INTRO_END && <Splash lt={lt} W={W} VH={VH} target={navTarget} />}
+      {lt < INTRO_END && <Splash lt={lt} W={size.w} VH={size.vh} k={k} target={navTarget} />}
 
       <main id="main">
         {/* ── The story: pinned to the screen while the page scrolls under it ── */}
         <section id="top" ref={storyRef} style={{ position: 'relative', height: `${STORY_VH}vh` }}>
           <div id="ch1" style={{ position: 'absolute', top: '110vh', left: 0, width: 1, height: 1 }} />
           <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', background: dark ? '#141415' : '#fefffe', transition: 'background .6s' }}>
+            {/* The stage, in the story's own coordinates, scaled up on a large screen. */}
+            <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: VH, transform: k === 1 ? undefined : `scale(${k})`, transformOrigin: '0 0' }}>
             <div aria-hidden style={{ opacity: F.c === 0 ? clamp((it - 1.3) / 1) : 1, position: 'absolute', left: F.glow.x, top: F.glow.y, width: 900, height: 700, transform: 'translate(-50%,-50%)', background: `radial-gradient(closest-side, ${F.glow.c}, transparent)`, pointerEvents: 'none', transition: 'background .6s' }} />
 
             {/* Hero */}
-            <div style={{ position: 'absolute', zIndex: 3, left: 0, right: 0, top: F.hero.top, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '0 24px', opacity: F.hero.op, transform: `translateY(${F.hero.ty}px)`, pointerEvents: F.hero.op > 0.5 ? 'auto' : 'none' }}>
-              <h1 aria-label={heroLine} style={{ margin: 0, maxWidth: 980, fontSize: F.narrow ? 'clamp(38px,10vw,56px)' : 'clamp(48px,6.6vw,88px)', fontWeight: 700, letterSpacing: '-0.05em', lineHeight: 1, paddingBottom: 8, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', columnGap: '.24em' }}>
+            <div ref={heroRef} style={{ position: 'absolute', zIndex: 3, left: 0, right: 0, top: F.hero.top, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '0 24px', opacity: F.hero.op, transform: `translateY(${F.hero.ty}px)`, pointerEvents: F.hero.op > 0.5 ? 'auto' : 'none' }}>
+              <h1 aria-label={heroLine} style={{ margin: 0, maxWidth: 980, fontSize: F.narrow ? 'clamp(38px,10vw,56px)' : F.short ? 'clamp(30px,5vw,48px)' : 'clamp(48px,6.6vw,88px)', fontWeight: 700, letterSpacing: '-0.05em', lineHeight: 1, paddingBottom: 8, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', columnGap: '.24em' }}>
                 {heroWords.map((t, i) => {
                   const p = eo((it - 1.15 - i * 0.07) / 0.75)
                   return <span key={i} aria-hidden style={{ display: 'inline-block', color: `color-mix(in oklab, #000 ${(100 - (i / Math.max(1, heroWords.length - 1)) * 100).toFixed(0)}%, #6a6a6a)`, opacity: clamp((it - 1.15 - i * 0.07) / 0.45), transform: `translateY(${((1 - p) * 0.45).toFixed(3)}em)`, filter: p >= 1 ? 'none' : `blur(${((1 - p) * 12).toFixed(1)}px)` }}>{t}</span>
                 })}
               </h1>
               <p style={{ ...fadeUp(1.75), margin: '16px 0 0', maxWidth: 540, fontSize: 'clamp(16px,1.6vw,19px)', lineHeight: 1.5, color: '#4a4a48', textWrap: 'pretty' }}>
-                A calm to-do list you talk to. It plans your day, learns when you really get things done and, if you like, turns every finished thing into a star, a step or a street.
+                A to-do list you talk to. It plans your day, and shows you who you’re becoming.
               </p>
               <div style={{ ...fadeUp(1.9), display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 24 }}>
                 <a href="/app" className="hover:opacity-[.88]" style={BTN_DARK}>Open Acture</a>
                 <a href="/login" className="hover:!bg-[#f7f7f5]" style={BTN_LIGHT}>Start today</a>
               </div>
-              <p style={{ ...fadeUp(2.1), margin: '12px 0 0', fontSize: 13, color: '#6b6a66' }}>Scroll: first a day, then why it works.</p>
             </div>
 
             {/* The chapters' words */}
@@ -275,7 +306,7 @@ export function StoryLanding() {
               <div key={tx.k} style={{ position: 'absolute', left: tx.left, top: tx.top, width: tx.width, transform: tx.tf, opacity: tx.op, textAlign: tx.align, color: tx.fg, pointerEvents: 'none' }} aria-hidden={tx.op < 0.5}>
                 <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: tx.kc }}>{tx.k}</div>
                 <h2 style={{ margin: '12px 0 0', fontSize: tx.fs, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1, textWrap: 'balance' }}>{tx.h}</h2>
-                <p style={{ margin: '14px 0 0', fontSize: 16.5, lineHeight: 1.5, color: tx.pc, textWrap: 'pretty' }}>{tx.p}</p>
+                <p style={{ margin: '14px 0 0', fontSize: tx.ps, lineHeight: 1.5, color: tx.pc, textWrap: 'pretty' }}>{tx.p}</p>
                 {tx.showDevices && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, fontSize: F.narrow ? 13 : 14, color: tx.pc }}>
                     <span><b style={{ color: tx.fg }}>Mac &amp; Windows</b> · Chrome: Install, in the address bar.</span>
@@ -331,6 +362,7 @@ export function StoryLanding() {
               <span style={{ position: 'relative', width: 80, height: 2, borderRadius: 2, background: dark ? 'rgba(255,255,255,.15)' : 'rgba(0,0,0,.1)', overflow: 'hidden' }}><span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${F.chap.pct.toFixed(1)}%`, background: '#F5A524' }} /></span>
               <span style={{ fontSize: 12.5, fontWeight: 500 }}>{F.chap.l}</span>
             </div>
+            </div>
           </div>
         </section>
 
@@ -338,6 +370,7 @@ export function StoryLanding() {
         <WhyStory
           W={W}
           VH={VH}
+          k={k}
           onActive={setWhyActive}
           buttons={(
             <>
@@ -348,7 +381,8 @@ export function StoryLanding() {
         />
 
         {/* ── Questions ── */}
-        <section id="faq" style={{ padding: 'clamp(80px,10vw,128px) 24px', background: '#f7f7f5', borderTop: '1px solid #ebe9e5', scrollMarginTop: 80 }}>
+        {/* Above the pinned picture of the story before it, which fades out underneath. */}
+        <section id="faq" style={{ ...zoomed, position: 'relative', zIndex: 1, padding: 'clamp(80px,10vw,128px) 24px', background: '#f7f7f5', borderTop: '1px solid #ebe9e5', scrollMarginTop: 80 }}>
           <div ref={faqRef} style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '40px 72px', alignItems: 'flex-start', opacity: faqSeen ? 1 : 0.001, transform: faqSeen ? 'none' : 'translateY(24px)', transition: 'opacity .9s, transform 1.1s cubic-bezier(.32,.72,0,1)' }}>
             <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 110 }}>
               <h2 style={{ margin: 0, fontSize: 'clamp(36px,5vw,56px)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1 }}>Questions,<br />answered.</h2>
@@ -382,7 +416,7 @@ export function StoryLanding() {
         </section>
 
         {/* ── The door ── */}
-        <section id="open" style={{ position: 'relative', padding: 'clamp(96px,12vw,150px) 24px 0', background: '#141415', color: '#f4f3f0', overflow: 'hidden' }}>
+        <section id="open" style={{ ...zoomed, position: 'relative', zIndex: 1, padding: 'clamp(96px,12vw,150px) 24px 0', background: '#141415', color: '#f4f3f0', overflow: 'hidden' }}>
           <div aria-hidden style={{ position: 'absolute', left: '50%', top: '-20%', width: 900, height: 600, transform: 'translateX(-50%)', background: 'radial-gradient(closest-side, rgba(245,165,36,.22), transparent)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative', maxWidth: 1120, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <Mark size={64} />

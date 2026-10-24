@@ -8,11 +8,13 @@ import type { WorldScene } from './scene'
  * Where the world is drawn. three.js comes in with scene.ts, imported only
  * once this mounts — the lists never pay for it.
  */
-export function WorldCanvas({ kind, data, lookBack = 0, className = '' }: {
+export function WorldCanvas({ kind, data, lookBack = 0, insets = [0, 0], className = '' }: {
   kind: WorldKind
   data: WorldPayload
   /** The path only: how far back along it to stand, 0–1. */
   lookBack?: number
+  /** px covered by the page's panels: on the right, and at the bottom. */
+  insets?: [number, number]
   className?: string
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -36,9 +38,11 @@ export function WorldCanvas({ kind, data, lookBack = 0, className = '' }: {
 
   useEffect(() => { scene?.show(kind, data) }, [scene, kind, data])
   useEffect(() => { scene?.lookBack(lookBack) }, [scene, lookBack])
+  useEffect(() => { scene?.setInsets(insets[0], insets[1]) }, [scene, insets])
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    // Positioned by the caller when it says so (full-bleed: absolute inset-0), relative otherwise.
+    <div className={`overflow-hidden ${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative'} ${className}`}>
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full touch-none cursor-grab active:cursor-grabbing" aria-hidden />
       <div ref={labelsRef} className="absolute inset-0 pointer-events-none" aria-hidden />
       {failed && (

@@ -111,7 +111,7 @@ export const FAQ = [
   { q: 'Where does my stuff go?', a: 'Your lists live in Acture’s own database. What you say or attach is sent to an AI model to be read, and that is all it is used for.' },
   { q: 'Will it buzz my phone?', a: 'Not yet. Reminders fire while Acture is open; there are no push notifications.' },
   { q: 'Is there an app?', a: 'Yes, and it is the same Acture. Install it from Chrome, on a computer or an Android phone: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
-  { q: 'Is it a game now?', a: 'Only if you want it to be. Becoming is off until you switch it on in Settings. Then you name who you’re becoming, every to-do you finish counts as a vote for them, and you choose how to see it: a night sky, a path or a small city. No points to lose, nobody to beat, and a missed day takes nothing away.' },
+  { q: 'Is it a game now?', a: 'Only if you want it to be. Your World is off until you switch it on in Settings. Then you name who you’re becoming, every to-do you finish counts as a vote for them, and you choose how to see it: a night sky, a path or a small city. No points to lose, nobody to beat, and a missed day takes nothing away.' },
   { q: 'Who can use it?', a: 'Right now it is a private instance: you sign in with a Google account that has been let in. It is free while it is being built.' },
 ]
 
@@ -145,20 +145,29 @@ export interface Row {
 interface Pose { cx: number; cy: number; w: number; h: number; r: number; bez: number; side: number; chrome: number; icon: number; rx: number; ry: number; rz: number; sc: number }
 
 /** Everything about one frame of the story. */
-export function frame(W: number, VH: number, sp: number, introT: number) {
+export function frame(W: number, VH: number, sp: number, introT: number, heroH: number | null = null) {
   // ── Story clock: ten phases, each with its own 0→1.
   const f = Math.min(NCH - 1e-4, sp * NCH), c = Math.floor(f), lp = f - c
   const seg = (a: number, b: number) => clamp((lp - a) / (b - a))
   const reached = (ch: number, at: number) => c > ch || (c === ch && lp >= at)
-  const narrow = W < 900
+  // Narrow: one column, the window over its words. A phone held sideways is
+  // not narrow — too short to stack anything — and gets the side-by-side
+  // layout with smaller type (short).
+  const narrow = W < 900 && W < VH * 1.2
+  const short = !narrow && VH < 560
 
   // ── Where the device sits in each phase: a desktop window, a phone, the app icon.
   // On a phone the device sits under the bar (never behind it) and the
   // chapter's words directly under the device, so the two never meet.
-  const NARROW_TOP = 84
-  const dw = narrow ? Math.min(420, W - 32) : Math.min(900, W * 0.56)
-  const dh = narrow ? Math.max(240, Math.min(420, VH * 0.46)) : Math.min(580, VH * 0.72)
-  const Lx = W * 0.36, Rx = W * 0.64, mid = VH * 0.5
+  // A tablet held upright is narrow too, but has room for a bigger window
+  // than a phone; and on a tall screen the window and its words sit in the
+  // middle together rather than leaving the lower half empty.
+  const tablet = narrow && W >= 600
+  const dw = narrow ? Math.min(tablet ? 640 : 420, W - 32) : Math.min(900, W * 0.56)
+  const dh = narrow ? Math.max(240, Math.min(tablet ? 600 : 460, VH * (tablet ? 0.5 : 0.46))) : short ? (VH - 84) * 0.92 : Math.min(580, VH * 0.72)
+  const NARROW_TOP = Math.max(84, (VH - (dh + 20 + 230)) / 2 + 24)
+  // On a short screen the middle is below the bar, not behind it.
+  const Lx = W * 0.36, Rx = W * 0.64, mid = short ? (VH + 76) / 2 : VH * 0.5
   type Base = Omit<Pose, 'rx' | 'ry' | 'rz' | 'sc'>
   const desk = (cx: number, cy: number, extra?: Partial<Base>): Base => ({ cx, cy, w: dw, h: dh, r: 14, bez: 0, side: narrow ? 0 : dw > 760 ? 200 : 0, chrome: 1, icon: 0, ...extra })
   const phone = (cx: number, cy: number): Base => narrow
@@ -166,11 +175,12 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
     : { cx, cy, w: Math.min(300, W - 60), h: Math.min(620, VH * 0.84), r: 46, bez: 10, side: 0, chrome: 0, icon: 0 }
   const icon = (cy: number): Base => ({ cx: W / 2, cy, w: 112, h: 112, r: 30, bez: 0, side: 0, chrome: 0, icon: 1 })
   const NY = NARROW_TOP + dh / 2
-  const heroTopPx = narrow ? 108 : VH < 760 ? 96 : 128
-  const heroBottom = heroTopPx + (narrow ? 310 : 290)
-  const y0 = Math.max(VH * 0.6, heroBottom + 24)
+  const heroTopPx = narrow ? 108 : short ? 72 : VH < 760 ? 96 : 128
+  // Measured when it can be (StoryLanding); a fair guess for the first frame.
+  const heroBottom = heroTopPx + (heroH ?? (narrow ? 310 : short ? 200 : 290))
+  const y0 = Math.max(VH * 0.6, heroBottom + 40)
   const bases: Base[] = narrow
-    ? [desk(W / 2, Math.max(VH * 0.64, heroBottom + 24) + dh / 2), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), phone(W / 2, VH * 0.34), icon(VH * 0.42)]
+    ? [desk(W / 2, Math.max(VH * 0.64, heroBottom + 32) + dh / 2), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), desk(W / 2, NY), phone(W / 2, VH * 0.34), icon(VH * 0.42)]
     : [desk(W / 2, y0 + dh / 2, { w: Math.min(1040, W - 96), side: 200 }), desk(Rx, mid), desk(Rx, mid), desk(Rx, mid), desk(Lx, mid), desk(Rx, mid), desk(Lx, VH * 0.46), desk(Rx, VH * 0.47), phone(Rx, mid), icon(VH * 0.45)]
   const ANG = [[14, 0, 0, 0.97], [0, -6, 0, 1], [4, 3, -1, 1], [0, 0, 0, 1.02], [2, 7, 0, 1], [12, 0, 0, 0.97], [0, 0, 0, 1], [0, 0, 0, 1], [0, -8, -2, 1], [0, 0, 0, 1]]
   const am = narrow ? 0.45 : 1
@@ -308,15 +318,17 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
   const texts = CHAPTERS.slice(1).map((ch, j) => {
     const i = j + 1, pose = POSES[i]
     const inn = c === i ? seg(0, 0.12) : 0, out = c === i ? seg(0.74, 0.88) : 0, op = c === i ? Math.min(inn, 1 - out) : 0
-    const leftSide = pose.cx > W / 2, tw = Math.max(280, Math.min(400, W * 0.27)), dk = i === 5
+    // As wide as the gap beside the window allows, never under it.
+    const leftSide = pose.cx > W / 2, tw = Math.min(400, Math.max(200, W * 0.36 - Math.max(24, W * 0.07) - 16)), dk = i === 5
     return {
       ...ch!, op,
-      left: narrow ? 20 : leftSide ? Math.max(24, W * 0.07) : W * 0.93 - tw,
-      width: narrow ? W - 40 : tw,
+      left: narrow ? (W - Math.min(W - 40, 560)) / 2 : leftSide ? Math.max(24, W * 0.07) : W * 0.93 - tw,
+      width: narrow ? Math.min(W - 40, 560) : tw,
       top: narrow ? NARROW_TOP + dh + 20 : pose.cy,
       tf: `translateY(${narrow ? 0 : -50}%) translateY(${(1 - inn) * 26 - out * 26}px)`,
       align: (narrow ? 'center' : 'left') as CSSProperties['textAlign'],
-      fs: narrow ? 'clamp(28px,7vw,36px)' : 'clamp(34px,3.6vw,52px)',
+      fs: narrow ? 'clamp(28px,7vw,36px)' : short ? 'clamp(24px,3.2vw,34px)' : 'clamp(34px,3.6vw,52px)',
+      ps: short ? 14.5 : 16.5,
       fg: dk ? '#f4f3f0' : '#1b1c1f', pc: dk ? '#bdbab4' : '#4a4a48', kc: dk ? '#818cf8' : '#b45309',
       // The per-device steps need room a short phone does not have.
       showDevices: 'devices' in ch! && !!ch!.devices && (!narrow || VH >= 720),
@@ -327,7 +339,7 @@ export function frame(W: number, VH: number, sp: number, introT: number) {
   const chapN = Math.max(1, Math.min(8, c))
 
   return {
-    c, lp, narrow, dark, th, dv, Pz, rows, rowIn, eRows, todayCount, isl, proj, projDone, keycaps, learn, photo, texts, palIdx,
+    c, lp, narrow, short, dark, th, dv, Pz, rows, rowIn, eRows, todayCount, isl, proj, projDone, keycaps, learn, photo, texts, palIdx,
     hero: { op: heroOp, ty: -seg(0, 0.6) * 60, top: heroTopPx },
     // On a phone the chapter's own label says where you are; the counter
     // would only sit on top of its words.
