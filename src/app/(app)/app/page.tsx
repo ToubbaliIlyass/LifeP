@@ -263,7 +263,7 @@ export default function Home() {
         {view === 'proposals' ? (
           <ProposalQueue onCountChange={setPendingCount} onOpenMenu={() => setMobileNavOpen(true)} />
         ) : view === 'world' ? (
-          // Becoming: who the to-dos are making you, as a world that grows.
+          // Your World: who the to-dos are making you, as a world that grows.
           <WorldView settings={settings} onSettingsChanged={setSettings} onOpenMenu={() => setMobileNavOpen(true)} />
         ) : view === 'settings' ? (
           // Drawn as one more list, with its own title in the list's column.

@@ -134,7 +134,7 @@ export interface Settings {
    */
   simple: boolean
   /**
-   * Becoming: who the to-dos are making you, drawn as a world that grows with
+   * Your World: who the to-dos are making you, drawn as a world that grows with
    * every one finished — a night sky, a path or a small city (see
    * src/lib/identity.ts). Off by default: it is there for the people it
    * helps, and a to-do list should never feel like a game nobody asked for.

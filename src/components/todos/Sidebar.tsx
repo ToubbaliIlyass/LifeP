@@ -60,7 +60,7 @@ export function Sidebar({
   onCapture: (how: 'listen' | 'type') => void
   /** Opens the assistant with these attached. */
   onAttach: (files: FileList) => void
-  /** Becoming, when it is switched on: which world it draws. */
+  /** Your World, when it is switched on: which world it draws. */
   world: WorldKind | null
 }) {
   const { todos, lists, date, patch, toggle, dragId, dragIds, setDragIds, plusDragging, setPlusDragging, startDraft, createList } = useTodos()
@@ -174,7 +174,7 @@ export function Sidebar({
             return (
               <a href="#world" onClick={follow('world')} className={rowClass('world', 'font-medium')}>
                 <Icon className="w-4 h-4 shrink-0 text-violet-500" />
-                <span className="flex-1 truncate">Becoming</span>
+                <span className="flex-1 truncate">Your World</span>
               </a>
             )
           })()}

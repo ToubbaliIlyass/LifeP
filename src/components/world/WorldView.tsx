@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronLeft, Plus, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronLeft, Maximize2, Minimize2, Plus, Trash2, Users, X } from 'lucide-react'
 import type { Settings } from '@/lib/settings'
 import { EVERYDAY_COLOR, IDENTITY_COLORS, WORLD_KINDS, colorOf, type Identity, type WorldKind, type WorldPayload } from '@/lib/identity'
 import { useDataChanged } from '@/lib/dataSignal'
@@ -13,11 +13,17 @@ import { WORLD_META } from './meta'
 /** Ways to finish "I’m becoming …", for a first identity. */
 const SUGGESTIONS = ['a runner', 'a reader', 'someone who writes', 'a good friend', 'someone who ships', 'calm']
 
-const SECTION = 'text-[14px] font-bold text-primary mt-8 mb-2.5 pb-1.5 border-b border-border/80'
 const CHIP = 'inline-flex items-center gap-1 rounded-full border px-2.5 py-[3px] text-[12.5px] leading-4 transition-colors'
+/** Frosted glass over the world: the controls float on it rather than sitting in a panel beside it. */
+const GLASS = 'bg-[rgba(16,16,24,.46)] backdrop-blur-xl border border-white/15 shadow-[0_8px_30px_rgba(0,0,0,.25)] text-white'
 
 /**
- * Becoming: who the to-dos are making you.
+ * Your World: who the to-dos are making you, as a place.
+ *
+ * Full-bleed on purpose: the world is the page, not a picture on it. The
+ * name, the switch between worlds, the count and the people you are
+ * becoming float over it on glass, the people in a panel that tucks away,
+ * and one press takes the whole thing full screen.
  *
  * The idea, from the psychology of habits: we come to know who we are partly
  * by watching what we do, so every finished to-do is a small vote for a kind
@@ -39,7 +45,38 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
   const [data, setData] = useState<WorldPayload | null>(null)
   const [open, setOpen] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
-  const [lookBack, setLookBack] = useState(0)
+  /** The people panel: open on a wide screen, tucked away on a phone until asked for. */
+  const [panel, setPanel] = useState(true)
+  const [full, setFull] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  /** What the panel covers, so the world is framed beside it (a side panel) or above it (a sheet). */
+  const [insets, setInsets] = useState<[number, number]>([0, 0])
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const measure = () => {
+      if (!panel) { setInsets([0, 0]); return }
+      const wide = window.innerWidth >= 768
+      setInsets(wide ? [el.offsetWidth + 32, 0] : [0, el.offsetHeight + 16])
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    window.addEventListener('resize', measure)
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
+  }, [panel, data])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read after mount, so server and first client render agree
+    if (window.innerWidth < 768) setPanel(false)
+    const onFull = () => setFull(document.fullscreenElement === rootRef.current)
+    document.addEventListener('fullscreenchange', onFull)
+    return () => document.removeEventListener('fullscreenchange', onFull)
+  }, [])
+  const toggleFull = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else rootRef.current?.requestFullscreen?.().catch(() => {})
+  }
   const world = settings?.world ?? { enabled: false, kind: 'sky' as WorldKind }
 
   const load = useCallback(() => {
@@ -106,113 +143,116 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="w-full mx-auto max-w-[860px] px-12 max-md:px-[18px] pt-10 max-md:pt-2 pb-16 text-[14px] max-md:text-[15px]">
-        <div className="md:hidden flex items-center h-9 -mx-1.5 mb-2">
-          <button onClick={onOpenMenu} aria-label="Back to lists" className="grid place-items-center w-9 h-9 rounded-md text-muted-foreground active:bg-foreground/[0.06]">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-        </div>
+    <div ref={rootRef} className="relative h-full w-full overflow-hidden bg-[#141413] text-white select-none">
+      {/* The world, edge to edge. */}
+      {data && <WorldCanvas kind={world.kind} data={data} insets={insets} className="absolute inset-0" />}
 
-        <header className="flex flex-wrap items-center gap-x-2 gap-y-3 mb-1">
-          <h1 className="min-w-0 flex items-center gap-2.5 text-[22px] font-bold leading-7 tracking-tight">
-            <Icon className="w-[22px] h-[22px] shrink-0 text-violet-500" />
-            Becoming
+      {/* Along the top: where you are, which world, and the buttons. */}
+      <div className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-start gap-2 p-4 max-md:p-3 bg-gradient-to-b from-black/45 via-black/15 to-transparent pointer-events-none">
+        <button onClick={onOpenMenu} aria-label="Back to lists" className={`md:hidden pointer-events-auto grid place-items-center w-10 h-10 rounded-full ${GLASS}`}>
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="min-w-0 pr-2 [text-shadow:0_1px_12px_rgba(0,0,0,.45)]">
+          <h1 className="flex items-center gap-2 text-[24px] max-md:text-[20px] font-bold leading-tight tracking-tight">
+            <Icon className="w-[22px] h-[22px] shrink-0 text-amber-300" />
+            Your World
           </h1>
-          <span className="flex-1" />
-          {/* Which world: one press, and it is rebuilt from the same votes. */}
-          <div role="radiogroup" aria-label="World" className="flex rounded-lg bg-foreground/[0.06] p-0.5">
-            {WORLD_KINDS.map((k) => {
-              const { name, Icon: KI } = WORLD_META[k]
-              const on = world.kind === k
-              return (
-                <button
-                  key={k}
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => { if (!on) { setLookBack(0); saveWorld({ kind: k }) } }}
-                  className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] font-medium transition ${on ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  <KI className="w-3.5 h-3.5" />{name}
-                </button>
-              )
-            })}
-          </div>
-        </header>
-        <p className="mb-4 text-muted-foreground">Every to-do you finish is a vote for who you’re becoming. {WORLD_META[world.kind].blurb}</p>
-
-        {!world.enabled && (
-          <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-violet-500/10 px-3 py-2.5 text-[13px]">
-            <span className="flex-1 min-w-[220px]">This is off, so it isn’t in the sidebar. Your votes are counted either way.</span>
-            <button onClick={() => saveWorld({ enabled: true })} className="rounded-md bg-violet-600 text-white px-2.5 py-1 font-semibold hover:opacity-90">Show it in the sidebar</button>
-          </div>
-        )}
-
-        {/* The world. */}
-        <div className="relative rounded-xl overflow-hidden bg-[#05060b] shadow-[0_1px_2px_rgba(0,0,0,.06),0_20px_50px_-24px_rgba(0,0,0,.45)]">
-          {data ? (
-            <WorldCanvas kind={world.kind} data={data} lookBack={lookBack} className="aspect-[16/10] max-md:aspect-[4/5]" />
-          ) : (
-            <div className="aspect-[16/10] max-md:aspect-[4/5]" />
-          )}
-          <div className="pointer-events-none absolute left-0 right-0 bottom-0 flex items-end gap-4 p-4 bg-gradient-to-t from-black/55 to-transparent text-white">
-            <div>
-              <div className="text-[28px] font-bold leading-none tracking-tight tabular-nums">{total.toLocaleString()}</div>
-              <div className="mt-1 text-[12.5px] text-white/75">{total === 1 ? 'vote' : 'votes'} · <span className="tabular-nums">{week}</span> this week</div>
-            </div>
-            <span className="flex-1" />
-            {world.kind === 'path' && total > 30 && (
-              <label className="pointer-events-auto flex items-center gap-2 text-[12px] text-white/80">
-                Look back
-                <input type="range" min={0} max={1} step={0.001} value={lookBack} onChange={(e) => setLookBack(Number(e.target.value))} className="w-28 accent-white" />
-              </label>
-            )}
-          </div>
-          {data && total === 0 && (
-            <p className="pointer-events-none absolute inset-x-0 top-[38%] text-center px-6 text-[15px] text-white/85">
-              {world.kind === 'sky' ? 'The first thing you finish lights the first star.' : world.kind === 'path' ? 'The first thing you finish is the first step.' : 'The first thing you finish lays the first floor.'}
-            </p>
-          )}
+          <p className="mt-0.5 text-[13px] text-white/80 max-md:hidden">Every to-do you finish is a vote for who you’re becoming.</p>
         </div>
+        <span className="flex-1" />
+        <div role="radiogroup" aria-label="World" className={`pointer-events-auto flex rounded-full p-1 ${GLASS} max-md:order-last max-md:w-full max-md:justify-between`}>
+          {WORLD_KINDS.map((k) => {
+            const { name, Icon: KI } = WORLD_META[k]
+            const on = world.kind === k
+            return (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={on}
+                onClick={() => { if (!on) saveWorld({ kind: k }) }}
+                className={`flex items-center justify-center gap-1.5 h-8 px-3 rounded-full text-[13px] font-medium transition max-md:flex-1 ${on ? 'bg-white text-[#16161d] shadow' : 'text-white/80 hover:text-white'}`}
+              >
+                <KI className="w-3.5 h-3.5" />{name}
+              </button>
+            )
+          })}
+        </div>
+        <button onClick={() => setPanel((p) => !p)} aria-pressed={panel} title="Who you’re becoming" className={`pointer-events-auto flex items-center gap-1.5 h-10 px-3.5 rounded-full text-[13px] font-medium ${GLASS} ${panel ? 'ring-1 ring-white/50' : ''}`}>
+          <Users className="w-4 h-4" /><span className="max-sm:hidden">Who you’re becoming</span>
+        </button>
+        <button onClick={toggleFull} title={full ? 'Leave full screen' : 'Full screen'} aria-label={full ? 'Leave full screen' : 'Full screen'} className={`pointer-events-auto grid place-items-center w-10 h-10 rounded-full ${GLASS}`}>
+          {full ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
+      </div>
 
-        {/* Who. */}
-        <h2 className={SECTION}>Who you’re becoming</h2>
-        <div className="flex flex-col">
+      {!world.enabled && (
+        <div className={`absolute z-10 left-1/2 -translate-x-1/2 top-[84px] max-md:top-[118px] flex items-center gap-3 rounded-full pl-4 pr-1.5 py-1.5 text-[13px] ${GLASS}`}>
+          <span>Not in your sidebar yet.</span>
+          <button onClick={() => saveWorld({ enabled: true })} className="rounded-full bg-white text-[#16161d] px-3 py-1 font-semibold hover:opacity-90">Add it</button>
+        </div>
+      )}
+
+      {data && total === 0 && (
+        <p className="absolute inset-x-0 top-[42%] z-10 text-center px-6 text-[17px] font-medium [text-shadow:0_2px_16px_rgba(0,0,0,.6)]">
+          {world.kind === 'sky' ? 'The first thing you finish lights the first star.' : world.kind === 'path' ? 'The first thing you finish is the first step.' : 'The first thing you finish lays the first floor.'}
+        </p>
+      )}
+
+      {/* The count, bottom left; how to move round it, bottom right. */}
+      <div className={`absolute z-10 left-4 bottom-4 max-md:left-3 max-md:bottom-3 rounded-2xl px-4 py-3 ${GLASS}`}>
+        <div className="text-[30px] max-md:text-[24px] font-bold leading-none tracking-tight tabular-nums">{total.toLocaleString()}</div>
+        <div className="mt-1 text-[12.5px] text-white/75">{total === 1 ? 'vote' : 'votes'} · <span className="tabular-nums">{week}</span> this week</div>
+      </div>
+      <p className="absolute z-10 right-4 bottom-4 text-[12px] text-white/70 [text-shadow:0_1px_8px_rgba(0,0,0,.6)] max-md:hidden pointer-events-none">Drag to turn · scroll to zoom</p>
+
+      {/* Who you’re becoming: a glass panel on the right, a sheet from the bottom on a phone. */}
+      <aside
+        ref={panelRef}
+        aria-label="Who you’re becoming"
+        className={`absolute z-20 ${GLASS} rounded-2xl flex flex-col transition-all duration-300
+          md:right-4 md:top-[76px] md:bottom-4 md:w-[380px]
+          max-md:inset-x-2 max-md:bottom-2 max-md:max-h-[64%]
+          ${panel ? 'opacity-100 translate-x-0 translate-y-0' : 'opacity-0 pointer-events-none md:translate-x-6 max-md:translate-y-6'}`}
+      >
+        <div className="flex items-center gap-2 px-4 pt-3.5 pb-2 border-b border-white/10">
+          <h2 className="flex-1 text-[15px] font-semibold">Who you’re becoming</h2>
+          <button onClick={() => setPanel(false)} aria-label="Close" className="grid place-items-center w-7 h-7 rounded-full text-white/70 hover:text-white hover:bg-white/10"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 text-[14px]">
           {data?.identities.map((idt, g) => {
             const color = colorOf(g, hues)
             const expanded = open === idt.id
             return (
-              <div key={idt.id} className="border-b border-border/60 last:border-b-0">
-                <div className="flex items-center gap-2.5 py-1.5">
+              <div key={idt.id} className="border-b border-white/10 last:border-b-0">
+                <div className="flex items-center gap-2.5 py-2">
                   <button
                     onClick={() => patch(idt.id, { hue: (idt.hue + 1) % IDENTITY_COLORS.length })}
                     title="Change its colour"
                     aria-label={`Change the colour of ${idt.name}`}
-                    className="w-3.5 h-3.5 shrink-0 rounded-full ring-2 ring-offset-2 ring-offset-background ring-transparent hover:ring-foreground/15"
+                    className="w-3.5 h-3.5 shrink-0 rounded-full ring-2 ring-white/0 hover:ring-white/40 ring-offset-2 ring-offset-transparent"
                     style={{ background: color }}
                   />
-                  <span className="text-muted-foreground shrink-0">I’m becoming</span>
                   <input
                     defaultValue={idt.name}
                     onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== idt.name) patch(idt.id, { name: v }) }}
                     onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                     aria-label="Who"
-                    className="flex-1 min-w-0 bg-transparent font-semibold outline-none rounded px-1 -mx-1 focus:bg-foreground/[0.05]"
+                    className="flex-1 min-w-0 bg-transparent font-semibold outline-none rounded px-1 -mx-1 focus:bg-white/10"
                   />
-                  <span className="text-[12.5px] text-muted-foreground tabular-nums shrink-0">{idt.votes}{idt.week > 0 && <span className="max-sm:hidden"> · {idt.week} this week</span>}</span>
-                  <button onClick={() => setOpen(expanded ? null : idt.id)} aria-expanded={expanded} className="flex items-center gap-1 shrink-0 rounded-md px-1.5 py-0.5 text-[12.5px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]">
-                    What counts <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                  <span className="text-[12.5px] text-white/70 tabular-nums shrink-0">{idt.votes}{idt.week > 0 && <span> · +{idt.week}</span>}</span>
+                  <button onClick={() => setOpen(expanded ? null : idt.id)} aria-expanded={expanded} aria-label="What counts" title="What counts" className="grid place-items-center w-7 h-7 shrink-0 rounded-full text-white/70 hover:text-white hover:bg-white/10">
+                    <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
                 {expanded && (
                   <div className="pb-3 pl-6 flex flex-col gap-3">
                     {!idt.listIds.length && !idt.itemIds.length && !idt.tags.length && (
-                      <p className="text-[12.5px] text-muted-foreground">Nothing counts toward it yet. Pick the lists, habits or tags that are this person’s work — everything finished in them, past and future, becomes a vote.</p>
+                      <p className="text-[12.5px] text-white/70">Nothing counts toward them yet. Pick the lists, habits or tags that are this person’s work — everything finished in them, past and future, becomes a vote.</p>
                     )}
                     <Pick label="Areas and projects" empty="No lists yet." items={[...sources.areas, ...sources.projects].map((l) => ({ key: l.id, label: l.title || 'Untitled', on: idt.listIds.includes(l.id) }))} color={color} onToggle={(k) => toggle(idt, 'listIds', k as number)} />
                     <Pick label="Habits" empty="No habits yet." items={sources.habits.map((h) => ({ key: h.id, label: h.title || 'Untitled', on: idt.itemIds.includes(h.id) }))} color={color} onToggle={(k) => toggle(idt, 'itemIds', k as number)} />
                     <Pick label="Tags" empty="No tags yet." items={sources.tags.map((t) => ({ key: t, label: t, on: idt.tags.some((x) => x.toLowerCase() === t.toLowerCase()) }))} color={color} onToggle={(k) => toggle(idt, 'tags', k as string)} />
-                    <button onClick={() => forget(idt)} className="self-start flex items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-red-600">
+                    <button onClick={() => forget(idt)} className="self-start flex items-center gap-1.5 text-[12.5px] text-white/60 hover:text-red-300">
                       <Trash2 className="w-3.5 h-3.5" /> Forget this one
                     </button>
                   </div>
@@ -223,32 +263,30 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
 
           {/* The everyday: whatever counts toward nobody in particular. */}
           {data && (
-            <div className="flex items-center gap-2.5 py-1.5 text-muted-foreground border-b border-border/60">
-              <span className="w-3.5 h-3.5 shrink-0 rounded-full" style={{ background: EVERYDAY_COLOR, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.12)' }} />
-              <span className="flex-1">The everyday <span className="text-[12.5px]">— everything else you finish</span></span>
+            <div className="flex items-center gap-2.5 py-2 text-white/75 border-b border-white/10">
+              <span className="w-3.5 h-3.5 shrink-0 rounded-full" style={{ background: EVERYDAY_COLOR }} />
+              <span className="flex-1">The everyday <span className="text-[12px] text-white/55">— everything else</span></span>
               <span className="text-[12.5px] tabular-nums">{data.everyday.votes}</span>
             </div>
           )}
 
-          <form onSubmit={(e) => { e.preventDefault(); add(draft) }} className="flex items-center gap-2.5 py-2">
-            <Plus className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-            <span className="text-muted-foreground shrink-0">I’m becoming</span>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="a runner, a writer, a good friend…" aria-label="Who you’re becoming" className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/60" />
-            {draft.trim() && <button type="submit" className="rounded-md bg-primary text-primary-foreground px-2.5 py-0.5 text-[13px] font-semibold">Add</button>}
+          <form onSubmit={(e) => { e.preventDefault(); add(draft) }} className="flex items-center gap-2.5 pt-3 pb-1">
+            <Plus className="w-3.5 h-3.5 shrink-0 text-white/60" />
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="I’m becoming… a runner, a writer" aria-label="Who you’re becoming" className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-white/45" />
+            {draft.trim() && <button type="submit" className="rounded-full bg-white text-[#16161d] px-3 py-0.5 text-[13px] font-semibold">Add</button>}
           </form>
           {data && data.identities.length === 0 && (
-            <div className="flex flex-wrap gap-1.5 pl-6">
-              {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => add(s)} className={`${CHIP} border-border/80 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]`}>{s}</button>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {SUGGESTIONS.map((sg) => (
+                <button key={sg} onClick={() => add(sg)} className={`${CHIP} border-white/25 text-white/80 hover:text-white hover:bg-white/10`}>{sg}</button>
               ))}
             </div>
           )}
+          <p className="mt-5 text-[12px] leading-relaxed text-white/60">
+            We come to know who we are partly by watching what we do, so every small thing finished is evidence. A vote never expires, and a missed day takes nothing away.
+          </p>
         </div>
-
-        <p className="mt-6 text-[12.5px] leading-relaxed text-muted-foreground max-w-[64ch]">
-          Why votes? We come to know who we are partly by watching what we do, so every small thing finished is evidence. A vote never expires, and a missed day takes nothing away — the world only ever grows. Drag it to look around.
-        </p>
-      </div>
+      </aside>
     </div>
   )
 }
@@ -262,9 +300,9 @@ function Pick({ label, empty, items, color, onToggle }: {
 }) {
   return (
     <div>
-      <div className="mb-1.5 text-[12px] font-medium text-muted-foreground">{label}</div>
+      <div className="mb-1.5 text-[12px] font-medium text-white/65">{label}</div>
       {items.length === 0 ? (
-        <p className="text-[12.5px] text-muted-foreground/70">{empty}</p>
+        <p className="text-[12.5px] text-white/50">{empty}</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {items.map((it) => (
@@ -272,8 +310,8 @@ function Pick({ label, empty, items, color, onToggle }: {
               key={it.key}
               onClick={() => onToggle(it.key)}
               aria-pressed={it.on}
-              className={`${CHIP} ${it.on ? 'font-medium text-foreground' : 'border-border/80 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'}`}
-              style={it.on ? { borderColor: color, background: `color-mix(in oklab, ${color} 18%, transparent)` } : undefined}
+              className={`${CHIP} ${it.on ? 'font-medium text-white' : 'border-white/20 text-white/70 hover:text-white hover:bg-white/10'}`}
+              style={it.on ? { borderColor: color, background: `color-mix(in oklab, ${color} 30%, transparent)` } : undefined}
             >
               {it.label}
             </button>

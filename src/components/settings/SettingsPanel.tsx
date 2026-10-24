@@ -297,7 +297,7 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
           )}
         </Section>
 
-        <Section title="Becoming" hint="Name who you’re becoming — a runner, a writer, a good friend — and every to-do you finish counts as a vote for them, drawn as a world that grows. Optional, and gentle: nothing is ever lost for a missed day.">
+        <Section title="Your World" hint="Name who you’re becoming — a runner, a writer, a good friend — and every to-do you finish counts as a vote for them, drawn as a world that grows. Optional, and gentle: nothing is ever lost for a missed day.">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={!!settings.world?.enabled} onChange={(e) => save({ world: { ...(settings.world ?? { kind: 'sky' }), enabled: e.target.checked } })} className="accent-[var(--primary)]" />
             Show my world in the sidebar
@@ -319,7 +319,7 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
               )
             })}
           </div>
-          <a href="#world" className="inline-block mt-3 text-[13px] font-medium text-primary hover:underline">Open Becoming →</a>
+          <a href="#world" className="inline-block mt-3 text-[13px] font-medium text-primary hover:underline">Open Your World →</a>
         </Section>
 
         <Section title="Location and time" hint="Where you are, for prayer times, and the clock your day is planned by. Asked once and kept across your devices.">
