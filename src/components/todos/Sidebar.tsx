@@ -8,6 +8,7 @@ import { byOrder, counts, progress, type StandardView } from '@/lib/todo-views'
 import type { Todo } from '@/lib/todos'
 import { useTodos } from './TodosProvider'
 import { ProgressRing, VIEW_META } from './parts'
+import { AiBalance } from './AiBalance'
 import { AttachButton } from '@/components/chat/attachments'
 import { ASSISTANT_TRIGGER } from '@/components/today/TodayAssistant'
 import { WORLD_META } from '@/components/world/meta'
@@ -243,6 +244,7 @@ export function Sidebar({
           <button onClick={() => setAdding((v) => !v)} className="flex items-center gap-1.5 whitespace-nowrap px-2 py-1 -ml-0.5 rounded-md text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]">
             <Plus className="w-4 h-4 shrink-0" /> New List
           </button>
+          <AiBalance />
           <span className="flex-1" />
           {/* A phone has no keyboard to start typing on, so Quick Find gets a button there. */}
           <button onClick={onQuickFind} title="Quick Find" aria-label="Quick Find" className={`${TOOL} md:hidden`}>

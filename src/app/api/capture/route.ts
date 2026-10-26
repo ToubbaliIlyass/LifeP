@@ -9,6 +9,7 @@ import { fromMinutes } from '@/lib/schedule'
 import { replanDay } from '@/lib/schedule-day'
 import { CaptureSchema, toCaptureNodes, fallbackCapture, type CaptureNode } from '@/lib/capture'
 import { logger } from '@/lib/log'
+import { recordUsage } from '@/lib/ai/usage'
 
 /** Days ahead a capture replans. Further out is planned when it gets closer. */
 const REPLAN_DAYS = 7
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
   try {
     if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set')
     const weekday = new Date(clock.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
-    const { output } = await generateText({
+    const { output, usage } = await generateText({
       model: defaultModel,
       system: [
         'You read what someone says needs to happen and list the items. Nothing else.',
@@ -55,7 +56,10 @@ export async function POST(request: Request) {
       ].join('\n'),
       prompt: text,
       output: Output.object({ schema: CaptureSchema }),
+      providerOptions: { openai: { promptCacheKey: `acture-capture-${user.id}` } },
+      maxOutputTokens: 800,
     })
+    void recordUsage(user.id, usage, 'capture', clock.date)
     nodes = toCaptureNodes(output.items, { today: clock.date, openTasks })
     // Read, but nothing came out of it — keep what was said rather than nothing.
     if (nodes.length === 0) { nodes = fallbackCapture(text, clock.date); read = 'fallback' }

@@ -18,7 +18,7 @@
  */
 const NAMELESS_TYPES = new Set([
   'HabitLog', 'TimeBlock', 'SavedView', 'Settings',
-  'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken',
+  'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'AiUsage',
   'JournalEntry',
 ])
 

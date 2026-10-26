@@ -109,3 +109,16 @@ test('city: buildings rise floor by floor, and a crowded district takes the next
   assert.ok(big.blocks.length > 1)
   assert.deepEqual(spiral(3), [[1, 0], [1, 1], [0, 1]])
 })
+
+test('a new identity finds the lists, habits and tags that sound like it', async () => {
+  const { suggestSources } = await import('./identity')
+  const sources = {
+    lists: [{ id: 1, title: 'Running plan' }, { id: 2, title: 'Taxes' }, { id: 3, title: 'Writing' }],
+    habits: [{ id: 10, title: 'Morning run' }, { id: 11, title: 'Read 10 pages' }],
+    tags: ['run', 'work', 'reading'],
+  }
+  assert.deepEqual(suggestSources('a runner', sources), { listIds: [1], itemIds: [10], tags: ['run'] })
+  assert.deepEqual(suggestSources('someone who writes', sources), { listIds: [3], itemIds: [], tags: [] })
+  assert.deepEqual(suggestSources('a reader', sources), { listIds: [], itemIds: [11], tags: ['reading'] })
+  assert.deepEqual(suggestSources('calm', sources), { listIds: [], itemIds: [], tags: [] })
+})

@@ -1,6 +1,7 @@
 import { experimental_transcribe as transcribe } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
+import { recordUsage } from '@/lib/ai/usage'
 
 /**
  * Dictation for browsers that cannot do it themselves.
@@ -45,11 +46,13 @@ export async function POST(request: Request) {
   const language = typeof locale === 'string' ? locale.slice(0, 2).toLowerCase() : undefined
 
   try {
-    const { text } = await transcribe({
+    const { text, durationInSeconds } = await transcribe({
       model: openai.transcription('gpt-4o-mini-transcribe'),
       audio: new Uint8Array(await file.arrayBuffer()),
       ...(language && /^[a-z]{2}$/.test(language) ? { providerOptions: { openai: { language } } } : {}),
     })
+    // Billed by the minute; if the length is unknown, the size of the clip stands in for it (~16 KB a second of Opus).
+    void recordUsage(user.id, { seconds: durationInSeconds ?? file.size / 16_000 }, 'dictation')
     return Response.json({ text: text.trim() })
   } catch {
     return Response.json({ error: 'Could not make out that recording.' }, { status: 502 })

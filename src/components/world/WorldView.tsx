@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, Maximize2, Minimize2, Plus, Trash2, Users, X } from 'lucide-react'
 import type { Settings } from '@/lib/settings'
-import { EVERYDAY_COLOR, IDENTITY_COLORS, WORLD_KINDS, colorOf, type Identity, type WorldKind, type WorldPayload } from '@/lib/identity'
+import { EVERYDAY_COLOR, IDENTITY_COLORS, WORLD_KINDS, colorOf, nextHue, suggestSources, type Identity, type WorldKind, type WorldPayload } from '@/lib/identity'
 import { useDataChanged } from '@/lib/dataSignal'
 import { clockZone } from '@/lib/wallclock'
 import { useTodos } from '@/components/todos/TodosProvider'
@@ -45,6 +45,8 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
   const [data, setData] = useState<WorldPayload | null>(null)
   const [open, setOpen] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
+  /** A name just typed, with what looks like it ticked, waiting for a yes before it counts. */
+  const [guide, setGuide] = useState<{ name: string; listIds: number[]; itemIds: number[]; tags: string[] } | null>(null)
   /** The people panel: open on a wide screen, tucked away on a phone until asked for. */
   const [panel, setPanel] = useState(true)
   const [full, setFull] = useState(false)
@@ -98,16 +100,33 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
     if (res.ok) onSettingsChanged(((await res.json()) as { settings: Settings }).settings)
   }
 
-  async function add(name: string) {
-    const n = name.trim()
-    if (!n) return
+  const sources = (() => {
+    const live = lists.filter((l) => !l.done)
+    const habits = todos.filter((t) => t.type === 'Habit')
+    const tags = [...new Set(todos.flatMap((t) => t.tags))].sort((a, b) => a.localeCompare(b))
+    return { areas: live.filter((l) => l.kind === 'area'), projects: live.filter((l) => l.kind === 'project'), habits, tags }
+  })()
+
+  /** Creates it, with whatever was chosen to count toward it. */
+  async function create(name: string, picked: { listIds: number[]; itemIds: number[]; tags: string[] }) {
     setDraft('')
-    const res = await fetch('/api/identities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) })
+    setGuide(null)
+    const res = await fetch('/api/identities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, ...picked }) })
     if (res.ok) {
       const { identity } = (await res.json()) as { identity: Identity }
-      setOpen(identity.id)
+      setOpen(picked.listIds.length || picked.itemIds.length || picked.tags.length ? null : identity.id)
       load()
     }
+  }
+
+  /** A name typed: if there is anything it could count, offer the likely ones first; otherwise just make it. */
+  function add(name: string) {
+    const n = name.trim()
+    if (!n) return
+    const anything = sources.areas.length + sources.projects.length + sources.habits.length + sources.tags.length > 0
+    if (!anything) { void create(n, { listIds: [], itemIds: [], tags: [] }); return }
+    setDraft(n)
+    setGuide({ name: n, ...suggestSources(n, { lists: [...sources.areas, ...sources.projects], habits: sources.habits, tags: sources.tags }) })
   }
 
   async function patch(id: number, changes: Partial<Identity>) {
@@ -124,12 +143,7 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
   }
 
   // What can count toward an identity, from the lists themselves.
-  const sources = useMemo(() => {
-    const live = lists.filter((l) => !l.done)
-    const habits = todos.filter((t) => t.type === 'Habit')
-    const tags = [...new Set(todos.flatMap((t) => t.tags))].sort((a, b) => a.localeCompare(b))
-    return { areas: live.filter((l) => l.kind === 'area'), projects: live.filter((l) => l.kind === 'project'), habits, tags }
-  }, [todos, lists])
+
 
   const total = data?.votes.length ?? 0
   const week = data ? data.identities.reduce((s, i) => s + i.week, 0) + data.everyday.week : 0
@@ -270,11 +284,36 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
             </div>
           )}
 
-          <form onSubmit={(e) => { e.preventDefault(); add(draft) }} className="flex items-center gap-2.5 pt-3 pb-1">
+          <form onSubmit={(e) => { e.preventDefault(); if (guide) void create(guide.name, guide); else add(draft) }} className="flex items-center gap-2.5 pt-3 pb-1">
             <Plus className="w-3.5 h-3.5 shrink-0 text-white/60" />
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="I’m becoming… a runner, a writer" aria-label="Who you’re becoming" className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-white/45" />
-            {draft.trim() && <button type="submit" className="rounded-full bg-white text-[#16161d] px-3 py-0.5 text-[13px] font-semibold">Add</button>}
+            <input value={draft} onChange={(e) => { setDraft(e.target.value); setGuide(null) }} placeholder="I’m becoming… a runner, a writer" aria-label="Who you’re becoming" className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-white/45" />
+            {draft.trim() && !guide && <button type="submit" className="rounded-full bg-white text-[#16161d] px-3 py-0.5 text-[13px] font-semibold">Add</button>}
           </form>
+          {guide && (
+            // What looks like it belongs to them is already ticked; one press to agree, or change it first.
+            <div className="mt-2 mb-1 rounded-xl border border-white/15 bg-white/[0.06] p-3 flex flex-col gap-3">
+              <p className="text-[13px] text-white/80">
+                What counts toward <b className="font-semibold text-white">{guide.name}</b>? Everything finished in these, past and future, becomes a vote.
+                {!guide.listIds.length && !guide.itemIds.length && !guide.tags.length && <span className="text-white/60"> Nothing matched by name — pick any, or add it and choose later.</span>}
+              </p>
+              {(() => {
+                const color = colorOf(data?.identities.length ?? 0, [...(data?.identities.map((i) => i.hue) ?? []), nextHue(data?.identities ?? [])])
+                const flip = (key: 'listIds' | 'itemIds' | 'tags', v: number | string) =>
+                  setGuide((g) => g && { ...g, [key]: (g[key] as (number | string)[]).includes(v) ? (g[key] as (number | string)[]).filter((x) => x !== v) : [...(g[key] as (number | string)[]), v] })
+                return (
+                  <>
+                    {sources.areas.length + sources.projects.length > 0 && <Pick label="Areas and projects" empty="" items={[...sources.areas, ...sources.projects].map((l) => ({ key: l.id, label: l.title || 'Untitled', on: guide.listIds.includes(l.id) }))} color={color} onToggle={(k) => flip('listIds', k as number)} />}
+                    {sources.habits.length > 0 && <Pick label="Habits" empty="" items={sources.habits.map((h) => ({ key: h.id, label: h.title || 'Untitled', on: guide.itemIds.includes(h.id) }))} color={color} onToggle={(k) => flip('itemIds', k as number)} />}
+                    {sources.tags.length > 0 && <Pick label="Tags" empty="" items={sources.tags.map((t) => ({ key: t, label: t, on: guide.tags.includes(t) }))} color={color} onToggle={(k) => flip('tags', k as string)} />}
+                  </>
+                )
+              })()}
+              <div className="flex items-center gap-2">
+                <button onClick={() => void create(guide.name, guide)} className="rounded-full bg-white text-[#16161d] px-3.5 py-1 text-[13px] font-semibold">Add</button>
+                <button onClick={() => setGuide(null)} className="rounded-full px-3 py-1 text-[13px] text-white/70 hover:text-white hover:bg-white/10">Back</button>
+              </div>
+            </div>
+          )}
           {data && data.identities.length === 0 && (
             <div className="flex flex-wrap gap-1.5 pt-2">
               {SUGGESTIONS.map((sg) => (

@@ -18,7 +18,7 @@ import { clockIn, type UserClock } from '@/lib/clock'
  * signal log (it is summarised into context instead). Matters more now that
  * these tools are also reachable by outside chatbots over MCP.
  */
-const PRIVATE_TYPES = new Set(['ApiToken', 'ActivitySignal', 'Settings', 'CanvasCredential', 'PushDevice'])
+const PRIVATE_TYPES = new Set(['ApiToken', 'ActivitySignal', 'Settings', 'CanvasCredential', 'PushDevice', 'AiUsage'])
 
 /**
  * Every read the assistant makes, minus what it may not see.

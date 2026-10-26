@@ -13,7 +13,10 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 const day = (v: unknown) => (v === null ? null : typeof v === 'string' && DATE.test(v) ? v : undefined)
 
 /** How a node stores "daily" | "weekdays" | "weekly"; weekly repeats on `day`'s weekday. */
-function recurrenceFor(repeats: unknown, day: string): { frequency: string; daysOfWeek?: number[] } | null {
+function recurrenceFor(repeats: unknown, day: string, days?: unknown): { frequency: string; daysOfWeek?: number[] } | null {
+  // "every tue and thu": the days said, rather than the one the to-do is on.
+  const said = Array.isArray(days) ? days.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6) : []
+  if (repeats === 'weekly' && said.length) return { frequency: 'weekly', daysOfWeek: said }
   if (repeats === 'daily') return { frequency: 'daily' }
   if (repeats === 'weekdays') return { frequency: 'weekdays', daysOfWeek: [1, 2, 3, 4, 5] }
   if (repeats === 'weekly') return { frequency: 'weekly', daysOfWeek: [new Date(day + 'T00:00:00').getDay()] }
@@ -57,7 +60,7 @@ async function relink(userId: number, nodeId: number, targetId: number | null, k
  * this writes them back). Only the fields sent are touched.
  *
  * Body, all optional: { title, notes, when, evening, someday, deadline,
- *   repeats, reminder, time, minutes, tags, checklist, order, listId, headingId,
+ *   repeats, repeatDays, reminder, time, minutes, tags, checklist, order, listId, headingId,
  *   headings, areaId, done }
  */
 export async function PATCH(
@@ -132,11 +135,11 @@ export async function PATCH(
     if (time && typeof props.dueDate !== 'string') { props.dueDate = todayStr(); delete props.someday }
     if (typeof body.minutes === 'number' && body.minutes > 0) props.estimatedMinutes = Math.min(Math.round(body.minutes), 8 * 60)
     if ('repeats' in body) {
-      put(props, 'recurrence', recurrenceFor(body.repeats, typeof props.dueDate === 'string' ? props.dueDate : todayStr()))
+      put(props, 'recurrence', recurrenceFor(body.repeats, typeof props.dueDate === 'string' ? props.dueDate : todayStr(), body.repeatDays))
     }
   } else if (node.type === 'Habit' && 'repeats' in body) {
     // A habit keeps the same answer in its own two fields, and always repeats.
-    const rule = recurrenceFor(body.repeats, todayStr())
+    const rule = recurrenceFor(body.repeats, todayStr(), body.repeatDays)
     if (rule) {
       props.frequency = rule.frequency
       put(props, 'daysOfWeek', rule.daysOfWeek ?? null)

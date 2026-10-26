@@ -18,7 +18,7 @@ async function event(request: Request, params: Promise<{ id: string }>) {
 
 /**
  * Changes an event, in the editor's words: { name, date, time, duration,
- * location, frequency, daysOfWeek }. Only what is sent is touched; an empty
+ * location, frequency, daysOfWeek, until }. Only what is sent is touched; an empty
  * time or place takes it away.
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -45,6 +45,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.frequency === 'weekly') p.daysOfWeek = days.length ? days : [new Date(String(p.date) + 'T00:00:00').getDay()]
     else if (body.frequency === 'weekdays') p.daysOfWeek = [1, 2, 3, 4, 5]
     else delete p.daysOfWeek
+    if (body.frequency === 'once') delete p.until
+  }
+  // The last day a repeating one is on; an empty one takes it away.
+  if ('until' in body && p.frequency !== 'once') {
+    if (typeof body.until === 'string' && DATE.test(body.until)) p.until = body.until
+    else delete p.until
   }
 
   // When it reminds you: at a time on each day it is on, or before it starts.

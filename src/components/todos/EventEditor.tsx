@@ -6,6 +6,8 @@ import type { DayEvent } from '@/lib/todos'
 import { DAY_LABELS, DAY_NAMES, DAY_ORDER } from '@/lib/days'
 import { toMinutes } from '@/lib/schedule'
 import { askForNotifications } from '@/lib/notify'
+import { parseEntry, saysMore } from '@/lib/quick-entry'
+import { todayStr } from '@/lib/date'
 
 /** When an event reminds you, as one choice: "start" is at its time, a number is minutes before. */
 const REMIND = [['', 'No reminder'], ['start', 'When it starts'], ['10', '10 minutes before'], ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before']] as const
@@ -25,6 +27,7 @@ export function EventEditor({ event, onDone }: { event: DayEvent; onDone: (chang
   const [location, setLocation] = useState(event.location ?? '')
   const [frequency, setFrequency] = useState(event.frequency)
   const [days, setDays] = useState<number[]>(event.daysOfWeek ?? [new Date(event.date + 'T00:00:00').getDay()])
+  const [until, setUntil] = useState(event.until ?? '')
   const [busy, setBusy] = useState(false)
   const [remind, setRemind] = useState<string>(event.remindBefore ? String(event.remindBefore) : event.reminder && event.reminder === event.time ? 'start' : '')
   const repeating = event.frequency !== 'once'
@@ -33,12 +36,34 @@ export function EventEditor({ event, onDone }: { event: DayEvent; onDone: (chang
     : remind ? { reminder: null, remindBefore: Number(remind) }
     : { reminder: null, remindBefore: null }
 
+  /**
+   * The name is a line like any other: "Lab from 2pm till 3:30pm every tue
+   * ending dec 11" adds what it says to the fields below, and only what it
+   * says. Shown as chips while it is typed; "keep the words" turns it off.
+   */
+  const [literal, setLiteral] = useState(false)
+  const said = !literal && name !== event.title ? parseEntry(name, todayStr()) : null
+  const entry = said && saysMore(said) ? said : null
+
   async function send(method: 'PATCH' | 'DELETE') {
     setBusy(true)
+    const e = entry
+    const body = {
+      name: e?.title || name,
+      date: e?.when ?? date,
+      time: (e?.time ?? time) || null,
+      duration: e?.minutes ?? duration,
+      location: e?.location ?? location,
+      frequency: e?.repeats ?? frequency,
+      daysOfWeek: e?.repeatDays ?? days,
+      until: (e?.until ?? until) || null,
+      // A time said in the name moves the reminder with it, as picking the time does.
+      ...(e?.time && remind === 'start' ? { reminder: e.time, remindBefore: null } : reminderBody()),
+    }
     const res = await fetch(`/api/events/${event.id}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      ...(method === 'PATCH' ? { body: JSON.stringify({ name, date, time: time || null, duration, location, frequency, daysOfWeek: days, ...reminderBody() }) } : {}),
+      ...(method === 'PATCH' ? { body: JSON.stringify(body) } : {}),
     }).catch(() => null)
     setBusy(false)
     onDone(!!res?.ok)
@@ -52,7 +77,14 @@ export function EventEditor({ event, onDone }: { event: DayEvent; onDone: (chang
       onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onDone(false) } }}
       className="w-[260px] p-1.5 space-y-2 text-[13.5px]"
     >
-      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-label="Name" className={`${FIELD} font-medium`} />
+      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-label="Name" placeholder="Lab from 2pm till 3:30pm every tue" className={`${FIELD} font-medium`} />
+      {entry && (
+        <div className="flex flex-wrap items-center gap-1 text-[12px]">
+          {entry.title && <span className="font-medium text-foreground/80 mr-0.5">“{entry.title}”</span>}
+          {entry.pieces.map((p) => <span key={p} className="rounded-[4px] bg-primary/[0.12] text-primary px-1.5 leading-[18px] font-medium">{p}</span>)}
+          <button type="button" onClick={() => setLiteral(true)} className="ml-1 text-muted-foreground hover:text-foreground underline underline-offset-2">keep the words</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <label>
           <span className={LABEL}>{repeating ? 'From' : 'Day'}</span>
@@ -78,6 +110,13 @@ export function EventEditor({ event, onDone }: { event: DayEvent; onDone: (chang
           </select>
         </label>
       </div>
+      {frequency !== 'once' && (
+        <label className="flex items-center gap-2">
+          <span className={`${LABEL} !mb-0 shrink-0`}>Ends</span>
+          <input type="date" value={until} min={date} onChange={(e) => setUntil(e.target.value)} className={`${FIELD} tabular-nums`} />
+          {until && <button type="button" onClick={() => setUntil('')} className="shrink-0 text-[12px] text-muted-foreground hover:text-foreground underline underline-offset-2">never</button>}
+        </label>
+      )}
       {frequency === 'weekly' && (
         <div className="flex gap-1">
           {DAY_ORDER.map((d) => {
