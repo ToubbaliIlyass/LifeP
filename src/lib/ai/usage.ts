@@ -1,6 +1,6 @@
 import { createNode, getNodes, updateNode } from '@/lib/graph/queries'
 import { logger } from '@/lib/log'
-import { audioCost, costOf, pricesFromEnv, type TokenUse } from '@/lib/ai/cost'
+import { audioCost, costOf, PRICES, type TokenUse } from '@/lib/ai/cost'
 import { todayStr } from '@/lib/date'
 
 /**
@@ -64,7 +64,7 @@ export async function readUsage(userId: number, today: string = todayStr()): Pro
   const months = (p.months ?? {}) as Record<string, unknown>
   const days = (p.days ?? {}) as Record<string, unknown>
   const month = bucket(months[today.slice(0, 7)])
-  const rates = pricesFromEnv()
+  const rates = PRICES
   return {
     total: bucket(p.total),
     month,
