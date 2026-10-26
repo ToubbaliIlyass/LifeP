@@ -17,12 +17,13 @@ import { parseWhen, splitWhen } from '@/lib/jump-start'
  *   do <day>         the day to do it            on <day> works too
  *   due <day>        the deadline                by <day> works too
  *   at <time>        the time                    3pm, 15:00, 9:30am
+ *   from <t> till <t>  a start and an end             from 11:30am till 12:50pm, 9-10:30am, 9 to 5
  *   for <length>     how long                    45m, 1h, 1h30, 90 minutes, an hour
  *   #tag             a tag                       as many as you like
  *   ! / !! / !low    priority                    high, or low
  *   every <rule>     repeats                     day, weekday, week, mon, tue and thu
  *   x5 / 5 times     how many times              stops after that many
- *   until <day>      when repeating stops
+ *   until <day>      when repeating stops        ending on dec 11, ends dec 11, through dec 11
  *   /<list>          which project or area       the start of its name is enough
  *   @<place>         where — for an event        @Room_12 for two words
  *
@@ -36,6 +37,8 @@ export interface Entry {
   someday: boolean
   deadline: string | null
   time: string | null
+  /** When it finishes that day, when said as a range ("from 9 till 10:30"). */
+  endTime: string | null
   minutes: number | null
   tags: string[]
   priority: 'high' | 'low' | null
@@ -92,7 +95,7 @@ function dayAt(words: string[], i: number, today: string, withTime = true): { wh
 }
 
 /** A time from `i`: "3pm", "3 pm", "15:00", "9:30am". */
-function timeAt(words: string[], i: number): { time: string; used: number } | null {
+function timeAt(words: string[], i: number): { time: string; used: number; meridiem: boolean; marked: boolean } | null {
   for (const k of [2, 1]) {
     if (i + k > words.length) continue
     const phrase = words.slice(i, i + k).map(clean).join('')
@@ -103,9 +106,41 @@ function timeAt(words: string[], i: number): { time: string; used: number } | nu
     if (h > 23 || min > 59) continue
     if (m[3]?.startsWith('p') && h < 12) h += 12
     if (m[3]?.startsWith('a') && h === 12) h = 0
-    return { time: `${pad(h)}:${pad(min)}`, used: k }
+    return { time: `${pad(h)}:${pad(min)}`, used: k, meridiem: !!m[3], marked: !!(m[2] || m[3]) }
   }
   return null
+}
+
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
+
+/**
+ * How long a range lasts. An end with no am/pm that would land before the
+ * start is the other half of the day ("from 9 to 5" is 9am to 5pm); one that
+ * still does not follow the start is not a range at all.
+ */
+function rangeMinutes(start: string, end: string, endMeridiem: boolean): { end: string; minutes: number } | null {
+  const from = toMin(start)
+  let to = toMin(end)
+  if (to <= from && !endMeridiem && to + 720 <= 24 * 60) to += 720
+  if (to <= from) return null
+  const clock = `${pad(Math.floor(to / 60) % 24)}:${pad(to % 60)}`
+  return { end: clock, minutes: to - from }
+}
+
+/** "11:30am-12:50pm", "9-10:30am": one word holding both ends, with a sign it is a time. */
+function rangeWord(w: string): { start: string; end: string; startMeridiem: boolean; endMeridiem: boolean } | null {
+  const m = clean(w).match(/^(\d{1,2}(?::\d{2})?(?:am|pm|a|p)?)[-–—](\d{1,2}(?::\d{2})?(?:am|pm|a|p)?)$/)
+  if (!m) return null
+  const a = timeAt([m[1]], 0)
+  const b = timeAt([m[2]], 0)
+  if (!a || !b || (!a.marked && !b.marked)) return null
+  // "9-10:30am": the start takes the end's half of the day when it fits.
+  let start = a.time
+  if (!a.meridiem && b.meridiem) {
+    const shifted = toMin(start) + (/pm?$/.test(m[2]) && Number(start.slice(0, 2)) < 12 ? 720 : 0)
+    if (shifted < toMin(b.time)) start = `${pad(Math.floor(shifted / 60))}:${pad(shifted % 60)}`
+  }
+  return { start, end: b.time, startMeridiem: a.meridiem, endMeridiem: b.meridiem }
 }
 
 /** "day", "weekday(s)", "week", "mon", "tue and thu", "mon, wed, fri". */
@@ -119,7 +154,7 @@ function ruleAt(words: string[], i: number): { repeats: Entry['repeats']; days: 
   for (let j = i; j < words.length; j++) {
     const w = clean(words[j])
     if ((w === 'and' || w === '&') && days.length) { used++; continue }
-    const d = WEEKDAYS.findIndex((x) => w.startsWith(x) && w.length >= 3)
+    const d = /^month/.test(w) ? -1 : WEEKDAYS.findIndex((x) => w.startsWith(x) && w.length >= 3)
     if (d < 0) break
     if (!days.includes(d)) days.push(d)
     used++
@@ -150,7 +185,7 @@ export function parseEntry(input: string, today: string): Entry | null {
   if (!words.length) return null
 
   const e: Entry = {
-    kind: null, title: '', when: null, evening: false, someday: false, deadline: null, time: null, minutes: null,
+    kind: null, title: '', when: null, evening: false, someday: false, deadline: null, time: null, endTime: null, minutes: null,
     tags: [], priority: null, repeats: null, repeatDays: null, until: null, list: null, location: null, pieces: [],
   }
 
@@ -161,6 +196,8 @@ export function parseEntry(input: string, today: string): Entry | null {
   else if (words.length > 1 && /^(event|todo|to-do|task)$/.test(head)) { e.kind = kindOf(head); words = words.slice(1) }
 
   let count: number | null = null
+  /** Whether the time came after "from", so a bare number can be where it ends. */
+  let fromStart = false
   const rest: string[] = []
   for (let i = 0; i < words.length; i++) {
     const raw = words[i]
@@ -175,9 +212,38 @@ export function parseEntry(input: string, today: string): Entry | null {
     if (/^x\d+$/.test(w)) { count = Number(w.slice(1)); continue }
     if (/^\d+$/.test(w) && /^times?$/.test(clean(next ?? '')) && e.repeats) { count = Number(w); i++; continue }
 
+    // "11:30am-12:50pm" in one word.
+    const span = !e.time ? rangeWord(w) : null
+    if (span) {
+      const r = rangeMinutes(span.start, span.end, span.endMeridiem)
+      if (r) { e.time = span.start; e.endTime = r.end; e.minutes = r.minutes; continue }
+    }
+
+    // "from 11:30am till 12:50pm", "at 9 to 10:30": an end for the time just read.
+    if ((w === 'till' || w === 'til' || w === 'until' || w === 'to' || w === '-' || w === '–') && next && e.time && !e.endTime) {
+      const t = timeAt(words, i + 1)
+      if (t && (t.marked || fromStart || w !== 'to')) {
+        const r = rangeMinutes(e.time, t.time, t.meridiem)
+        if (r) { e.endTime = r.end; e.minutes = r.minutes; i += t.used; continue }
+      }
+    }
+
+    // "ending on dec 11", "through dec 11": when a repeat stops. Only before a day, so "the ending of the book" stays.
+    if ((w === 'ending' || w === 'ends' || w === 'end' || w === 'till' || w === 'til' || w === 'through' || w === 'thru') && next) {
+      const skip = /^(on|the|by)$/i.test(clean(next)) ? 1 : 0
+      const d = dayAt(words, i + 1 + skip, today, false)
+      if (d?.when) { e.until = d.when; i += d.used + skip; continue }
+    }
+
     if ((w === 'due' || w === 'by' || w === 'deadline') && next) {
       const d = dayAt(words, i + 1, today, false)
       if (d?.when) { e.deadline = d.when; i += d.used; continue }
+    }
+    // "from 11:30am …": a time, not a day. A bare number counts only when an end follows ("from 9 to 5").
+    if (w === 'from' && next && !e.time) {
+      const t = timeAt(words, i + 1)
+      const after = clean(words[i + 1 + (t?.used ?? 0)] ?? '')
+      if (t && (t.marked || /^(till|til|until|to|-|–)$/.test(after))) { e.time = t.time; fromStart = true; i += t.used; continue }
     }
     if ((w === 'do' || w === 'on' || w === 'starting' || w === 'from') && next) {
       const d = dayAt(words, i + 1, today)
@@ -243,8 +309,8 @@ export function parseEntry(input: string, today: string): Entry | null {
   if (e.kind) e.pieces.push(e.kind === 'event' ? 'Event' : 'To-do')
   if (e.someday) e.pieces.push('Someday')
   else if (e.when) e.pieces.push(e.evening ? `${short(e.when)} evening` : short(e.when))
-  if (e.time) e.pieces.push(`at ${e.time}`)
-  if (e.minutes) e.pieces.push(e.minutes < 60 ? `${e.minutes}m` : `${+(e.minutes / 60).toFixed(2)}h`)
+  if (e.time) e.pieces.push(e.endTime ? `${e.time}–${e.endTime}` : `at ${e.time}`)
+  if (e.minutes && !e.endTime) e.pieces.push(e.minutes < 60 ? `${e.minutes}m` : `${+(e.minutes / 60).toFixed(2)}h`)
   if (e.deadline && e.deadline !== e.until) e.pieces.push(`due ${short(e.deadline)}`)
   if (e.repeats) {
     const rule = e.repeatDays ? e.repeatDays.map((d) => DAY_LABEL[d]).join(', ') : e.repeats === 'daily' ? 'day' : e.repeats === 'weekdays' ? 'weekday' : 'week'

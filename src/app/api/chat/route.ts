@@ -13,10 +13,11 @@ import { loadAvailability } from '@/lib/availability'
 import { logger } from '@/lib/log'
 import { clockIn, zoneFor } from '@/lib/clock'
 import { fromMinutes } from '@/lib/schedule'
+import { recordUsage } from '@/lib/ai/usage'
 
 // Only the tail of the conversation is resent each turn. Older turns are
 // dropped rather than re-billed — the graph snapshot carries the durable state.
-const MAX_HISTORY_MESSAGES = 16
+const MAX_HISTORY_MESSAGES = 10
 
 /*
  * Attachments ride along with the message they were sent with, and no further.
@@ -36,6 +37,28 @@ function dropOldAttachments(history: UIMessage[]): UIMessage[] {
               : p,
           ),
         },
+  )
+}
+
+/*
+ * What a tool returned is read once, in the turn it was returned in; the
+ * answer the assistant wrote from it is what the later turns need. Resending
+ * every old result (a whole day's plan, a page of search hits) on each
+ * message was most of a long conversation's bill.
+ */
+function dropOldToolResults(history: UIMessage[]): UIMessage[] {
+  const lastUser = history.map((m) => m.role).lastIndexOf('user')
+  return history.map((m, i) =>
+    i < lastUser
+      ? {
+          ...m,
+          parts: m.parts.map((p) =>
+            p.type.startsWith('tool-') && 'output' in p && p.output !== undefined
+              ? ({ ...p, output: 'Done — the result is no longer needed.' } as typeof p)
+              : p,
+          ),
+        }
+      : m,
   )
 }
 
@@ -98,21 +121,33 @@ export async function POST(request: Request) {
     (memories ? `\n\n${memories}` : '') +
     (availabilitySummary ? `\n\n${availabilitySummary}` : '')
 
-  const history = dropOldAttachments(messages.slice(-MAX_HISTORY_MESSAGES))
+  const history = dropOldToolResults(dropOldAttachments(messages.slice(-MAX_HISTORY_MESSAGES)))
 
   const result = streamText({
     model: defaultModel,
-    // Static text first (prompt, then enabled modules) so the prefix stays cacheable across turns.
-    system: SYSTEM_PROMPT + moduleContext + dateContext + personalContext + graphContext + rejectionContext,
+    /*
+     * Most stable first, most changeable last. The provider caches the longest
+     * unchanged start of a request at a fraction of the price, and the date
+     * line carries the minute — so it goes at the very end, where changing
+     * it spoils nothing before it.
+     */
+    system: SYSTEM_PROMPT + moduleContext + personalContext + graphContext + rejectionContext + dateContext,
+    // One user's requests share a cache, so the stable start is found again.
+    providerOptions: { openai: { promptCacheKey: `acture-${user.id}` } },
+    maxOutputTokens: 2000,
     messages: await convertToModelMessages(history),
     tools: buildTools(user, settings, { clock, directTasks: true }),
     // Room for the whole loop in one turn: add what was said, plan the day,
     // read it back.
-    stopWhen: stepCountIs(8),
-    onFinish({ usage }) {
+    stopWhen: stepCountIs(6),
+    onFinish({ usage, totalUsage }) {
+      // The whole turn, every step of it, not just the last.
+      const spent = totalUsage ?? usage
+      void recordUsage(user.id, spent, 'chat', clock.date)
       logger.info('chat_completion', {
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
+        inputTokens: spent.inputTokens,
+        cachedInputTokens: spent.cachedInputTokens,
+        outputTokens: spent.outputTokens,
         historyMessages: history.length,
         snapshotChars: graphContext.length,
         memoryChars: personalContext.length,

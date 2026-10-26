@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
-  Archive, Bell, CalendarDays, CalendarPlus, Check, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Flag, Flame, Heading, Inbox, Layers, ListChecks, Loader2, Moon, Plus,
+  Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Flag, Flame, Heading, Inbox, Layers, ListChecks, Loader2, Moon, Plus,
   Repeat, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import { parseWhen } from '@/lib/jump-start'
@@ -122,6 +122,8 @@ export function TodoView({
   const [focusTitle, setFocusTitle] = useState(openId !== null)
   const [sel, setSel] = useState<number | null>(openId)
   const [tag, setTag] = useState<string | null>(null)
+  /** The Logbook's older days, put away until asked for. */
+  const [archiveOpen, setArchiveOpen] = useState(false)
   /** Ticked off while this list was open: they stay put until you leave. */
   const [justDone, setJustDone] = useState<Set<number>>(() => new Set())
   const [showLogged, setShowLogged] = useState(false)
@@ -815,21 +817,42 @@ export function TodoView({
           : today
         days.set(key, [...(days.get(key) ?? []), it])
       }
+      // Days older than a month are put away, under one line that opens them.
+      const cutoff = addDays(today, -30)
+      const recent = [...days].filter(([day]) => day >= cutoff)
+      const older = [...days].filter(([day]) => day < cutoff)
+      const dayBlock = ([day, group]: [string, typeof items]) => {
+        const done = group.flatMap((g) => (g.todo ? [g.todo] : []))
+        return (
+          <div key={day}>
+            <h2 className={SECTION}>{relDate(day, today)}</h2>
+            <ul>
+              {group.map((g) => (g.list ? listRow(g.list, g.list.kind === 'project' ? 'Project' : 'Area') : row(g.todo!, 'logbook', done, 'logbook')))}
+            </ul>
+          </div>
+        )
+      }
+      const archived = older.reduce((n, [, group]) => n + group.length, 0)
       return (
         <>
           {standardHead('logbook')}
           {items.length === 0 && empty('Nothing completed yet.', 'Finished to-dos and projects are kept here.')}
-          {[...days].map(([day, group]) => {
-            const done = group.flatMap((g) => (g.todo ? [g.todo] : []))
-            return (
-              <div key={day}>
-                <h2 className={SECTION}>{relDate(day, today)}</h2>
-                <ul>
-                  {group.map((g) => (g.list ? listRow(g.list, g.list.kind === 'project' ? 'Project' : 'Area') : row(g.todo!, 'logbook', done, 'logbook')))}
-                </ul>
-              </div>
-            )
-          })}
+          {recent.map(dayBlock)}
+          {archived > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setArchiveOpen((o) => !o)}
+                aria-expanded={archiveOpen}
+                className="mt-6 flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                <Archive className="w-[15px] h-[15px]" />
+                Archive · {archived} from before {relDate(cutoff, today)}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {archiveOpen && older.map(dayBlock)}
+            </>
+          )}
         </>
       )
     }

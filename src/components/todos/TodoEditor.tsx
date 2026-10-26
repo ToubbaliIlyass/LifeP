@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowRight, Archive, Bell, CalendarDays, Clock, Flag, MapPin, Moon, Plus, Repeat, Star, Trash2, X } from 'lucide-react'
 import type { ChecklistItem, Todo, TodoList } from '@/lib/todos'
 import { relDate, repeatLabel } from '@/lib/todo-views'
@@ -70,12 +70,47 @@ export function TodoEditor({
     el.scrollIntoView({ block: 'nearest' })
   })
 
-  /** The whole line, read as it is typed — shown as chips, then applied on save. */
-  const entry = todo.id < -900 && !todo.literal ? parseEntry(todo.title, today) : null
-  // "event: …" typed first makes it one, without touching the switch.
-  const isEvent = entry?.kind ? entry.kind === 'event' : todo.asEvent === true
-  const isTask = todo.type === 'Task' && !isEvent
   const isDraft = todo.id < -900
+  /** The title as it was when this opened, so only words added since are read. */
+  const [opened] = useState(todo.title)
+  const deleting = useRef(false)
+  /**
+   * The whole line, read as it is typed — shown as chips, then applied on
+   * save. A new to-do reads all of it; one that already exists reads it only
+   * once its title has been changed, and never as another kind of thing.
+   */
+  const typed = !todo.literal && (isDraft || (todo.type === 'Task' && todo.title !== opened))
+  const parsed = typed ? parseEntry(todo.title, today) : null
+  const entry = parsed && (isDraft || (!parsed.kind && saysMore(parsed))) ? parsed : null
+  // "event: …" typed first makes it one, without touching the switch.
+  const isEvent = isDraft && entry?.kind ? entry.kind === 'event' : todo.asEvent === true
+  const isTask = todo.type === 'Task' && !isEvent
+
+  /*
+   * Closing a to-do that was already there: what its new title says is
+   * applied, and the words that said it come off the title. Done once, on the
+   * way out, from the latest render — the same line a new to-do takes.
+   */
+  const closing = useRef<() => void>(() => {})
+  useEffect(() => {
+    closing.current = () => {
+      if (isDraft || deleting.current || !entry) return
+      const changes: Partial<Todo> = { title: entry.title || todo.title }
+      if (entry.someday) changes.someday = true
+      else if (entry.when) { changes.when = entry.when; changes.someday = false; changes.evening = entry.evening }
+      if (entry.time) { changes.time = entry.time; changes.reminder = entry.time }
+      if (entry.minutes) changes.minutes = entry.minutes
+      if (entry.repeats) { changes.repeats = entry.repeats; changes.repeatDays = entry.repeatDays }
+      if (entry.deadline) changes.deadline = entry.deadline
+      if (entry.priority) changes.priority = entry.priority
+      if (entry.tags.length) changes.tags = [...new Set([...todo.tags, ...entry.tags])]
+      const q = entry.list?.toLowerCase()
+      const named = q ? (lists.find((l) => !l.done && l.title.toLowerCase().startsWith(q)) ?? lists.find((l) => !l.done && l.title.toLowerCase().includes(q))) : undefined
+      if (named) changes.listId = named.id
+      onPatch(changes)
+    }
+  })
+  useEffect(() => () => closing.current(), [])
   const list = lists.find((l) => l.id === todo.listId)
   const setChecklist = (checklist: ChecklistItem[]) => onPatch({ checklist })
 
@@ -343,7 +378,7 @@ export function TodoEditor({
           <span className="flex-1" />
           <button
             type="button"
-            onClick={onDelete}
+            onClick={() => { deleting.current = true; onDelete() }}
             aria-label="Delete to-do"
             className="grid place-items-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045]"
           >

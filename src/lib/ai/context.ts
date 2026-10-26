@@ -5,7 +5,7 @@ import { readSettings } from '@/lib/settings'
 const ANCHOR_TYPES = new Set(['Goal', 'Project', 'Course'])
 // Memory and availability get their own context sections; tokens and raw
 // signals never reach the model at all.
-const EXCLUDE_TYPES = new Set(['HabitLog', 'JournalEntry', 'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'Settings'])
+const EXCLUDE_TYPES = new Set(['HabitLog', 'JournalEntry', 'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'Settings', 'AiUsage'])
 const STOP_WORDS = new Set([
   'the', 'and', 'for', 'that', 'this', 'with', 'have', 'from', 'what',
   'want', 'need', 'add', 'create', 'make', 'new', 'can', 'you', 'help',

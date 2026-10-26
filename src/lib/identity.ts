@@ -200,3 +200,32 @@ export function tally(identities: Identity[], votes: Vote[]): Pick<WorldPayload,
 
 /** The date `age` days before `today`. */
 export const dateOfAge = (today: string, age: number) => addDays(today, -age)
+
+/** The words of "a runner" / "someone who writes" worth looking for, cut back to their stems ("run", "writ"). */
+function stemsOf(name: string): string[] {
+  const words = name.toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').split(/\s+/)
+    .filter((w) => w.length >= 3 && !/^(someone|somebody|who|the|and|person|man|woman|more|being|become|becoming)$/.test(w))
+  return [...new Set(words.map((w) => w.replace(/(?:ers|er|ing|ist|ists|ors|or|es|s|ed|y)$/, '').replace(/([^aeiou])\1$/, '$1')).filter((w) => w.length >= 3))]
+}
+
+/**
+ * Which lists, habits and tags look like they belong to a new identity, by
+ * name: "a runner" finds "Running", "Run club" and #run. Only ever a
+ * suggestion — the user confirms it before anything counts.
+ */
+export function suggestSources(name: string, sources: {
+  lists: { id: number; title: string }[]
+  habits: { id: number; title: string }[]
+  tags: string[]
+}): { listIds: number[]; itemIds: number[]; tags: string[] } {
+  const stems = stemsOf(name)
+  const hit = (label: string) => {
+    const words = label.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+    return stems.some((s) => words.some((w) => w.startsWith(s)))
+  }
+  return {
+    listIds: sources.lists.filter((l) => hit(l.title)).map((l) => l.id),
+    itemIds: sources.habits.filter((h) => hit(h.title)).map((h) => h.id),
+    tags: sources.tags.filter(hit),
+  }
+}

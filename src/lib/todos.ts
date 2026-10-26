@@ -121,6 +121,8 @@ export interface DayEvent {
   daysOfWeek: number[] | null
   /** The day it was first on — what an edit changes, for a repeating one. */
   firstDate: string | null
+  /** The last day a repeating one is on. */
+  until?: string | null
   /** HH:MM on each day it is on, to be reminded at. */
   reminder?: string | null
   /** Minutes before it starts. */
@@ -401,6 +403,7 @@ export function buildTodos({
       frequency: str(p.frequency) === 'none' ? 'once' : str(p.frequency) ?? 'once',
       daysOfWeek: Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null,
       firstDate: str(p.date),
+      until: str(p.until),
       reminder: reminderFields(p).reminder,
       remindBefore: reminderFields(p).remindBefore,
       snoozedUntil: reminderFields(p).snoozedUntil,

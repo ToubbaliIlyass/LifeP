@@ -55,3 +55,41 @@ test('until and counts end a repeat', () => {
   assert.equal(w.when, '2026-10-19')
   assert.equal(w.until, '2026-10-26')
 })
+
+test('a start, an end and the day a repeat stops', () => {
+  const line = 'Machine Learning Class from 11:30am till 12:50pm every mond, wed ending on december 11th'
+  for (const head of ['event ', 'todo ', '']) {
+    const e = parseEntry(head + line, TODAY)!
+    assert.equal(e.title, 'Machine Learning Class')
+    assert.equal(e.time, '11:30')
+    assert.equal(e.endTime, '12:50')
+    assert.equal(e.minutes, 80)
+    assert.deepEqual(e.repeatDays, [1, 3])
+    assert.equal(e.repeats, 'weekly')
+    assert.equal(e.when, '2026-10-19') // the first Monday or Wednesday from a Thursday
+    assert.equal(e.until, '2026-12-11')
+  }
+  assert.equal(parseEntry('todo ' + line, TODAY)!.deadline, '2026-12-11')
+  assert.equal(parseEntry('event ' + line, TODAY)!.deadline, null)
+})
+
+test('ranges said in other ways', () => {
+  const a = parseEntry('Lab 11:30am-12:50pm', TODAY)!
+  assert.deepEqual([a.title, a.time, a.endTime, a.minutes], ['Lab', '11:30', '12:50', 80])
+  const b = parseEntry('shift from 9 to 5', TODAY)!
+  assert.deepEqual([b.title, b.time, b.endTime, b.minutes], ['shift', '09:00', '17:00', 480])
+  const c = parseEntry('call at 2pm until 3:30pm tomorrow', TODAY)!
+  assert.deepEqual([c.time, c.endTime, c.minutes, c.when], ['14:00', '15:30', 90, '2026-10-16'])
+  const d = parseEntry('Seminar 9-10:30am', TODAY)!
+  assert.deepEqual([d.time, d.endTime, d.minutes], ['09:00', '10:30', 90])
+  assert.equal(parseEntry('yoga every day ends dec 20', TODAY)!.until, '2026-12-20')
+})
+
+test('ordinary words around ranges are left alone', () => {
+  for (const text of ['work from home', 'drive to the airport', 'wait till spring', 'buy 2-3 eggs', 'read the ending of the book', 'move from 5 apples']) {
+    const e = parseEntry(text, TODAY)!
+    assert.equal(e.title, text, text)
+    assert.equal(e.time, null, text)
+    assert.equal(e.until, null, text)
+  }
+})

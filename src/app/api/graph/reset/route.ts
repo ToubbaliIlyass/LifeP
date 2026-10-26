@@ -23,7 +23,7 @@ import { and, eq, notInArray } from 'drizzle-orm'
  * on saying it was connected while every sync answered "Canvas is not
  * connected", and the only way back was to find the token page again.
  */
-const CONFIGURATION = ['Settings', 'ApiToken', 'CanvasCredential']
+const CONFIGURATION = ['Settings', 'ApiToken', 'CanvasCredential', 'AiUsage']
 
 export async function POST(request: Request) {
   const user = await getCurrentUser()
