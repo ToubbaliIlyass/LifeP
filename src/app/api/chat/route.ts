@@ -1,5 +1,5 @@
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 'ai'
-import { defaultModel } from '@/lib/ai/client'
+import { aiConfigured, defaultModel, isFreeModel } from '@/lib/ai/client'
 import { SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 import { buildTools } from '@/lib/ai/tools'
 import { modulePrompts } from '@/lib/modules'
@@ -63,7 +63,7 @@ function dropOldToolResults(history: UIMessage[]): UIMessage[] {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!aiConfigured()) {
     return Response.json(
       { error: 'OPENAI_API_KEY is not set. Add it to .env.local and restart the dev server.' },
       { status: 503 },
@@ -140,10 +140,11 @@ export async function POST(request: Request) {
     // Room for the whole loop in one turn: add what was said, plan the day,
     // read it back.
     stopWhen: stepCountIs(6),
-    onFinish({ usage, totalUsage }) {
+    onFinish({ usage, totalUsage, response }) {
       // The whole turn, every step of it, not just the last.
       const spent = totalUsage ?? usage
-      void recordUsage(user.id, spent, 'chat', clock.date)
+      // A free fallback model costs nothing; only its calls are counted, not charged.
+      void recordUsage(user.id, isFreeModel(response.modelId) ? { ...spent, free: true } : spent, 'chat', clock.date)
       logger.info('chat_completion', {
         inputTokens: spent.inputTokens,
         cachedInputTokens: spent.cachedInputTokens,

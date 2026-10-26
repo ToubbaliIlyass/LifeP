@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, getNodes, getNodeById, updateNode } from '@/lib/graph/queries'
-import { defaultModel } from '@/lib/ai/client'
+import { aiConfigured, defaultModel, isFreeModel } from '@/lib/ai/client'
 import { readSettings } from '@/lib/settings'
 import { clockIn, zoneFor } from '@/lib/clock'
 import { addDays } from '@/lib/date'
@@ -43,9 +43,9 @@ export async function POST(request: Request) {
   let nodes: CaptureNode[]
   let read: 'ai' | 'fallback' = 'ai'
   try {
-    if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set')
+    if (!aiConfigured()) throw new Error('OPENAI_API_KEY is not set')
     const weekday = new Date(clock.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
-    const { output, usage } = await generateText({
+    const { output, usage, response } = await generateText({
       model: defaultModel,
       system: [
         'You read what someone says needs to happen and list the items. Nothing else.',
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       providerOptions: { openai: { promptCacheKey: `acture-capture-${user.id}` } },
       maxOutputTokens: 800,
     })
-    void recordUsage(user.id, usage, 'capture', clock.date)
+    void recordUsage(user.id, isFreeModel(response.modelId) ? { ...usage, free: true } : usage, 'capture', clock.date)
     nodes = toCaptureNodes(output.items, { today: clock.date, openTasks })
     // Read, but nothing came out of it — keep what was said rather than nothing.
     if (nodes.length === 0) { nodes = fallbackCapture(text, clock.date); read = 'fallback' }

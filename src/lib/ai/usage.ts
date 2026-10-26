@@ -38,9 +38,9 @@ async function usageNode(userId: number) {
 }
 
 /** Adds a finished call to the balance. `seconds` is for transcription, which is billed by the minute. */
-export async function recordUsage(userId: number, use: TokenUse & { seconds?: number }, source: string, today: string = todayStr()): Promise<void> {
+export async function recordUsage(userId: number, use: TokenUse & { seconds?: number; free?: boolean }, source: string, today: string = todayStr()): Promise<void> {
   try {
-    const usd = costOf(use) + (use.seconds ? audioCost(use.seconds) : 0)
+    const usd = use.free ? 0 : costOf(use) + (use.seconds ? audioCost(use.seconds) : 0)
     const node = await usageNode(userId)
     const p = (node?.properties ?? {}) as Record<string, unknown>
     const months = { ...((p.months as Record<string, unknown>) ?? {}) }
