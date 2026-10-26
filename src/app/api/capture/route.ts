@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, getNodes, getNodeById, updateNode } from '@/lib/graph/queries'
-import { aiConfigured, defaultModel, isFreeModel } from '@/lib/ai/client'
+import { aiConfigured, structuredModel, isFreeModel } from '@/lib/ai/client'
 import { readSettings } from '@/lib/settings'
 import { clockIn, zoneFor } from '@/lib/clock'
 import { addDays } from '@/lib/date'
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     if (!aiConfigured()) throw new Error('OPENAI_API_KEY is not set')
     const weekday = new Date(clock.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
     const { output, usage, response } = await generateText({
-      model: defaultModel,
+      model: structuredModel,
       system: [
         'You read what someone says needs to happen and list the items. Nothing else.',
         `Today is ${weekday} ${clock.date}; it is ${fromMinutes(clock.minutes)} where they are. Resolve "tomorrow", "Friday", "tonight" from that.`,

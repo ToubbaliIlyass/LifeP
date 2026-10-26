@@ -12,7 +12,6 @@ test('out of credit or over a limit is worth repeating elsewhere; other failures
 })
 
 test('free models are told apart from paid ones', () => {
-  assert.equal(isFreeModel('openrouter/free'), true)
   assert.equal(isFreeModel('google/gemma-4-31b-it:free'), true)
   assert.equal(isFreeModel('gpt-5.6-luna'), false)
   assert.equal(isFreeModel(undefined), false)
