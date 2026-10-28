@@ -1,5 +1,6 @@
 import { getNodes, getEdges, createNode, createEdge, deleteNode } from '@/lib/graph/queries'
 import { eventOccursOn, isDueOn, addDays } from '@/lib/date'
+import { statusOn } from '@/lib/event-status'
 import { clockIn, type UserClock } from '@/lib/clock'
 import {
   planSchedule,
@@ -321,6 +322,9 @@ export async function planDay(
       date,
     )
     if (!occurs) continue
+    // Cancelled, or not gone to: the time is free again. Attended already took its place in the day.
+    const settled = statusOn(p, date)
+    if (settled === 'cancelled' || settled === 'missed') continue
     const start = toMinutes(p.time)
     busy.push({ start, end: start + (typeof p.duration === 'number' ? p.duration : 60) })
   }

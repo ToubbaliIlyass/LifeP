@@ -1,4 +1,5 @@
 import { isDueOn, eventOccursOn } from '@/lib/date'
+import { statusOn } from '@/lib/event-status'
 import { blockOccursOn } from '@/lib/sessions'
 import { toMinutes, DEFAULT_TASK_MINUTES } from '@/lib/schedule'
 import type { Node, Edge } from '@/lib/db/schema'
@@ -200,6 +201,9 @@ export function buildNowQueue({
       date,
     )
     if (!occurs) continue
+    // Called off, or not gone to: off the day. Attended stays, ticked.
+    const status = statusOn(p, date)
+    if (status === 'cancelled' || status === 'missed') continue
     const start = typeof p.time === 'string' ? p.time : null
     const minutes = typeof p.duration === 'number' ? p.duration : 60
     items.push({
@@ -212,6 +216,7 @@ export function buildNowQueue({
       targetId: event.id,
       targetType: 'Event',
       note: typeof p.location === 'string' && p.location ? p.location : null,
+      ...(status === 'attended' ? { completed: true } : {}),
     })
   }
 

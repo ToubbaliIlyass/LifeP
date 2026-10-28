@@ -1,18 +1,20 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import type { EventStatus } from '@/lib/event-status'
 import type { DayEvent, Todo, TodoList, TodosPayload } from '@/lib/todos'
 import { useUndo } from '@/components/undo/UndoProvider'
 import { useDataChanged } from '@/lib/dataSignal'
 import { useLiveSync } from '@/lib/useLiveSync'
 import { todayStr } from '@/lib/date'
-import { clockZone } from '@/lib/wallclock'
+import { clockZone, wallNow } from '@/lib/wallclock'
+import { dayFacts } from '@/lib/tuck/mood'
 import { relDate, skipPreview } from '@/lib/todo-views'
 import { safeGet, safeSet } from '@/lib/storage'
 import { parseEntry } from '@/lib/quick-entry'
 import { X } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
-import { SAVE_FAILED, TICKED } from '@/lib/tuck/events'
+import { SAVE_FAILED, SAY, TICKED } from '@/lib/tuck/events'
 import { dueReminders, remindersIn, SNOOZES, snoozeUntil, type Reminder } from '@/lib/reminders'
 import { momentNow, pushIsOn, systemNotification } from '@/lib/push'
 
@@ -35,6 +37,8 @@ interface TodosContextValue {
   toggle: (todo: Todo) => void
   /** Skips this time round of a repeating to-do; the series carries on. Undoable. */
   skip: (todo: Todo) => void
+  /** Settles one day of an event: attended, cancelled or not gone to. Leaves the day's list; undoable. */
+  resolveEvent: (event: DayEvent, status: EventStatus | null) => void
   remove: (todo: Todo) => void
   /** Opens a blank to-do with these fields already set. */
   startDraft: (defaults: Partial<Todo>) => void
@@ -276,6 +280,37 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     }, true)
   }, [run, record])
 
+  const resolveEvent = useCallback((event: DayEvent, status: EventStatus | null) => {
+    const name = event.title.trim() || 'Event'
+    const mark = (s: EventStatus | null) =>
+      setData((d) => (d ? { ...d, events: d.events.map((e) => (e.id === event.id && e.date === event.date ? { ...e, status: s } : e)) } : d))
+    // Everything for today settled by this one? Tuck has a word; worked out from the lists as they are now.
+    if (status && event.date === (data?.date ?? todayStr()) && data) {
+      const events = data.events.map((e) => (e.id === event.id && e.date === event.date ? { ...e, status } : e))
+      const f = dayFacts({ now: wallNow(), todos: todosRef.current, lists: data.lists, events, daysAway: 0 })
+      if (f.open.length === 0 && f.openEvents === 0) window.dispatchEvent(new CustomEvent(SAY, { detail: { state: 'all-done', line: 'All clear. The garden is tidy.' } }))
+    }
+    const send = (s: EventStatus | null) => fetch(`/api/events/${event.id}/resolve`, json('POST', { date: event.date, status: s }))
+    mark(status)
+    // Putting it back needs no toast of its own.
+    if (!status) { run(() => send(null), true); return }
+    run(async () => {
+      const res = await send(status)
+      if (!res.ok) { mark(null); return }
+      let undone = false
+      const undo = async () => {
+        if (undone) return
+        undone = true
+        setNote(null)
+        mark(null)
+        await run(() => send(null), true)
+      }
+      const word = status === 'attended' ? 'Marked as attended' : status === 'cancelled' ? 'Marked as cancelled' : 'Marked as not attended'
+      record(`${word}: “${name}”`, undo)
+      setNote({ text: `${word}: “${name}”.`, undo })
+    }, true)
+  }, [data, run, record])
+
   const skip = useCallback((todo: Todo) => {
     const today = data?.date ?? todayStr()
     const plan = skipPreview(todo, today)
@@ -421,10 +456,10 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     todos: draft ? [draft, ...(data?.todos ?? [])] : data?.todos ?? [],
     lists: data?.lists ?? [],
     events: data?.events ?? [],
-    patch, toggle, skip, remove, startDraft, endDraft, patchList, createList, removeList,
+    patch, toggle, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, reload: load,
     saving, down,
-  }), [data, draft, saving, down, patch, toggle, skip, remove, startDraft, endDraft, patchList, createList, removeList,
+  }), [data, draft, saving, down, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, load])
 
   return (

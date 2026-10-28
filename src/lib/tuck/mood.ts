@@ -53,6 +53,10 @@ export interface DayFacts {
   today: string
   open: Todo[]
   doneToday: number
+  /** Today's events still to settle (attended / cancelled / not gone to). */
+  openEvents: number
+  /** Today's events already settled, whichever way. */
+  settledEvents: number
   overdue: number
   streak: number
   finished: number
@@ -64,10 +68,13 @@ export function dayFacts(i: MoodInput): DayFacts {
   const live = i.todos.filter((t) => t.type !== 'Prayer' && !inDoneList(t, i.lists))
   const open = live.filter((t) => !t.done && isToday(t, today))
   const doneToday = live.filter((t) => t.done && t.doneAt && localDateStr(new Date(t.doneAt)) === today).length
+  const todays = i.events.filter((e) => e.date === localDateStr(i.now))
+  const openEvents = todays.filter((e) => !e.status).length
+  const settledEvents = todays.length - openEvents
   const overdue = open.filter((t) => (t.when && t.when < today) || (t.deadline && t.deadline < today)).length
   const streak = i.todos.reduce((m, t) => (t.type === 'Habit' ? Math.max(m, t.streak ?? 0) : m), 0)
   const finished = i.todos.filter((t) => t.done && t.type !== 'Prayer').length
-  return { today, open, doneToday, overdue, streak, finished, level: levelFor(finished) }
+  return { today, open, doneToday, openEvents, settledEvents, overdue, streak, finished, level: levelFor(finished) }
 }
 
 export function pickMood(i: MoodInput): Mood | null {
@@ -97,17 +104,18 @@ export function pickMood(i: MoodInput): Mood | null {
     return { state: 'stuck-helper', key: `stuck:${stuck.t.id}`, line: `Stuck on “${stuck.t.title || 'this one'}”? Take my trowel, we’ll dig together.`, action: { label: 'Break it down', kind: 'break-down', todoId: stuck.t.id } }
   }
 
-  if (f.doneToday > 0 && f.open.length === 0) return { state: 'all-done', key: 'all-done', line: 'All clear. The garden is tidy.' }
+  // Nothing left to do or to show up to. A settled event counts, even a cancelled one: the day is clear.
+  if ((f.doneToday > 0 || f.settledEvents > 0) && f.open.length === 0 && f.openEvents === 0) return { state: 'all-done', key: 'all-done', line: 'All clear. The garden is tidy.' }
 
   if (f.streak >= 3) return { state: 'streak', key: `streak:${f.streak}`, line: `${f.streak} days in a row. Watered.` }
 
   // An event is on right now.
-  const on = i.events.find((e) => e.date === f.today && e.time && minutesOf(e.time) <= minutes && minutes < minutesOf(e.time) + e.minutes)
+  const on = i.events.find((e) => e.date === f.today && !e.status && e.time && minutesOf(e.time) <= minutes && minutes < minutesOf(e.time) + e.minutes)
   if (on) return { state: 'focus', key: `focus:${on.id}`, line: `${on.title} is on. I’ll keep quiet.` }
 
   // The small hours, then the late evening.
   if (hour < 5) {
-    return f.open.length === 0
+    return f.open.length === 0 && f.openEvents === 0
       ? { state: 'deep-sleep', key: 'deep-sleep', line: 'Nothing due. Sleeping.' }
       : { state: 'night-sleepy', key: 'night-sleepy', line: 'Getting sleepy. Want me to save the rest for tomorrow?' }
   }
@@ -138,7 +146,7 @@ export function momentFor(done: Todo, before: DayFacts, after: DayFacts, finishe
   if (done.type === 'Habit' && (done.streak ?? 0) >= 2) {
     return { state: 'streak', key: 'streak', line: `${(done.streak ?? 0) + 1} days in a row. Watered.` }
   }
-  if (after.open.length === 0 && after.doneToday > 0) {
+  if (after.open.length === 0 && after.openEvents === 0 && (after.doneToday > 0 || after.settledEvents > 0)) {
     return after.doneToday >= 3
       ? { state: 'celebrating', key: 'celebrate', line: 'We did it! Everything for today is done.' }
       : { state: 'all-done', key: 'all-done', line: 'All clear. The garden is tidy.' }

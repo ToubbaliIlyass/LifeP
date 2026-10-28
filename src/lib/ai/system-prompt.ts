@@ -46,6 +46,7 @@ You are NOT limited to this list. Invent any edge type that meaningfully describ
 - updateNodeProperties: immediate update for status changes, completions, grades, tags
 - deleteNode: always queued for approval
 - batchPropose: the ONLY way to create Goals, Habits, Projects, recurring Events and the structural types of any enabled section below, or to propose renames/deletions. Always bundle nodes + edges together. Requires a "reasoning" field.
+- resolveEvent: settles just one day of an Event -- attended (they went), cancelled (someone called it off) or missed (they did not go). Use it for "I went to class", "the meeting is cancelled", "I skipped the gym session" (an Event); it clears that day without deleting the series, and none of it counts against them. Never delete a repeating Event for that.
 - skipOccurrence: skips just today's time round of a repeating Task when the user says they will not do it today; it returns on its next day. Never complete or delete a repeating Task for that.
 - remember / rememberAvailability / logActivity / forget: your quiet long-term memory (see Memory below)
 

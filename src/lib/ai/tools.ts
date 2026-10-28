@@ -9,6 +9,7 @@ import { identityOf, needsIdentity } from '@/lib/graph/naming'
 import { saveRule } from '@/lib/availability'
 import { logActivity } from '@/lib/day-log'
 import { skipTask } from '@/lib/skip-server'
+import { resolveEvent } from '@/lib/event-status-server'
 import { hiddenTypes, moduleProposeTypes, type ModuleAware } from '@/lib/modules'
 import { replanDay } from '@/lib/schedule-day'
 import { dayView } from '@/lib/day-view'
@@ -378,6 +379,20 @@ export function buildTools(
       execute: async ({ nodeId }) => {
         const r = await skipTask(user.id, nodeId, { today: clockNow().date })
         return r.ok ? { skipped: true, wasFor: r.from, nextOn: r.to } : { skipped: false, reason: r.reason }
+      },
+    }),
+
+    resolveEvent: tool({
+      description:
+        'Settle ONE day of an Event (never the whole series): status "attended" when they went ("I went to the dentist", "class done"), "cancelled" when someone called it off, "missed" when they did not go. It leaves that day\'s list and stops reminding; nothing is deleted, and none of it counts against them, so never use updateNodeProperties, deleteNode or logActivity for this. status null puts it back. date defaults to today.',
+      inputSchema: z.object({
+        nodeId: z.number().describe('The Event'),
+        status: z.enum(['attended', 'cancelled', 'missed']).nullable(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('The day it was on; today when omitted'),
+      }),
+      execute: async ({ nodeId, status, date }) => {
+        const r = await resolveEvent(user.id, nodeId, date ?? clockNow().date, status)
+        return r.ok ? { resolved: true, date: r.date, status: r.status } : { resolved: false, reason: r.reason }
       },
     }),
 
