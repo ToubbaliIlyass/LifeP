@@ -300,7 +300,7 @@ export function StoryLanding() {
                 })}
               </h1>
               <p style={{ ...fadeUp(1.75), margin: '16px 0 0', maxWidth: 540, fontSize: 'clamp(16px,1.6vw,19px)', lineHeight: 1.5, color: '#4a4a48', textWrap: 'pretty' }}>
-                A to-do list you talk to. It plans your day, and shows you who you’re becoming.
+                A calm to-do list you talk to. It plans your day, learns when you really get things done, and shows you who you’re becoming.
               </p>
               <div style={{ ...fadeUp(1.9), display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 24 }}>
                 <a href="/app" className="hover:opacity-[.88]" style={BTN_DARK}>Open Acture</a>
@@ -453,6 +453,7 @@ export function StoryLanding() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '36px 64px' }}>
                 <FooterCol title="The app" links={[['What it does', '#ch1'], ['Why it works', '#why'], ['Questions', '#faq']]} />
+                <FooterCol title="Read more" links={[['Voice to-do list', '/voice-to-do-list'], ['Day planner', '/day-planner'], ['A Things alternative', '/things-alternative']]} />
                 <FooterCol title="Get in" links={[['Open Acture', '/app'], ['Start today', '/login']]} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14, maxWidth: 240 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6f6c67' }}>Good to know</span>
@@ -521,7 +522,7 @@ function Device({ F }: { F: Frame }) {
             <div style={{ position: 'absolute', inset: 0, opacity: F.showProject ? 0 : 1, transition: 'opacity .45s' }}>
               <div style={{ maxWidth: 700, margin: '0 auto', padding: dv.pad, fontSize: 14 }}>
                 <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: 22, fontWeight: 700, lineHeight: '28px', letterSpacing: '-0.02em' }}><Icon n="star" size={22} color="#fbbf24" fill="#fbbf24" />Today</h3>
+                  <div style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: 22, fontWeight: 700, lineHeight: '28px', letterSpacing: '-0.02em' }}><Icon n="star" size={22} color="#fbbf24" fill="#fbbf24" />Today</div>
                   <span style={{ flex: 1 }} />
                   <span style={{ width: 28, height: 28, borderRadius: 6, display: 'grid', placeItems: 'center', color: F.sparkOn ? th.primFg : th.mute, background: F.sparkOn ? th.prim : 'transparent', transition: 'all .3s' }}><Icon n="sparkles" size={17} /></span>
                   <span style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', color: th.mute }}><Icon n="plus" size={18} /></span>
@@ -560,7 +561,7 @@ function Device({ F }: { F: Frame }) {
             <div style={{ position: 'absolute', inset: 0, opacity: F.showProject ? 1 : 0, transition: 'opacity .45s' }}>
               <div style={{ maxWidth: 640, margin: '0 auto', padding: dv.pad, fontSize: 14 }}>
                 <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: 22, fontWeight: 700, lineHeight: '28px', letterSpacing: '-0.02em' }}><Ring v={F.projDone} size={22} color={th.prim} />Thesis defence</h3>
+                  <div style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: 22, fontWeight: 700, lineHeight: '28px', letterSpacing: '-0.02em' }}><Ring v={F.projDone} size={22} color={th.prim} />Thesis defence</div>
                   <span style={{ color: th.mute }}><Icon n="ellipsis" size={18} /></span>
                 </header>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12.5, color: th.mute }}><span>School</span><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#f59e0b' }}><Icon n="flag" size={12} color="#f59e0b" />Due Mon 26</span></div>

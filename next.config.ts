@@ -32,6 +32,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Never in search results: the data API and the sign-in handlers.
+        // (robots.txt only stops crawling; this stops indexing.)
+        source: '/:path(api|auth)/:rest*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
         // The service worker is fetched fresh every time, so a fix to it
         // reaches installed copies at once instead of whenever a cache expires.
         source: '/sw.js',

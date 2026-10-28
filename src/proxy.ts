@@ -79,6 +79,6 @@ export const config = {
     // worth a Supabase round trip on each request — and what installing the
     // app fetches, which has to reach a browser that is not signed in yet
     // (the install button is on the public site).
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|robots.txt|sitemap.xml|llms.txt|opengraph-image|twitter-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -28,6 +28,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: 'Acture',
+  // The app is private: nothing under it (/app, /login, /dev) is for search.
+  robots: { index: false, follow: false, nocache: true },
   description: 'Things, but it listens. Say what needs to happen and Acture turns it into to-dos, finds each one a time, and learns when you actually get things done.',
   // Added to an iPhone's home screen, it opens as an app of its own: no
   // Safari bars, its own name under the icon. The status bar keeps its own
