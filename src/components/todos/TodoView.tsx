@@ -15,6 +15,8 @@ import {
 import { addDays } from '@/lib/date'
 import { clockZone } from '@/lib/wallclock'
 import { notifyDataChanged } from '@/lib/dataSignal'
+import { Tuck } from '@/components/ui/Tuck'
+import type { TuckState } from '@/lib/tuck/states'
 import { DRAFT_ID, useTodos } from './TodosProvider'
 import { AutoTextarea, TodoEditor, reminderLabel, type PopKind } from './TodoEditor'
 import { askForNotifications } from '@/lib/notify'
@@ -111,7 +113,7 @@ export function TodoView({
   banner?: React.ReactNode
 }) {
   const {
-    ready, todos, lists, events, date: today, patch, toggle, remove, startDraft, endDraft,
+    ready, down, todos, lists, events, date: today, patch, toggle, remove, startDraft, endDraft,
     patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload,
   } = useTodos()
 
@@ -634,10 +636,14 @@ export function TodoView({
       </div>
     )
   }
-  const empty = (title: string, text: string) => (
-    <div className="mt-8 max-w-[44ch] text-muted-foreground">
-      <b className="block mb-1 font-semibold text-foreground">{title}</b>
-      {text}
+  /** Nothing here yet, with Tuck beside it: quiet for a clear inbox or day, a bare bed for the rest. */
+  const empty = (title: string, text: string, tuck: TuckState = 'empty-garden') => (
+    <div className="mt-8 flex items-center gap-5 max-w-[60ch] text-muted-foreground max-sm:flex-col max-sm:items-start max-sm:gap-2">
+      <Tuck state={tuck} size={156} decorative className="max-sm:-ml-2" />
+      <div>
+        <b className="block mb-1 font-semibold text-foreground">{title}</b>
+        {text}
+      </div>
     </div>
   )
 
@@ -709,7 +715,7 @@ export function TodoView({
           {tagBar(all)}
           {eventRows(todayEvents)}
           {all.length === 0 && todayEvents.length === 0
-            ? empty('A clear day.', 'Say what needs to happen, or press N and type it: “call the bank 3pm”. For something you show up to, use the calendar button above.')
+            ? empty('A clear day.', 'Say what needs to happen, or press N and type it: “call the bank 3pm”. For something you show up to, use the calendar button above.', 'empty-inbox')
             : rows(f.filter((t) => !t.evening), 'today', 'today')}
           {evening.length > 0 && (
             <>
@@ -728,7 +734,7 @@ export function TodoView({
           {standardHead('inbox', addButton())}
           {tagBar(all)}
           {all.length === 0
-            ? empty('Inbox zero.', 'New to-dos land here until you give them a day or a place.')
+            ? empty('Inbox zero.', 'New to-dos land here until you give them a day or a place.', 'empty-inbox')
             : rows(all.filter(tagged), 'inbox', 'inbox')}
         </>
       )
@@ -867,7 +873,7 @@ export function TodoView({
       )
     }
 
-    if (!list) return ready ? empty('This list is gone.', 'It may have been deleted. Pick another from the side.') : null
+    if (!list) return ready ? empty('This list is gone.', 'It may have been deleted. Pick another from the side.', 'not-found') : null
 
     const more = (
       <button aria-label="List options" className={ICON_BTN} onClick={(e) => setPop({ kind: 'list', rect: e.currentTarget.getBoundingClientRect() })}>
@@ -1391,10 +1397,22 @@ export function TodoView({
 
   return (
     <div ref={scroller} className="h-full overflow-y-auto flex flex-col">
-      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 text-[14px] max-md:text-[15px] transition-opacity duration-150 ${ready ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 text-[14px] max-md:text-[15px] transition-opacity duration-150 ${ready || down ? 'opacity-100' : 'opacity-0'}`}>
         {phoneBar}
-        {banner}
-        {known ? body() : null}
+        {!ready && down ? (
+          // The server is not answering: say so, kindly, with a way to try again.
+          <div className="mt-20 flex flex-col items-center text-center" role="status">
+            <Tuck state="maintenance" size={190} decorative />
+            <p className="mt-2 text-[16px] font-semibold">Fixing something. Back soon.</p>
+            <p className="mt-1 text-[13.5px] text-muted-foreground">Your lists are safe. This is on our side.</p>
+            <button onClick={reload} className="mt-4 rounded-md border border-border/80 px-3 py-1.5 text-[13px] font-medium hover:bg-foreground/[0.05]">Try again</button>
+          </div>
+        ) : (
+          <>
+            {banner}
+            {known ? body() : null}
+          </>
+        )}
       </div>
       {/*
         Inside the scroller and in the same column as the rows, not laid over

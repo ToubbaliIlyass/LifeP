@@ -1,6 +1,6 @@
 'use client'
 
-import { ActureMark } from '@/components/ui/acture-mark'
+import { Tuck } from '@/components/ui/Tuck'
 
 /**
  * The hold between the splash and knowing who is looking.
@@ -16,11 +16,14 @@ import { ActureMark } from '@/components/ui/acture-mark'
  * So: nothing is shown until there is something true to show. It is an
  * overlay rather than an early return so the dashboard underneath mounts and
  * starts its own fetches while this covers it — the wait is used, not added.
+ *
+ * What is shown while it waits is Tuck, digging: four frames, a loop.
  */
 export function AppLoading() {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background" role="status" aria-label="Loading">
-      <ActureMark className="w-7 h-7 text-foreground/70 animate-pulse motion-reduce:animate-none" />
+    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-1 bg-background" role="status" aria-label="Loading">
+      <Tuck state="loading-1" size={112} decorative />
+      <p className="text-[13px] text-muted-foreground" aria-hidden>Digging…</p>
     </div>
   )
 }

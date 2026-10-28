@@ -1,6 +1,9 @@
 'use client'
 
 import { NotificationsControl } from './NotificationsControl'
+import { InstallControl } from '@/components/install/InstallControl'
+import { useInstall } from '@/components/install/InstallApp'
+import { TuckAbout } from '@/components/tuck/TuckAbout'
 import { useCallback, useEffect, useState } from 'react'
 import { Check, ChevronLeft, Download, LogOut, MapPin, Moon, SlidersHorizontal, Sun, Upload } from 'lucide-react'
 import { THEMES, applyTheme, applyMode, storedMode, storedTheme } from '@/lib/themes'
@@ -68,6 +71,9 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
   const [locationError, setLocationError] = useState<string | null>(null)
   const [startingOver, setStartingOver] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const install = useInstall()
+  /** Opened in a browser tab, not yet installed: worth saying how. */
+  const installable = !!install && !install.installed
 
   function setTheme(id: string) {
     applyTheme(id)          // instant, and remembered locally for the next paint
@@ -272,6 +278,12 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
           <NotificationsControl />
         </Section>
 
+        {installable && (
+          <Section title="Install">
+            <InstallControl />
+          </Section>
+        )}
+
         <Section title="Prayer times" hint="Puts the five on Today at their times, worked out on your device from your location. Ticking all five completes the day’s prayer.">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={prayer.enabled} onChange={(e) => save({ prayer: { ...prayer, enabled: e.target.checked } })} className="accent-[var(--primary)]" />
@@ -418,6 +430,10 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
               </button>
             </form>
           </div>
+        </Section>
+
+        <Section title="Tuck">
+          <TuckAbout />
         </Section>
       </div>
     </div>

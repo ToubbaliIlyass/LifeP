@@ -7,6 +7,8 @@ import { EVERYDAY_COLOR, IDENTITY_COLORS, WORLD_KINDS, colorOf, nextHue, suggest
 import { useDataChanged } from '@/lib/dataSignal'
 import { clockZone } from '@/lib/wallclock'
 import { useTodos } from '@/components/todos/TodosProvider'
+import { Tuck } from '@/components/ui/Tuck'
+import { TUCK_LINES } from '@/lib/tuck/states'
 import { WorldCanvas } from './WorldCanvas'
 import { WORLD_META } from './meta'
 
@@ -315,11 +317,18 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
             </div>
           )}
           {data && data.identities.length === 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-2">
-              {SUGGESTIONS.map((sg) => (
-                <button key={sg} onClick={() => add(sg)} className={`${CHIP} border-white/25 text-white/80 hover:text-white hover:bg-white/10`}>{sg}</button>
-              ))}
-            </div>
+            <>
+              {/* A blank map: Tuck, on the dark glass, with the first thing to try. */}
+              <div className="flex items-center gap-2 pt-1">
+                <Tuck state="empty-world" size={92} tone="dark" decorative className="-ml-1" />
+                <p className="text-[12.5px] leading-snug text-white/75">{TUCK_LINES['empty-world']}</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {SUGGESTIONS.map((sg) => (
+                  <button key={sg} onClick={() => add(sg)} className={`${CHIP} border-white/25 text-white/80 hover:text-white hover:bg-white/10`}>{sg}</button>
+                ))}
+              </div>
+            </>
           )}
           <p className="mt-5 text-[12px] leading-relaxed text-white/60">
             We come to know who we are partly by watching what we do, so every small thing finished is evidence. A vote never expires, and a missed day takes nothing away.
