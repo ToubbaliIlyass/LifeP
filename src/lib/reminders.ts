@@ -61,6 +61,8 @@ function forTodo(t: Todo): Reminder[] {
 
 function forEvent(e: DayEvent): Reminder[] {
   const out: Reminder[] = []
+  // Attended, cancelled or not gone to: nothing left to be reminded of.
+  if (e.status) return out
   const where = e.location ? ` · ${e.location}` : ''
   const add = (at: string, body: string) => out.push({ key: `event:${e.id}:${at}`, id: e.id, kind: 'event', title: e.title || 'Event', at, body })
   if (e.reminder) add(`${e.date}T${e.reminder}`, `${e.time ? `At ${e.time}` : 'Today'}${where}`)

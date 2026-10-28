@@ -5,6 +5,7 @@ import {
   Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Flag, Flame, Heading, Inbox, Layers, ListChecks, Loader2, Moon, Plus,
   Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
+import type { EventStatus } from '@/lib/event-status'
 import { parseWhen } from '@/lib/jump-start'
 import type { DayEvent, Todo, TodoList } from '@/lib/todos'
 import { UPCOMING_DAYS } from '@/lib/todos'
@@ -113,7 +114,7 @@ export function TodoView({
   banner?: React.ReactNode
 }) {
   const {
-    ready, down, todos, lists, events, date: today, patch, toggle, skip, remove, startDraft, endDraft,
+    ready, down, todos, lists, events, date: today, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft,
     patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload,
   } = useTodos()
 
@@ -549,17 +550,88 @@ export function TodoView({
    * What is on the calendar that day, in one quiet box above the to-dos: it
    * happens whether or not anything is ticked, so it is read, not worked through.
    */
-  const eventRows = (items: DayEvent[]) => items.length > 0 && (
+  const [eventMenu, setEventMenu] = useState<string | null>(null)
+  useEffect(() => {
+    if (!eventMenu) return
+    const close = (ev: Event) => { if (!(ev.target as Element | null)?.closest?.('[data-event-menu]')) setEventMenu(null) }
+    const esc = (ev: KeyboardEvent) => { if (ev.key === 'Escape') setEventMenu(null) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+  }, [eventMenu])
+
+  const STATUS_WORD: Record<EventStatus, string> = { attended: 'Went', cancelled: 'Cancelled', missed: 'Didn’t go' }
+  /** Quiet round buttons: always there on touch, shown on hover or focus with a mouse. */
+  const EVENT_BTN = 'grid place-items-center w-7 h-7 -my-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-foreground/[0.08] focus-visible:text-foreground focus-visible:bg-foreground/[0.08] outline-none transition-colors'
+
+  /**
+   * What is on the calendar that day, in one quiet box above the to-dos: it
+   * happens whether or not anything is ticked, so it is read, not worked through.
+   * With `settle` (Today), each one can be marked as gone to or not, which takes
+   * it off the day. Not going is never marked as a failure: no red, no count.
+   */
+  const eventRows = (items: DayEvent[], settle = false) => items.length > 0 && (
     <ul className="my-2 rounded-md bg-foreground/[0.05] px-2.5 py-1.5 text-[13px] leading-[19px]">
-      {items.map((e) => (
-        <li key={`${e.id}:${e.date}`} onClick={(ev) => setPop({ kind: 'event', rect: ev.currentTarget.getBoundingClientRect(), event: e })} className="flex items-baseline gap-1.5 cursor-pointer hover:text-primary">
-          <span className="w-[3px] h-[11px] self-center shrink-0 rounded-full bg-sky-500/70" />
-          {e.time && <span className="shrink-0 tabular-nums font-medium text-sky-700 dark:text-sky-400">{e.time}</span>}
-          <span className="min-w-0 truncate">{e.title}</span>
-          {e.location && <span className="min-w-0 truncate text-muted-foreground">· {e.location}</span>}
-        </li>
-      ))}
+      {items.map((e) => {
+        const key = `${e.id}:${e.date}`
+        return (
+          <li key={key} onClick={(ev) => setPop({ kind: 'event', rect: ev.currentTarget.getBoundingClientRect(), event: e })} className="group/ev relative flex items-baseline gap-1.5 cursor-pointer hover:text-primary">
+            <span className="w-[3px] h-[11px] self-center shrink-0 rounded-full bg-sky-500/70" />
+            {e.time && <span className="shrink-0 tabular-nums font-medium text-sky-700 dark:text-sky-400">{e.time}</span>}
+            <span className="min-w-0 truncate">{e.title}</span>
+            {e.location && <span className="min-w-0 truncate text-muted-foreground">· {e.location}</span>}
+            {settle && (
+              <span
+                onClick={(ev) => ev.stopPropagation()}
+                className={`ml-auto flex shrink-0 items-center gap-0.5 self-center text-foreground md:opacity-0 md:group-hover/ev:opacity-100 md:group-focus-within/ev:opacity-100 ${eventMenu === key ? 'md:!opacity-100' : ''}`}
+              >
+                <button onClick={() => resolveEvent(e, 'attended')} title="Went" aria-label={`Mark “${e.title}” as attended`} className={EVENT_BTN}>
+                  <Check className="w-[15px] h-[15px]" />
+                </button>
+                <span data-event-menu className="relative">
+                  <button
+                    onClick={() => setEventMenu(eventMenu === key ? null : key)}
+                    title="Cancelled or didn’t go"
+                    aria-label={`“${e.title}” was cancelled or not attended`}
+                    aria-haspopup="menu"
+                    aria-expanded={eventMenu === key}
+                    className={EVENT_BTN}
+                  >
+                    <X className="w-[15px] h-[15px]" />
+                  </button>
+                  {eventMenu === key && (
+                    <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-[150px] rounded-lg border border-border/70 bg-card p-1 text-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
+                      {(['cancelled', 'missed'] as const).map((s) => (
+                        <button key={s} role="menuitem" autoFocus={s === 'cancelled'} onClick={() => { setEventMenu(null); resolveEvent(e, s) }} className={MENU}>
+                          {STATUS_WORD[s]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </span>
+              </span>
+            )}
+          </li>
+        )
+      })}
     </ul>
+  )
+
+  /** Today's events already settled: out of the way, one tap from being put back. */
+  const settledEvents = (items: DayEvent[]) => items.length > 0 && (
+    <details className="my-2 text-[13px] text-muted-foreground">
+      <summary className="cursor-pointer select-none rounded-md px-0.5 py-0.5 hover:text-foreground">Done today · {items.length}</summary>
+      <ul className="mt-1 px-0.5">
+        {items.map((e) => (
+          <li key={`${e.id}:${e.date}`} className="flex items-baseline gap-1.5 py-0.5">
+            <span className="shrink-0 tabular-nums">{e.time ?? ''}</span>
+            <span className={`min-w-0 truncate ${e.status === 'attended' ? 'line-through' : ''}`}>{e.title}</span>
+            <span className="shrink-0">· {e.status ? STATUS_WORD[e.status] : ''}</span>
+            <button onClick={() => resolveEvent(e, null)} aria-label={`Put “${e.title}” back on today`} title="Put back on today" className="ml-auto shrink-0 rounded-md px-1.5 text-primary hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] outline-none">Undo</button>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 
   const listRow = (l: TodoList, note?: string) => (
@@ -706,7 +778,8 @@ export function TodoView({
       const f = all.filter(tagged)
       const evening = f.filter((t) => t.evening)
       const d = parseDay(today)
-      const todayEvents = events.filter((e) => e.date === today)
+      const todayEvents = events.filter((e) => e.date === today && !e.status)
+      const settled = events.filter((e) => e.date === today && !!e.status)
       const canPlan = all.some((t) => !t.done && t.type !== 'Prayer' && !t.time)
       return (
         <>
@@ -726,9 +799,11 @@ export function TodoView({
             ready && <>{DAYS[d.getDay()]}, {d.getDate()} {MONTHS_LONG[d.getMonth()]}{planNote && <span className="ml-2 text-foreground/70">· {planNote}</span>}</>,
           )}
           {tagBar(all)}
-          {eventRows(todayEvents)}
+          {eventRows(todayEvents, true)}
           {all.length === 0 && todayEvents.length === 0
-            ? empty('A clear day.', 'Say what needs to happen, or press N and type it: “call the bank 3pm”. For something you show up to, use the calendar button above.', 'empty-inbox')
+            ? settled.length > 0
+              ? empty('Day complete.', 'Everything you had on today is settled. Nothing left to do.', 'all-done')
+              : empty('A clear day.', 'Say what needs to happen, or press N and type it: “call the bank 3pm”. For something you show up to, use the calendar button above.', 'empty-inbox')
             : rows(f.filter((t) => !t.evening), 'today', 'today')}
           {evening.length > 0 && (
             <>
@@ -736,6 +811,7 @@ export function TodoView({
               {rows(evening, 'today', 'evening')}
             </>
           )}
+          {settledEvents(settled)}
         </>
       )
     }

@@ -1,6 +1,7 @@
 import type { Node, Edge } from '@/lib/db/schema'
 import { addDays, eventOccursOn, isDueOn } from '@/lib/date'
 import { blockOccursOn, firmnessOf } from '@/lib/sessions'
+import { statusOn, type EventStatus } from '@/lib/event-status'
 import { displayName } from '@/lib/graph/naming'
 import { toMinutes } from '@/lib/schedule'
 import type { PrayerSlot } from '@/lib/now'
@@ -129,6 +130,8 @@ export interface DayEvent {
   remindBefore?: number | null
   /** Snoozed: reminds again at this moment. */
   snoozedUntil?: string | null
+  /** How this day's showing up went; null while it is still on the list. See src/lib/event-status.ts. */
+  status?: EventStatus | null
 }
 
 export interface TodosPayload {
@@ -407,6 +410,7 @@ export function buildTodos({
       reminder: reminderFields(p).reminder,
       remindBefore: reminderFields(p).remindBefore,
       snoozedUntil: reminderFields(p).snoozedUntil,
+      status: statusOn(p, day),
     }
   }
   for (let i = 0; i <= UPCOMING_DAYS; i++) {
