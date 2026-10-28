@@ -8,6 +8,7 @@ import { saveMemories, MEMORY_CATEGORIES } from '@/lib/memory'
 import { identityOf, needsIdentity } from '@/lib/graph/naming'
 import { saveRule } from '@/lib/availability'
 import { logActivity } from '@/lib/day-log'
+import { skipTask } from '@/lib/skip-server'
 import { hiddenTypes, moduleProposeTypes, type ModuleAware } from '@/lib/modules'
 import { replanDay } from '@/lib/schedule-day'
 import { dayView } from '@/lib/day-view'
@@ -368,6 +369,16 @@ export function buildTools(
         completed: z.boolean().optional().describe('false if they only worked on it without finishing'),
       }),
       execute: async (input) => logActivity(user.id, input),
+    }),
+
+    skipOccurrence: tool({
+      description:
+        'Skip ONE time round of a repeating Task ("skip my run today", "not doing the stretching today"): it leaves today and comes back on its next day by its own rule. This is not completing it and not deleting it, so never use updateNodeProperties or logActivity for that. Only for a Task that has a recurrence; a one-off cannot be skipped. If it is the last time round before its deadline, it says so and nothing changes.',
+      inputSchema: z.object({ nodeId: z.number().describe('The repeating Task') }),
+      execute: async ({ nodeId }) => {
+        const r = await skipTask(user.id, nodeId, { today: clockNow().date })
+        return r.ok ? { skipped: true, wasFor: r.from, nextOn: r.to } : { skipped: false, reason: r.reason }
+      },
     }),
 
     rememberAvailability: tool({

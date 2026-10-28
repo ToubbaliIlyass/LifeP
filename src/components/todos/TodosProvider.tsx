@@ -7,6 +7,7 @@ import { useDataChanged } from '@/lib/dataSignal'
 import { useLiveSync } from '@/lib/useLiveSync'
 import { todayStr } from '@/lib/date'
 import { clockZone } from '@/lib/wallclock'
+import { relDate, skipPreview } from '@/lib/todo-views'
 import { safeGet, safeSet } from '@/lib/storage'
 import { parseEntry } from '@/lib/quick-entry'
 import { X } from 'lucide-react'
@@ -32,6 +33,8 @@ interface TodosContextValue {
   /** Changes a to-do: on screen at once, written a moment later. */
   patch: (id: number, changes: Partial<Todo>) => void
   toggle: (todo: Todo) => void
+  /** Skips this time round of a repeating to-do; the series carries on. Undoable. */
+  skip: (todo: Todo) => void
   remove: (todo: Todo) => void
   /** Opens a blank to-do with these fields already set. */
   startDraft: (defaults: Partial<Todo>) => void
@@ -98,6 +101,13 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   const { record } = useUndo()
   const [saving, setSaving] = useState(false)
   const [down, setDown] = useState(false)
+  /** The small card after a skip: what happened, and the way back. */
+  const [note, setNote] = useState<{ text: string; undo: (() => void) | null } | null>(null)
+  useEffect(() => {
+    if (!note) return
+    const id = setTimeout(() => setNote(null), 6000)
+    return () => clearTimeout(id)
+  }, [note])
 
   const queue = useRef(new Map<number, { changes: Record<string, unknown>; timer: ReturnType<typeof setTimeout> }>())
   const inflight = useRef(0)
@@ -266,6 +276,36 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     }, true)
   }, [run, record])
 
+  const skip = useCallback((todo: Todo) => {
+    const today = data?.date ?? todayStr()
+    const plan = skipPreview(todo, today)
+    const name = todo.title.trim() || 'New to-do'
+    if (!plan.ok) {
+      if (plan.reason === 'last') setNote({ text: `“${name}” is on its last time round, so there is nothing to skip to.`, undo: null })
+      return
+    }
+    const { from, to } = plan
+    const move = (day: string) =>
+      setData((d) => (d ? { ...d, todos: d.todos.map((t) => (t.id === todo.id ? { ...t, when: day, time: null, timePlanned: false } : t)) } : d))
+    // A snooze belonged to the occurrence just skipped.
+    move(to)
+    run(async () => {
+      const res = await fetch(`/api/todos/${todo.id}/skip`, json('POST', { date: from, tz: clockZone() }))
+      // Already moved on (another tab, a double click): just show what is true.
+      if (!res.ok) return
+      let undone = false
+      const undo = async () => {
+        if (undone) return
+        undone = true
+        setNote(null)
+        move(from)
+        await run(() => fetch(`/api/todos/${todo.id}/skip`, json('POST', { undo: true, date: from })), true)
+      }
+      record(`Skipped “${name}”`, undo)
+      setNote({ text: `Skipped “${name}”. Next: ${relDate(to, today)}.`, undo })
+    }, true)
+  }, [data?.date, run, record])
+
   /** Deletes a node, keeping what is needed to put it back. */
   const destroy = useCallback((id: number, label: string) => {
     run(async () => {
@@ -381,15 +421,26 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     todos: draft ? [draft, ...(data?.todos ?? [])] : data?.todos ?? [],
     lists: data?.lists ?? [],
     events: data?.events ?? [],
-    patch, toggle, remove, startDraft, endDraft, patchList, createList, removeList,
+    patch, toggle, skip, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, reload: load,
     saving, down,
-  }), [data, draft, saving, down, patch, toggle, remove, startDraft, endDraft, patchList, createList, removeList,
+  }), [data, draft, saving, down, patch, toggle, skip, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, load])
 
   return (
     <TodosContext.Provider value={value}>
       {children}
+      {note && (
+        <div role="status" aria-live="polite" className={`fixed z-[65] left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-24 flex items-center gap-3 max-w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border/70 bg-card px-3.5 py-2.5 text-[13.5px] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]`}>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{note.text}</span>
+          {note.undo && (
+            <button onClick={note.undo} className="shrink-0 rounded-md px-2 py-1 font-semibold text-primary hover:bg-foreground/[0.06]">Undo</button>
+          )}
+          <button onClick={() => setNote(null)} aria-label="Dismiss" className="shrink-0 grid place-items-center w-6 h-6 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       {ringing.length > 0 && (
         <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))]" role="status" aria-live="polite">
           {ringing.map((r) => {
@@ -411,6 +462,9 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
                 <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[38px]">
                   {todo && !todo.done && (
                     <button onClick={() => { toggle(todo); away() }} className="rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-[12.5px] font-semibold hover:opacity-90">Done</button>
+                  )}
+                  {todo && skipPreview(todo, data?.date ?? todayStr()).ok && (
+                    <button onClick={() => { skip(todo); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[12.5px] font-medium hover:bg-foreground/[0.05]">Skip today</button>
                   )}
                   {SNOOZES.map((s) => (
                     <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[12.5px] font-medium hover:bg-foreground/[0.05]">

@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, Archive, Bell, CalendarDays, Clock, Flag, MapPin, Moon, Plus, Repeat, Star, Trash2, X } from 'lucide-react'
+import { ArrowRight, Archive, Bell, CalendarDays, Clock, Flag, MapPin, Moon, Plus, Repeat, SkipForward, Star, Trash2, X } from 'lucide-react'
 import type { ChecklistItem, Todo, TodoList } from '@/lib/todos'
-import { relDate, repeatLabel } from '@/lib/todo-views'
+import { relDate, repeatLabel, skipLabel } from '@/lib/todo-views'
 import { parseEntry, saysMore } from '@/lib/quick-entry'
 import { lead } from '@/lib/reminders'
 import { EVENING_TONE, SOMEDAY_TONE, TodoCheck } from './parts'
@@ -44,7 +44,7 @@ const PILL = 'inline-flex items-center gap-1.5 max-w-[220px] text-[12.5px] px-2 
  * typed; closing is just clicking away.
  */
 export function TodoEditor({
-  todo, lists, today, autoFocus, onPatch, onToggle, onDelete, onClose, onPop,
+  todo, lists, today, autoFocus, onPatch, onToggle, onSkip, onDelete, onClose, onPop,
 }: {
   todo: Todo
   lists: TodoList[]
@@ -52,6 +52,8 @@ export function TodoEditor({
   autoFocus: boolean
   onPatch: (changes: Partial<Todo>) => void
   onToggle: () => void
+  /** Only for a repeating to-do that is open: skips this time round. */
+  onSkip?: () => void
   onDelete: () => void
   onClose: () => void
   onPop: (kind: PopKind, anchor: HTMLElement) => void
@@ -373,6 +375,12 @@ export function TodoEditor({
             <button type="button" className={pill(false)} onClick={(e) => onPop('move', e.currentTarget)}>
               <ArrowRight className="w-[15px] h-[15px]" />
               <span className="truncate">{list ? list.title || 'Untitled' : isTask ? 'Inbox' : 'No list'}</span>
+            </button>
+          )}
+          {onSkip && !isDraft && (
+            <button type="button" className={pill(false)} onClick={() => { onSkip(); onClose() }}>
+              <SkipForward className="w-[15px] h-[15px]" />
+              <span className="truncate">{skipLabel(todo, today)}</span>
             </button>
           )}
           <span className="flex-1" />
