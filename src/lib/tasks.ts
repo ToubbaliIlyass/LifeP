@@ -59,6 +59,8 @@ export async function setTaskStatus(userId: number, taskId: number, status: stri
         // One history for every time round — see seriesOf in src/lib/availability.ts.
         seriesId: typeof props.seriesId === 'number' ? props.seriesId : taskId,
         completedAt: undefined,
+        // Skips belong to the occurrence they were made on (src/lib/skip.ts).
+        skipped: undefined,
         // Each occurrence starts with its checklist unticked.
         ...(Array.isArray(props.checklist)
           ? { checklist: (props.checklist as Record<string, unknown>[]).map((c) => ({ ...c, done: false })) }

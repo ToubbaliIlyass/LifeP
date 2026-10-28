@@ -1,4 +1,5 @@
 import type { Todo, TodoList } from '@/lib/todos'
+import { skipOccurrence, type SkipResult } from '@/lib/skip'
 
 /**
  * Which list a to-do shows in.
@@ -117,4 +118,22 @@ export function repeatLabel(repeats: string | null): string {
   if (repeats === 'weekdays') return 'Weekdays'
   if (repeats === 'weekly') return 'Weekly'
   return 'Every day'
+}
+
+/** Only a repeating to-do that is open and on a day can have one time round skipped. */
+export const canSkip = (t: Todo) => t.type === 'Task' && !!t.repeats && !t.done && !t.someday && !!t.when && t.id > 0
+
+/** Where skipping would take it, by the same rule the server applies (src/lib/skip.ts). */
+export function skipPreview(t: Todo, today: string): SkipResult {
+  if (!canSkip(t)) return { ok: false, reason: 'not-repeating' }
+  return skipOccurrence({
+    recurrence: { frequency: t.repeats, daysOfWeek: t.repeatDays ?? undefined },
+    dueDate: t.when, deadline: t.deadline ?? undefined, status: 'todo',
+  }, today, t.when ?? undefined)
+}
+
+/** "Skip today" on today's, "Skip Thu 15 Oct" on another day's. */
+export function skipLabel(t: Todo, today: string): string {
+  if (!t.when || t.when === today) return 'Skip today'
+  return `Skip ${relDate(t.when, today).toLowerCase() === 'tomorrow' ? 'tomorrow' : relDate(t.when, today)}`
 }

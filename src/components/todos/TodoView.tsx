@@ -3,14 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Flag, Flame, Heading, Inbox, Layers, ListChecks, Loader2, Moon, Plus,
-  Repeat, Sparkles, Square, Star, Tag, Trash2, X,
+  Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import { parseWhen } from '@/lib/jump-start'
 import type { DayEvent, Todo, TodoList } from '@/lib/todos'
 import { UPCOMING_DAYS } from '@/lib/todos'
 import {
   DAYS, MONTHS_LONG, STANDARD_VIEWS, byDay, byOrder, deadlineLabel, inDoneList, inInbox, isAnytime, isSomeday, isToday,
-  isUpcoming, parseDay, progress, relDate, repeatLabel, upcomingDay, type StandardView,
+  canSkip, isUpcoming, parseDay, skipLabel, progress, relDate, repeatLabel, upcomingDay, type StandardView,
 } from '@/lib/todo-views'
 import { addDays } from '@/lib/date'
 import { clockZone } from '@/lib/wallclock'
@@ -113,7 +113,7 @@ export function TodoView({
   banner?: React.ReactNode
 }) {
   const {
-    ready, down, todos, lists, events, date: today, patch, toggle, remove, startDraft, endDraft,
+    ready, down, todos, lists, events, date: today, patch, toggle, skip, remove, startDraft, endDraft,
     patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload,
   } = useTodos()
 
@@ -447,6 +447,7 @@ export function TodoView({
           autoFocus={focusTitle}
           onPatch={(changes) => patch(t.id, changes)}
           onToggle={() => complete(t)}
+          onSkip={canSkip(t) ? () => skip(t) : undefined}
           onDelete={() => destroy(t)}
           onClose={closeEditor}
           onPop={(kind, anchor) => setPop({ kind, rect: anchor.getBoundingClientRect(), todoId: t.id })}
@@ -480,7 +481,7 @@ export function TodoView({
           if (fixed) setSel(t.id)
           else open(t.id)
         }}
-        className={`${ROW} select-none ${sel === t.id || picked.has(t.id) ? 'bg-primary/[0.12]' : 'hover:bg-foreground/[0.04]'}`}
+        className={`${ROW} group/row select-none ${sel === t.id || picked.has(t.id) ? 'bg-primary/[0.12]' : 'hover:bg-foreground/[0.04]'}`}
       >
         {hint?.id === t.id && (
           <span className={`absolute left-2 right-2 h-0.5 rounded bg-primary ${hint.before ? '-top-px' : '-bottom-px'}`} />
@@ -500,6 +501,18 @@ export function TodoView({
           <span className={`shrink-0 inline-flex items-center gap-1 text-[12px] ${due.tone === 'over' ? 'text-red-500 font-semibold' : due.tone === 'soon' ? 'text-amber-500' : 'text-muted-foreground'}`}>
             <Flag className="w-3 h-3" />{due.text}
           </span>
+        )}
+        {/* One time round of a repeating to-do, put off; it carries on after. Always there on a phone, which has no hover. */}
+        {canSkip(t) && (
+          <button
+            type="button"
+            title={skipLabel(t, today)}
+            aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`}
+            onClick={(e) => { e.stopPropagation(); skip(t) }}
+            className={`${ICON_BTN} -my-0.5 -mr-1 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 max-md:opacity-100 [@media(hover:none)]:opacity-100`}
+          >
+            <SkipForward className="w-[15px] h-[15px]" />
+          </button>
         )}
       </li>
     )
