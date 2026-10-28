@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Inbox, Repeat } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
+import { TUCK_LINES, type TuckState } from '@/lib/tuck/states'
 import type { Proposal } from '@/lib/db/schema'
 import type { BatchOperation } from '@/lib/ai/tools'
 import { notifyDataChanged } from '@/lib/dataSignal'
@@ -103,6 +105,17 @@ export function ProposalQueue({ onCountChange, onOpenMenu }: {
   onOpenMenu: () => void
 }) {
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
+  /** Tuck's reaction to the last yes or no, for a few seconds. */
+  const [note, setNote] = useState<'accepted' | 'declined' | null>(null)
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const react = (approved: boolean) => {
+    if (noteTimer.current) clearTimeout(noteTimer.current)
+    setNote(approved ? 'accepted' : 'declined')
+    noteTimer.current = setTimeout(() => setNote(null), 4500)
+  }
+  useEffect(() => () => { if (noteTimer.current) clearTimeout(noteTimer.current) }, [])
+  // Waiting for a yes: the idea held up. Nothing waiting: the quiet.
+  const pose: TuckState = note ?? (proposals && proposals.length === 0 ? 'empty-inbox' : 'proposing')
 
   const load = useCallback(() => {
     fetch('/api/proposals')
@@ -125,10 +138,16 @@ export function ProposalQueue({ onCountChange, onOpenMenu }: {
             <ChevronLeft className="w-6 h-6" />
           </button>
         </div>
-        <h1 className="flex items-center gap-2.5 text-[22px] font-bold leading-7 tracking-tight mb-2">
-          <Inbox className="w-[22px] h-[22px] text-primary" />To review
-        </h1>
-        <p className="mb-4 text-[14px] text-foreground/75">Bigger things the assistant wants to add. Nothing here happens until you say yes.</p>
+        <div className="flex items-center gap-4 mb-4">
+          <Tuck state={pose} size={104} decorative className="max-sm:hidden" />
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2.5 text-[22px] font-bold leading-7 tracking-tight mb-2">
+              <Inbox className="w-[22px] h-[22px] text-primary" />To review
+            </h1>
+            <p className="text-[14px] text-foreground/75">Bigger things the assistant wants to add. Nothing here happens until you say yes.</p>
+            {note && <p role="status" className="mt-1.5 text-[13.5px] font-medium">{TUCK_LINES[note]}</p>}
+          </div>
+        </div>
         {proposals && proposals.length === 0 && (
           <div className="mt-8 max-w-[44ch] text-muted-foreground">
             <b className="flex items-center gap-1.5 mb-1 font-semibold text-foreground"><Repeat className="w-4 h-4" />Nothing waiting.</b>
@@ -137,7 +156,7 @@ export function ProposalQueue({ onCountChange, onOpenMenu }: {
         )}
         <ul>
           {proposals?.map((p) => (
-            <ProposalRow key={p.id} proposal={p} onResolved={(approved) => { if (approved) notifyDataChanged(); load() }} />
+            <ProposalRow key={p.id} proposal={p} onResolved={(approved) => { react(approved); if (approved) notifyDataChanged(); load() }} />
           ))}
         </ul>
       </div>

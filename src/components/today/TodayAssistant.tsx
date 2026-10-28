@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, Keyboard, ArrowUp, Square, X, RotateCcw, ChevronRight, Loader2 } from 'lucide-react'
+import { Mic, Keyboard, ArrowUp, Square, X, RotateCcw, ChevronRight } from 'lucide-react'
 import type { UIMessage } from 'ai'
 import { useAssistant } from '@/components/chat/AssistantProvider'
 import { ToolActivity, isToolPart, type ToolPart } from '@/components/chat/ToolActivity'
 import { AttachButton, AttachmentStrip, FilePreview, useAttachments } from '@/components/chat/attachments'
+import { Tuck, TuckAvatar } from '@/components/ui/Tuck'
+import { afterPose, workingPose } from '@/lib/tuck/chat'
+import { TUCK_LINES, type TuckState } from '@/lib/tuck/states'
 import { useSpeechInput } from '@/lib/useSpeechInput'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { clockZone } from '@/lib/wallclock'
@@ -80,6 +83,25 @@ export function TodayAssistant({ onNavigate, dock = false }: {
 }) {
   const { messages, setMessages, sendMessage, stop, status, error } = useAssistant()
   const busy = status === 'submitted' || status === 'streaming'
+  /** For a few seconds after a reply: Tuck's "done", or its explanation of the plan. */
+  const [afterglow, setAfterglow] = useState<TuckState | null>(null)
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy && !error) {
+      const done = afterPose(messages)
+      if (done) {
+        const on = setTimeout(() => setAfterglow(done), 0)
+        const off = setTimeout(() => setAfterglow(null), 4200)
+        wasBusy.current = busy
+        return () => { clearTimeout(on); clearTimeout(off) }
+      }
+    }
+    wasBusy.current = busy
+    // The reply that just ended is what is read; later renders must not re-fire it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy])
+  /** Which Tuck goes with where the conversation is: busy with a step, just done, or nothing to add. */
+  const pose: TuckState | null = error && !busy ? 'error' : busy ? workingPose(messages) : afterglow
 
   /** What speech has made of it so far; sent when listening ends. */
   const heard = useRef('')
@@ -278,16 +300,14 @@ export function TodayAssistant({ onNavigate, dock = false }: {
           // ── Listening ──────────────────────────────────────
           <div className={dock ? 'px-2 py-3' : 'px-5 py-5'}>
             <div className="flex items-center gap-4">
-              {/* The mic, alive: a ring breathing out from it, and a
-                  waveform beside it — unmistakably "I am listening". */}
-              <span className="relative w-12 h-12 shrink-0">
-                {!speech.transcribing && (
-                  <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping motion-reduce:hidden" />
-                )}
-                <span className="relative w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                  {speech.transcribing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
-                </span>
-              </span>
+              {/* Tuck, listening: with the waves, and the bars beside it for the voice itself. While
+                  the browser is asking for the mic, Tuck asks too — "only when you tap". */}
+              <Tuck
+                state={speech.transcribing ? 'thinking' : arming && !live ? 'permission-mic' : 'listening'}
+                size={116}
+                decorative
+                className="-my-3 -ml-2"
+              />
               <div className="flex-1 min-w-0">
                 {!speech.transcribing && (
                   <div className="flex items-center gap-[3px] h-7 mb-1" aria-hidden>
@@ -303,7 +323,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
                 <p className="text-[15px] text-foreground/85 leading-relaxed">
                   {speech.transcribing
                     ? 'Writing that down…'
-                    : speech.transcript || prompt || (speech.mode === 'record' ? 'Recording — tap Done when you have said it all.' : 'Listening… say everything that needs to happen.')}
+                    : speech.transcript || prompt || (arming && !live ? TUCK_LINES['permission-mic'] : (speech.mode === 'record' ? 'Recording — tap Done when you have said it all.' : 'Listening… say everything that needs to happen.'))}
                 </p>
               </div>
             </div>
@@ -438,19 +458,23 @@ export function TodayAssistant({ onNavigate, dock = false }: {
   )
 
   const failure = error && !busy && (
-    <div className="rounded-lg bg-destructive/[0.07] px-3 py-2.5 text-[12.5px]">
-      <p className="text-destructive/90">Couldn&apos;t get an answer{error.message ? ` — ${error.message}` : ''}.</p>
-      {rescue === 'saved' ? (
-        <p className="mt-1 text-foreground/75">Put on today as a task instead.</p>
-      ) : (
-        <button
-          onClick={saveAsTask}
-          disabled={rescue === 'saving'}
-          className="mt-1.5 text-[12px] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground disabled:opacity-50"
-        >
-          {rescue === 'saving' ? 'Adding…' : 'Add what I said to today as a task'}
-        </button>
-      )}
+    <div className="flex items-center gap-2 rounded-lg bg-destructive/[0.07] pl-1.5 pr-3 py-1.5 text-[12.5px]">
+      {/* Oops, not a sad face: the sprout droops and the shoulders go up. */}
+      <Tuck state="error" size={96} decorative />
+      <div className="min-w-0">
+        <p className="text-destructive/90">Couldn&apos;t get an answer{error.message ? ` — ${error.message}` : ''}.</p>
+        {rescue === 'saved' ? (
+          <p className="mt-1 text-foreground/75">Put on today as a task instead.</p>
+        ) : (
+          <button
+            onClick={saveAsTask}
+            disabled={rescue === 'saving'}
+            className="mt-1.5 text-[12px] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground disabled:opacity-50"
+          >
+            {rescue === 'saving' ? 'Adding…' : 'Add what I said to today as a task'}
+          </button>
+        )}
+      </div>
     </div>
   )
 
@@ -464,13 +488,29 @@ export function TodayAssistant({ onNavigate, dock = false }: {
       <div className="relative flex justify-center h-0">
         <Island mode={mode} canClose={!listeningView} onClose={close} shellRef={shell}>
           {mode === 'compose' ? (
-            <div className="w-[var(--island-w,560px)] px-1.5">{bar}</div>
+            <div className="w-[var(--island-w,560px)] px-1.5">
+              {/* Waiting for input: Tuck, idle, and the first line of the conversation. */}
+              {!listeningView && (
+                <div className="flex items-center gap-3 pl-2 pt-2 pr-3">
+                  <Tuck state="idle" size={92} decorative />
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold leading-tight">Hi, I’m Tuck</p>
+                    <p className="mt-0.5 text-[13px] text-muted-foreground">{TUCK_LINES.idle}</p>
+                  </div>
+                </div>
+              )}
+              {bar}
+            </div>
           ) : (
             // A column that never outgrows the screen: the conversation in the
             // middle scrolls, the bar on top and the box below stay put.
             <div className="w-[var(--island-w,620px)] max-h-[var(--island-max,80vh)] flex flex-col">
               <div className="shrink-0 flex items-center gap-1 pl-4 pr-2 pt-2">
-                <span className="flex-1 text-[12px] font-medium text-muted-foreground/80">Assistant</span>
+                <TuckAvatar size={40} decorative />
+                <span className="flex-1 ml-1.5 min-w-0 leading-tight">
+                  <span className="block text-[14px] font-semibold">Tuck</span>
+                  <span className="block truncate text-[12px] text-muted-foreground">{busy ? 'Working on it…' : 'Your gardener'}</span>
+                </span>
                 {busy ? (
                   <button onClick={stop} className="text-[12px] px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60">
                     Stop
@@ -495,7 +535,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
               </div>
               <Thread
                 messages={messages}
-                thinking={busy && !reply?.parts.some((p) => p.type === 'text' && p.text.length > 0)}
+                pose={pose}
                 busy={busy}
                 failure={failure}
                 onNavigate={onNavigate}
@@ -705,16 +745,17 @@ function Island({ mode, canClose, onClose, shellRef: shell, children }: {
 }
 
 /** The conversation inside the island, newest at the bottom and kept in view. */
-function Thread({ messages, thinking, busy, failure, onNavigate }: {
+function Thread({ messages, pose, busy, failure, onNavigate }: {
   messages: UIMessage[]
-  thinking: boolean
+  /** Tuck's pose for the live moment of the conversation, if there is one. */
+  pose: TuckState | null
   busy: boolean
   failure: React.ReactNode
   onNavigate?: (tab: string) => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const last = messages[messages.length - 1]
-  const tail = `${messages.length}:${last?.parts.length}:${textOf(last).length}:${thinking}`
+  const tail = `${messages.length}:${last?.parts.length}:${textOf(last).length}:${pose}`
   useEffect(() => {
     const el = scroller.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
@@ -725,11 +766,11 @@ function Thread({ messages, thinking, busy, failure, onNavigate }: {
       {messages.map((m, i) => (
         <Message key={m.id} message={m} onNavigate={onNavigate} chat live={busy && i === messages.length - 1} />
       ))}
-      {thinking && (
-        <div className="flex items-center gap-1.5 py-1" aria-label="Thinking">
-          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/45 animate-bounce [animation-delay:0ms]" />
-          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/45 animate-bounce [animation-delay:150ms]" />
-          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/45 animate-bounce [animation-delay:300ms]" />
+      {pose && pose !== 'error' && (
+        // Only the live moment: the pose of an earlier turn is not kept.
+        <div className="flex items-center gap-2 -my-2" role="status" data-chat-pose={pose}>
+          <Tuck state={pose} size={104} decorative className="-ml-2" />
+          <span className="text-[13px] text-muted-foreground">{TUCK_LINES[pose]}</span>
         </div>
       )}
       {failure}

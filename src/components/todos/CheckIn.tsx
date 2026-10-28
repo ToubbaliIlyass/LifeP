@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Keyboard, Mic, Moon, X } from 'lucide-react'
+import { Keyboard, Mic, X } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
 import { startListening, startTyping } from '@/components/today/TodayAssistant'
 import { safeGet, safeSet } from '@/lib/storage'
 import { wallNow } from '@/lib/wallclock'
@@ -38,9 +39,10 @@ export function CheckIn({ date }: { date: string }) {
   const close = () => { safeSet('local', key, '1'); setAnswered(true) }
 
   return (
-    <div className="mb-5 flex items-start gap-3 rounded-lg bg-indigo-500/[0.08] dark:bg-indigo-400/[0.1] px-3.5 py-3">
-      <Moon className="w-4 h-4 mt-0.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
-      <div className="flex-1 min-w-0">
+    <div className="mb-5 flex items-start gap-3 rounded-lg bg-indigo-500/[0.08] dark:bg-indigo-400/[0.1] pl-2 pr-3.5 py-2">
+      {/* Tuck with the lantern, looking back over the day with you. */}
+      <Tuck state="evening-wrap" size={76} decorative />
+      <div className="flex-1 min-w-0 py-1">
         <p className="font-semibold">How did today go?</p>
         <p className="text-[13px] text-foreground/70">Tell Acture what you got done and when. It learns your days from this, and plans tomorrow better.</p>
         <div className="flex flex-wrap gap-1.5 mt-2">

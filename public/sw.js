@@ -9,7 +9,7 @@
  *    and Snooze on the notification itself, so a reminder can be dealt
  *    with without opening the app.
  */
-const CACHE = 'acture-offline-v2'
+const CACHE = 'acture-offline-v3'
 const OFFLINE = '/offline.html'
 
 self.addEventListener('install', (event) => {

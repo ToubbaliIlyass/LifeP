@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Square, Tag } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
 import type { Todo } from '@/lib/todos'
 import { STANDARD_VIEWS, inInbox, isSomeday, isToday, isUpcoming, progress } from '@/lib/todo-views'
 import { useTodos } from './TodosProvider'
@@ -138,7 +139,11 @@ export function QuickFind({ initial, onClose, onNavigate }: {
         </label>
         {q.trim() && (
           <div className="max-h-[min(420px,60vh)] overflow-y-auto p-1.5 text-[14px]">
-            {hits.length === 0 ? <p className="px-3 py-2 text-muted-foreground">Nothing called that.</p> : hits.map(row)}
+            {hits.length === 0 ? (
+              <p className="flex items-center gap-2 px-3 py-1 text-muted-foreground">
+                <Tuck state="not-found" size={52} decorative />Nothing called that. Wrong tunnel?
+              </p>
+            ) : hits.map(row)}
           </div>
         )}
       </div>

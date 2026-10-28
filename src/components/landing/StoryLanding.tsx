@@ -8,6 +8,7 @@ import {
   type Frame, type Row, type Theme,
 } from './story-engine'
 import { WhyStory } from './WhyStory'
+import { Tuck } from '@/components/ui/Tuck'
 
 /*
  * The landing page: one scroll, and a day happens.
@@ -286,6 +287,12 @@ export function StoryLanding() {
 
             {/* Hero */}
             <div ref={heroRef} style={{ position: 'absolute', zIndex: 3, left: 0, right: 0, top: F.hero.top, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '0 24px', opacity: F.hero.op, transform: `translateY(${F.hero.ty}px)`, pointerEvents: F.hero.op > 0.5 ? 'auto' : 'none' }}>
+              {/* Tuck says hello: the companion, before the headline. Left out where the screen is too short for it. */}
+              {!F.short && (
+                <div style={{ ...fadeUp(1.0), marginBottom: F.narrow ? 0 : 4 }}>
+                  <Tuck state="greeting" size={F.narrow ? 96 : 120} tone="light" alt="Tuck, the gardener behind Acture, waving hello" />
+                </div>
+              )}
               <h1 aria-label={heroLine} style={{ margin: 0, maxWidth: 980, fontSize: F.narrow ? 'clamp(38px,10vw,56px)' : F.short ? 'clamp(30px,5vw,48px)' : 'clamp(48px,6.6vw,88px)', fontWeight: 700, letterSpacing: '-0.05em', lineHeight: 1, paddingBottom: 8, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', columnGap: '.24em' }}>
                 {heroWords.map((t, i) => {
                   const p = eo((it - 1.15 - i * 0.07) / 0.75)
@@ -387,6 +394,8 @@ export function StoryLanding() {
             <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 110 }}>
               <h2 style={{ margin: 0, fontSize: 'clamp(36px,5vw,56px)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1 }}>Questions,<br />answered.</h2>
               <p style={{ margin: 0, maxWidth: 340, fontSize: 16, lineHeight: 1.5, color: '#4a4a48' }}>The straight version, including what it doesn’t do yet.</p>
+              {/* Tuck at the board: explaining, which is what the questions are for. */}
+              <Tuck state="explaining" size={168} tone="light" alt="Tuck pointing at a board with its trowel" />
             </div>
             <div style={{ flex: '1.5 1 480px', minWidth: 0, borderTop: '1px solid #dcdad5' }}>
               {FAQ.map((fq, i) => {
@@ -419,8 +428,9 @@ export function StoryLanding() {
         <section id="open" style={{ ...zoomed, position: 'relative', zIndex: 1, padding: 'clamp(96px,12vw,150px) 24px 0', background: '#141415', color: '#f4f3f0', overflow: 'hidden' }}>
           <div aria-hidden style={{ position: 'absolute', left: '50%', top: '-20%', width: 900, height: 600, transform: 'translateX(-50%)', background: 'radial-gradient(closest-side, rgba(245,165,36,.22), transparent)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative', maxWidth: 1120, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <Mark size={64} />
-            <h2 style={{ margin: '28px 0 0', maxWidth: 780, fontSize: 'clamp(40px,6vw,76px)', fontWeight: 700, letterSpacing: '-0.045em', lineHeight: 1, textWrap: 'balance' }}>Ready when you are.</h2>
+            {/* On the dark of the last section, Tuck is ready: the dark twin, with its light rim. */}
+            <Tuck state="onboarding-ready" size={208} tone="dark" alt="Tuck, ready when you are" />
+            <h2 style={{ margin: '16px 0 0', maxWidth: 780, fontSize: 'clamp(40px,6vw,76px)', fontWeight: 700, letterSpacing: '-0.045em', lineHeight: 1, textWrap: 'balance' }}>Ready when you are.</h2>
             <p style={{ margin: '16px 0 0', fontSize: 17, color: '#bdbab4' }}>Free while it’s being built. Approved accounts sign in with Google.</p>
             <button onClick={signIn} disabled={signingIn} className="hover:opacity-90 disabled:opacity-60" style={{ display: 'inline-flex', alignItems: 'center', flex: 'none', whiteSpace: 'nowrap', gap: 10, height: 46, boxSizing: 'border-box', marginTop: 30, borderRadius: 10, border: 0, background: '#fefffe', color: '#1b1c1f', padding: '0 18px', fontSize: 16, fontWeight: 600, cursor: 'pointer', font: 'inherit' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#1b1c1f', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800 }}>G</span>

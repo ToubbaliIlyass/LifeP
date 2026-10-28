@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
+import { SAY } from '@/lib/tuck/events'
+import { TUCK_LINES, type TuckState } from '@/lib/tuck/states'
 import { DAY_LABELS, DAY_NAMES, DAY_ORDER } from '@/lib/days'
 
 /**
@@ -16,6 +19,9 @@ import { DAY_LABELS, DAY_NAMES, DAY_ORDER } from '@/lib/days'
  * something better said to the assistant the moment it comes up.
  *
  * Both answers can be skipped, and both can be changed later.
+ *
+ * Tuck opens it: two short steps to say who it is and how to talk to it, then
+ * the one real question. Skip is there from the first.
  */
 
 interface Commitment {
@@ -30,9 +36,17 @@ const BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-border
 const HEADING = 'text-[14px] font-bold text-primary mt-7 mb-1.5 pb-1.5 border-b border-border/80'
 const HINT = 'text-[12.5px] text-muted-foreground mb-3'
 
+/** The two steps before the question: who Tuck is, and how to talk to it. */
+const INTRO: { state: TuckState; title: string; text: string }[] = [
+  { state: 'onboarding-hello', title: 'Hi, I’m Tuck.', text: 'I look after your to-dos. Say what needs to happen, and I’ll turn it into a plan for your day.' },
+  { state: 'onboarding-show-me', title: 'Just tell me, or show me.', text: 'Speak it, type it, or hand me a photo of a timetable or a screenshot of a message. I’ll sort it out.' },
+]
+
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const [commitments, setCommitments] = useState<Commitment[]>([])
   const [busy, setBusy] = useState<'saving' | 'skipping' | null>(null)
+  /** 0 and 1 are Tuck's introduction; 2 is the setup itself. */
+  const [step, setStep] = useState(0)
 
   const setCommitment = (i: number, changes: Partial<Commitment>) =>
     setCommitments((list) => list.map((c, j) => (j === i ? { ...c, ...changes } : c)))
@@ -73,13 +87,37 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     setBusy(null)
     // Closing over a failed save would end setup with none of it written.
     if (!res?.ok) { alert('Could not save your setup — please try again.'); return }
+    // Set up: Tuck celebrates once, in the corner, over the first list.
+    window.dispatchEvent(new CustomEvent(SAY, { detail: { state: 'celebrating', line: 'We did it! Your first plan starts here.' } }))
     onDone()
+  }
+
+  if (step < INTRO.length) {
+    const { state, title, text } = INTRO[step]
+    return (
+      <div role="dialog" aria-modal="true" aria-label="Meet Tuck" className="fixed inset-0 z-[60] overflow-y-auto bg-background">
+        <div className="mx-auto flex min-h-full max-w-[460px] flex-col items-center justify-center px-6 py-12 text-center">
+          <Tuck key={state} state={state} size={280} alt={`Tuck. ${TUCK_LINES[state]}`} />
+          <h1 className="mt-4 text-[26px] font-bold leading-8 tracking-tight">{title}</h1>
+          <p className="mt-2 text-[15px] text-foreground/75">{text}</p>
+          <div className="mt-7 flex items-center gap-2">
+            {step > 0 && <button onClick={() => setStep(step - 1)} className={BUTTON}>Back</button>}
+            <button autoFocus onClick={() => setStep(step + 1)} className="rounded-md bg-primary text-primary-foreground px-3.5 py-1.5 text-[13.5px] font-semibold hover:opacity-90">Next</button>
+            <button onClick={skip} disabled={!!busy} className={`${BUTTON} border-transparent text-muted-foreground`}>{busy === 'skipping' ? 'Skipping…' : 'Skip'}</button>
+          </div>
+          <p className="mt-6 text-[12px] text-muted-foreground tabular-nums" aria-label={`Step ${step + 1} of 3`}>{step + 1} / 3</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Set up Acture" className="fixed inset-0 z-[60] overflow-y-auto bg-background">
-      <div className="mx-auto max-w-[560px] px-6 pt-[12vh] pb-16 text-[14px]">
-        <h1 className="text-[22px] font-bold leading-7 tracking-tight">One thing before your first plan</h1>
+      <div className="mx-auto max-w-[560px] px-6 pt-[10vh] pb-16 text-[14px]">
+        <div className="flex items-center gap-3">
+          <h1 className="flex-1 text-[22px] font-bold leading-7 tracking-tight">One thing before your first plan</h1>
+          <Tuck state="onboarding-ready" size={168} alt="Tuck, ready when you are" className="max-sm:hidden" />
+        </div>
         <p className="mt-1.5 text-foreground/75">
           Acture learns when you do things from what you do. What it can’t guess is what’s already fixed — get that wrong and a to-do lands in the middle of your class.
         </p>
@@ -126,6 +164,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         </button>
 
         <div className="flex items-center gap-2 mt-10">
+          <button onClick={() => setStep(step - 1)} disabled={!!busy} className={BUTTON}>Back</button>
           <button onClick={finish} disabled={!!busy} className="rounded-md bg-primary text-primary-foreground px-3.5 py-1.5 text-[13.5px] font-semibold hover:opacity-90 disabled:opacity-60">
             {busy === 'saving' ? 'Saving…' : 'Start using Acture'}
           </button>

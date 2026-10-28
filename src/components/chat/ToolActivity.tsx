@@ -1,6 +1,8 @@
 'use client'
 
-import { Inbox, Link2, Plus, Pencil, Search, Sparkles, Loader2, CalendarCheck, CalendarDays } from 'lucide-react'
+import { Link2, Plus, Pencil, Search, Sparkles, CalendarCheck, CalendarDays } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
+import type { TuckState } from '@/lib/tuck/states'
 import type { BatchOperation } from '@/lib/ai/tools'
 
 /**
@@ -38,6 +40,13 @@ function toolName(part: ToolPart): string {
 }
 
 const ICON = 'w-3 h-3 shrink-0'
+
+/**
+ * What the assistant is doing, as Tuck doing it: digging while it searches,
+ * looking at the day, planning, holding up a proposal. Small, and only for
+ * the moment it is true; a finished read goes back to a quiet line.
+ */
+const doing = (state: TuckState) => <Tuck state={state} size={32} decorative className="-my-1" />
 
 function Row({
   icon,
@@ -109,19 +118,19 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
           ? `Delete node ${input.nodeId ?? ''}`
           : name === 'proposeNodeType'
             ? `New node type: ${input.name ?? ''}`
-            : 'Preparing a proposal…'
+            : 'Preparing a suggestion…'
 
     if (pending) {
       return (
-        <Row icon={<Loader2 className={`${ICON} animate-spin`} />} faint>
-          Preparing a proposal…
+        <Row icon={doing('proposing')} faint>
+          Preparing a suggestion…
         </Row>
       )
     }
 
     return (
       <div className="rounded-md bg-foreground/[0.05] px-3 py-2.5 flex items-start gap-2.5">
-        <Inbox className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+        <Tuck state="proposing" size={52} decorative className="-ml-1.5 -my-1.5" />
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-semibold text-muted-foreground">Waiting for your yes</p>
           <p className="text-[13.5px] font-medium text-foreground leading-snug mt-0.5">{summary}</p>
@@ -166,7 +175,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
     const out = part.output as { duplicate?: boolean } | undefined
     const link = `#${input.sourceId} → #${input.targetId} as "${input.type}"`
     return (
-      <Row icon={<Link2 className={ICON} />} faint={out?.duplicate}>
+      <Row icon={pending || out?.duplicate ? <Link2 className={ICON} /> : doing('found')} faint={out?.duplicate}>
         {pending
           ? 'Linking…'
           : out?.duplicate
@@ -195,7 +204,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
     const out = part.output as { date?: string; planned?: unknown[]; noRoomFor?: unknown[]; error?: string } | undefined
     if (pending) {
       return (
-        <Row icon={<Loader2 className={`${ICON} animate-spin`} />} faint>
+        <Row icon={doing('planning')} faint>
           Planning the day…
         </Row>
       )
@@ -205,7 +214,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
     const missed = out?.noRoomFor?.length ?? 0
     return (
       <div className="border border-border/60 bg-muted/30 rounded-xl px-3 py-2.5 flex items-center gap-2.5">
-        <CalendarCheck className="w-3.5 h-3.5 shrink-0 text-primary" />
+        <Tuck state="confirmed" size={44} decorative className="-ml-1 -my-1.5" />
         <p className="text-[12px] text-foreground/85 flex-1 min-w-0">
           {placed === 0 ? 'Nothing left to plan' : `${placed} on the calendar`}
           {out?.date && <span className="text-muted-foreground/60"> · {out.date}</span>}
@@ -225,7 +234,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
 
   if (name === 'getDay') {
     return (
-      <Row icon={pending ? <Loader2 className={`${ICON} animate-spin`} /> : <CalendarDays className={ICON} />} faint>
+      <Row icon={pending ? doing('looking') : <CalendarDays className={ICON} />} faint>
         {pending ? 'Looking at your day…' : `Checked ${typeof input.date === 'string' ? input.date : 'today'}`}
       </Row>
     )
@@ -237,7 +246,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
     const count = out?.count ?? out?.nodes?.length
     return (
       <Row
-        icon={pending ? <Loader2 className={`${ICON} animate-spin`} /> : <Search className={ICON} />}
+        icon={pending ? doing('digging') : <Search className={ICON} />}
         faint
       >
         {pending

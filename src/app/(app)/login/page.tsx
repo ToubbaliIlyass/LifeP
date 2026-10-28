@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { ActureLogo } from '@/components/ui/acture-mark'
+import { Tuck } from '@/components/ui/Tuck'
 
 function GoogleMark() {
   return (
@@ -36,7 +36,8 @@ export default function LoginPage() {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background text-foreground px-6">
       <div className="w-full max-w-[340px]">
-        <ActureLogo className="w-10 h-10 mb-5" />
+        {/* Signing in is asking for a key: Tuck holds one up. */}
+        <Tuck state="permission-key" size={190} alt="Tuck holding up a key" className="-ml-4 mb-1" />
         <h1 className="text-[22px] font-bold leading-7 tracking-tight">Acture</h1>
         <p className="mt-1 mb-6 text-[14px] text-foreground/75">
           Say what needs to happen. It becomes your to-dos, and finds them a time.

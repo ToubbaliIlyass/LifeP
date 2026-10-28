@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { PanelLeft } from 'lucide-react'
 import { ProposalQueue } from '@/components/proposals/ProposalQueue'
 import { AppLoading } from '@/components/AppLoading'
@@ -14,12 +14,15 @@ import { Sidebar } from '@/components/todos/Sidebar'
 import { TodoView } from '@/components/todos/TodoView'
 import { QuickFind } from '@/components/todos/QuickFind'
 import { CheckIn } from '@/components/todos/CheckIn'
+import { TodayTuck } from '@/components/tuck/TodayTuck'
+import { TuckStatus } from '@/components/tuck/TuckStatus'
 import { WorldView } from '@/components/world/WorldView'
 import { todayStr } from '@/lib/date'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { safeGet, safeSet } from '@/lib/storage'
 import { applyTheme, applyMode, storedMode, storedTheme } from '@/lib/themes'
 import { setClockZone } from '@/lib/wallclock'
+import { PROPOSAL_NEW } from '@/lib/tuck/events'
 
 /*
  * Acture is one loop: say what needs to happen, and it becomes to-dos with a
@@ -162,10 +165,16 @@ export default function Home() {
   }, [])
 
   // ── Proposals polling ─────────────────────────────────
+  // The count at the last look: a rise after the first look is a new proposal, which Tuck mentions.
+  const lastCount = useRef<number | null>(null)
   const refreshCount = useCallback(() => {
     fetch('/api/proposals')
       .then((r) => r.json())
-      .then(({ proposals }: { proposals: unknown[] }) => setPendingCount(proposals.length))
+      .then(({ proposals }: { proposals: unknown[] }) => {
+        if (lastCount.current !== null && proposals.length > lastCount.current) window.dispatchEvent(new Event(PROPOSAL_NEW))
+        lastCount.current = proposals.length
+        setPendingCount(proposals.length)
+      })
       .catch(() => {})
   }, [])
   useVisiblePolling(refreshCount, 4000)
@@ -294,11 +303,14 @@ export default function Home() {
               onOpenMenu={() => setMobileNavOpen(true)}
               onQuickFind={(initial) => setFinding(initial)}
               dock={<TodayAssistant dock onNavigate={select} />}
-              banner={<CheckIn date={todayStr()} />}
+              banner={<>{view === 'today' && <TodayTuck />}<CheckIn date={todayStr()} /></>}
             />
           </>
         )}
       </div>
+
+      {/* Tuck's word on what is happening behind the screen: ticks, new proposals, saving, offline. */}
+      <TuckStatus onNavigate={select} />
 
       {finding !== null && <QuickFind initial={finding} onClose={() => setFinding(null)} onNavigate={select} />}
 

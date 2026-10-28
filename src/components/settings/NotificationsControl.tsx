@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Bell, BellOff, Send } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
 import { disablePush, enablePush, pushState, type PushState } from '@/lib/push'
 
 const BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-border/80 px-2.5 py-1 text-[13px] font-medium hover:bg-foreground/[0.05] disabled:opacity-60'
@@ -43,7 +44,11 @@ export function NotificationsControl() {
 
   if (!state) return <p className="text-[13px] text-muted-foreground">Checking this device…</p>
   return (
-    <div className="space-y-2.5">
+    <div className="flex items-start gap-3">
+      {/* Asking for the key: reminders need the browser's permission, and Tuck asks nicely. */}
+      {state === 'off' && <Tuck state="permission-key" size={92} alt="Tuck holding up a key" className="-mt-2 max-sm:hidden" />}
+    <div className="space-y-2.5 min-w-0">
+      {state === 'off' && <p className="text-[13.5px] font-medium">May I send you reminders? Only when something is due.</p>}
       <p className="text-[13.5px]">{SAYS[state]}</p>
       <div className="flex flex-wrap gap-2">
         {state === 'off' && <button onClick={turnOn} disabled={busy} className={BUTTON}><Bell className="w-3.5 h-3.5" />Turn on</button>}
@@ -55,6 +60,7 @@ export function NotificationsControl() {
         )}
       </div>
       {tested && <p className="text-[12.5px] text-muted-foreground" role="status">{tested}</p>}
+    </div>
     </div>
   )
 }

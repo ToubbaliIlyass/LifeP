@@ -15,7 +15,8 @@ import type { Metadata } from 'next'
  * plain links need nothing to load. Dark mode comes from the system.
  *
  * Drawn like the site: the same floating bar, the same type and colours, and
- * the miss shown as what Acture knows best, a to-do.
+ * the miss shown as what Acture knows best, a to-do. Tuck stands over it,
+ * in the wrong tunnel — a plain <picture>, so it too needs no script.
  */
 
 export const metadata: Metadata = {
@@ -70,6 +71,7 @@ main {
   max-width: 576px; margin: 0 auto; min-height: 100dvh; padding: 112px 24px 64px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
 }
+.tuck { display: block; width: 168px; height: auto; margin: -8px 0 4px; }
 .card {
   width: 100%; max-width: 360px; padding: 20px; text-align: left;
   border: 1px solid var(--border); border-radius: 16px; background: var(--card);
@@ -129,6 +131,12 @@ export default function GlobalNotFound() {
         </nav>
 
         <main>
+          {/* Tuck, between three tunnels. The dark twin has a light rim, for the dark page. */}
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcSet="/tuck/svg-dark/not-found.svg" />
+            <img className="tuck" src="/tuck/svg/not-found.svg" width={168} height={158} alt="Tuck, lost between three tunnels" />
+          </picture>
+
           {/* The miss, as a to-do: looked for, and not found. */}
           <div className="card" aria-hidden>
             <div className="day"><span>★</span> Today</div>

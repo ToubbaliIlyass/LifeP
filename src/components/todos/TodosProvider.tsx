@@ -9,7 +9,9 @@ import { todayStr } from '@/lib/date'
 import { clockZone } from '@/lib/wallclock'
 import { safeGet, safeSet } from '@/lib/storage'
 import { parseEntry } from '@/lib/quick-entry'
-import { Bell, X } from 'lucide-react'
+import { X } from 'lucide-react'
+import { Tuck } from '@/components/ui/Tuck'
+import { SAVE_FAILED, TICKED } from '@/lib/tuck/events'
 import { dueReminders, remindersIn, SNOOZES, snoozeUntil, type Reminder } from '@/lib/reminders'
 import { momentNow, pushIsOn, systemNotification } from '@/lib/push'
 
@@ -51,6 +53,14 @@ interface TodosContextValue {
   requestOpen: (id: number) => void
   takeOpenRequest: () => number | null
   reload: () => void
+  /**
+   * What is happening behind the screen, for Tuck (see TuckStatus): writes
+   * still on their way, and whether the lists could not be read because the
+   * server is not answering. (A write that failed, or a to-do ticked, is
+   * announced as a window event: see src/lib/tuck/events.ts.)
+   */
+  saving: boolean
+  down: boolean
 }
 
 const TodosContext = createContext<TodosContextValue | null>(null)
@@ -86,6 +96,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<TodosPayload | null>(null)
   const [draft, setDraft] = useState<Todo | null>(null)
   const { record } = useUndo()
+  const [saving, setSaving] = useState(false)
+  const [down, setDown] = useState(false)
 
   const queue = useRef(new Map<number, { changes: Record<string, unknown>; timer: ReturnType<typeof setTimeout> }>())
   const inflight = useRef(0)
@@ -144,14 +156,19 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     if (busy()) { reloadWanted.current = true; return }
     const tz = clockZone() ?? ''
     fetch(`/api/todos${tz ? `?tz=${encodeURIComponent(tz)}` : ''}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        // A server that answers with an error is down; one that does not answer at all is, too,
+        // unless this device is simply offline (which has its own say, see TuckStatus).
+        setDown(r.status >= 500)
+        return r.ok ? r.json() : null
+      })
       .then((d: TodosPayload | null) => {
         if (!d) return
         // Something was changed while this was in the air: ask again after it.
         if (busy()) { reloadWanted.current = true; return }
         setData(d)
       })
-      .catch(() => {})
+      .catch(() => { if (navigator.onLine) setDown(true) })
   }, [])
   useEffect(() => { loadRef.current = load }, [load])
 
@@ -172,12 +189,15 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   /** Runs a write, and catches up on any reload that waited for it. */
   const run = useCallback(async <T,>(write: () => Promise<T>, thenReload = false): Promise<T | null> => {
     inflight.current++
+    setSaving(true)
     try {
       return await write()
     } catch {
+      window.dispatchEvent(new Event(SAVE_FAILED))
       return null
     } finally {
       inflight.current--
+      if (!busy()) setSaving(false)
       if (thenReload) reloadWanted.current = true
       if (!busy() && reloadWanted.current) { reloadWanted.current = false; loadRef.current() }
     }
@@ -228,6 +248,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
         : todo.type === 'Habit' ? fetch(`/api/habits/${todo.id}`, json('PATCH', { completed: on, tz: clockZone() }))
         : fetch(`/api/todos/${todo.id}`, json('PATCH', { done: on, tz: clockZone() }))
 
+    // Tuck has a word for a to-do ticked off, and needs the lists as they were before it.
+    if (done && todo.type !== 'Prayer') window.dispatchEvent(new CustomEvent(TICKED, { detail: { id: todo.id } }))
     set(done)
     run(async () => {
       const res = await send(done)
@@ -361,7 +383,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     events: data?.events ?? [],
     patch, toggle, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, reload: load,
-  }), [data, draft, patch, toggle, remove, startDraft, endDraft, patchList, createList, removeList,
+    saving, down,
+  }), [data, draft, saving, down, patch, toggle, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, load])
 
   return (
@@ -375,7 +398,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
             return (
               <div key={r.key} className="rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
                 <div className="flex items-start gap-3">
-                  <Bell className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                  {/* Tuck rings the bell: a reminder is a nudge, never an alarm. */}
+                  <Tuck state="nudge" size={44} decorative className="-ml-1.5 -mt-1.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-medium truncate">{r.title}</p>
                     <p className="text-[12.5px] text-muted-foreground tabular-nums">{r.body}</p>
@@ -384,7 +408,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pl-7">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[38px]">
                   {todo && !todo.done && (
                     <button onClick={() => { toggle(todo); away() }} className="rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-[12.5px] font-semibold hover:opacity-90">Done</button>
                   )}
