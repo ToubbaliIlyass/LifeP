@@ -724,7 +724,7 @@ export function TodoView({
   /** Nothing here yet, with Tuck beside it: quiet for a clear inbox or day, a bare bed for the rest. */
   const empty = (title: string, text: string, tuck: TuckState = 'empty-garden') => (
     <div className="mt-8 flex items-center gap-5 max-w-[60ch] text-muted-foreground max-sm:flex-col max-sm:items-start max-sm:gap-2">
-      <Tuck state={tuck} size={156} decorative className="max-sm:-ml-2" />
+      <Tuck state={tuck} size={200} decorative className="max-sm:-ml-2" />
       <div>
         <b className="block mb-1 font-semibold text-foreground">{title}</b>
         {text}
@@ -1491,7 +1491,7 @@ export function TodoView({
         {!ready && down ? (
           // The server is not answering: say so, kindly, with a way to try again.
           <div className="mt-20 flex flex-col items-center text-center" role="status">
-            <Tuck state="maintenance" size={190} decorative />
+            <Tuck state="maintenance" size={240} decorative />
             <p className="mt-2 text-[16px] font-semibold">Fixing something. Back soon.</p>
             <p className="mt-1 text-[13.5px] text-muted-foreground">Your lists are safe. This is on our side.</p>
             <button onClick={reload} className="mt-4 rounded-md border border-border/80 px-3 py-1.5 text-[13px] font-medium hover:bg-foreground/[0.05]">Try again</button>

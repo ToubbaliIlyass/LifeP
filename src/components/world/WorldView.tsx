@@ -320,7 +320,7 @@ export function WorldView({ settings, onSettingsChanged, onOpenMenu }: {
             <>
               {/* A blank map: Tuck, on the dark glass, with the first thing to try. */}
               <div className="flex items-center gap-2 pt-1">
-                <Tuck state="empty-world" size={92} tone="dark" decorative className="-ml-1" />
+                <Tuck state="empty-world" size={116} tone="dark" decorative className="-ml-1" />
                 <p className="text-[12.5px] leading-snug text-white/75">{TUCK_LINES['empty-world']}</p>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-2">

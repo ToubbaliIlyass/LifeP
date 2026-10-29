@@ -42,7 +42,7 @@ export function TodayTuck() {
   return (
     <div role="status" data-tuck-card={mood.state} className="mb-5 flex items-center gap-3 rounded-xl bg-foreground/[0.045] pl-3 pr-3 py-3">
       {/* Growth shows on the sprout: a seed at first, a bloom after a hundred. */}
-      <Tuck state={mood.state} size={124} decorative level={facts.level === 'sprout' ? null : facts.level} />
+      <Tuck state={mood.state} size={160} decorative level={facts.level === 'sprout' ? null : facts.level} />
       <div className="flex-1 min-w-0">
         <p className="text-[15px] leading-snug">{mood.line}</p>
         {mood.action && (

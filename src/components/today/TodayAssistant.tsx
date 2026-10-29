@@ -492,7 +492,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
               {/* Waiting for input: Tuck, idle, and the first line of the conversation. */}
               {!listeningView && (
                 <div className="flex items-center gap-3 pl-2 pt-2 pr-3">
-                  <Tuck state="idle" size={92} decorative />
+                  <Tuck state="idle" size={120} decorative />
                   <div className="min-w-0">
                     <p className="text-[14px] font-semibold leading-tight">Hi, I’m Tuck</p>
                     <p className="mt-0.5 text-[13px] text-muted-foreground">{TUCK_LINES.idle}</p>
@@ -769,7 +769,7 @@ function Thread({ messages, pose, busy, failure, onNavigate }: {
       {pose && pose !== 'error' && (
         // Only the live moment: the pose of an earlier turn is not kept.
         <div className="flex items-center gap-2 -my-2" role="status" data-chat-pose={pose}>
-          <Tuck state={pose} size={104} decorative className="-ml-2" />
+          <Tuck state={pose} size={132} decorative className="-ml-2" />
           <span className="text-[13px] text-muted-foreground">{TUCK_LINES[pose]}</span>
         </div>
       )}

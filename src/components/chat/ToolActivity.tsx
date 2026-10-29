@@ -130,7 +130,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
 
     return (
       <div className="rounded-md bg-foreground/[0.05] px-3 py-2.5 flex items-start gap-2.5">
-        <Tuck state="proposing" size={52} decorative className="-ml-1.5 -my-1.5" />
+        <Tuck state="proposing" size={68} decorative className="-ml-1.5 -my-1.5" />
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-semibold text-muted-foreground">Waiting for your yes</p>
           <p className="text-[13.5px] font-medium text-foreground leading-snug mt-0.5">{summary}</p>
@@ -214,7 +214,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
     const missed = out?.noRoomFor?.length ?? 0
     return (
       <div className="border border-border/60 bg-muted/30 rounded-xl px-3 py-2.5 flex items-center gap-2.5">
-        <Tuck state="confirmed" size={44} decorative className="-ml-1 -my-1.5" />
+        <Tuck state="confirmed" size={60} decorative className="-ml-1 -my-1.5" />
         <p className="text-[12px] text-foreground/85 flex-1 min-w-0">
           {placed === 0 ? 'Nothing left to plan' : `${placed} on the calendar`}
           {out?.date && <span className="text-muted-foreground/60"> · {out.date}</span>}
