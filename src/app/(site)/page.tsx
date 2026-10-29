@@ -1,21 +1,22 @@
-import type { Metadata } from 'next'
 import { StoryLanding } from '@/components/landing/StoryLanding'
+import { FAQ } from '@/components/landing/story-engine'
+import { FaqJsonLd, SoftwareApplicationJsonLd } from '@/components/seo/JsonLd'
+import { PAGES, pageMetadata } from '@/lib/seo-copy'
 
-export const metadata: Metadata = {
-  title: 'Acture: Things, but it listens',
-  description:
-    'A calm to-do list you talk to. Say it or show it, and Acture turns it into to-dos, finds each one a time, and learns when you really get things done.',
-  openGraph: {
-    title: 'Acture: Things, but it listens',
-    description: 'A calm to-do list you talk to. It plans your day, then learns when you really get things done.',
-    type: 'website',
-  },
-}
+export const metadata = pageMetadata(PAGES.home)
 
 /*
  * The front door: one scroll, and a day happens — see StoryLanding.tsx,
- * built from the Claude Design file "Acture Landing v4".
+ * built from the Claude Design file "Acture Landing v4". The questions it
+ * shows (FAQ) are the same list the FAQPage markup is made from, so the
+ * markup can never say something the page doesn't.
  */
 export default function Landing() {
-  return <StoryLanding />
+  return (
+    <>
+      <SoftwareApplicationJsonLd />
+      <FaqJsonLd items={FAQ} />
+      <StoryLanding />
+    </>
+  )
 }
