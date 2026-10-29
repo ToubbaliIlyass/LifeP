@@ -690,6 +690,22 @@
   .acture-voice-bar { animation: none; transform: scaleY(0.6); }
 }
 
+/* The undo card: it rises into place, and a thin line runs down the six
+   seconds in which the change can still be reversed. */
+@keyframes acture-toast-in {
+  from { opacity: 0; transform: translate(-50%, 14px) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes acture-toast-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.acture-toast { transform: translateX(-50%); animation: acture-toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.acture-toast-timer { transform-origin: left; animation: acture-toast-timer 6s linear forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .acture-toast { animation: none; }
+}
+
 /* The landing page's story (src/components/landing/StoryLanding.tsx): the
    mic's pulse while listening, and Quick Find's caret. */
 @keyframes acture-ping {

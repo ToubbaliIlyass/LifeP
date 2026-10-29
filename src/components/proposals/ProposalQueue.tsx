@@ -139,7 +139,7 @@ export function ProposalQueue({ onCountChange, onOpenMenu }: {
           </button>
         </div>
         <div className="flex items-center gap-4 mb-4">
-          <Tuck state={pose} size={104} decorative className="max-sm:hidden" />
+          <Tuck state={pose} size={140} decorative className="max-sm:hidden" />
           <div className="min-w-0">
             <h1 className="flex items-center gap-2.5 text-[22px] font-bold leading-7 tracking-tight mb-2">
               <Inbox className="w-[22px] h-[22px] text-primary" />To review

@@ -141,7 +141,7 @@ export function QuickFind({ initial, onClose, onNavigate }: {
           <div className="max-h-[min(420px,60vh)] overflow-y-auto p-1.5 text-[14px]">
             {hits.length === 0 ? (
               <p className="flex items-center gap-2 px-3 py-1 text-muted-foreground">
-                <Tuck state="not-found" size={52} decorative />Nothing called that. Wrong tunnel?
+                <Tuck state="not-found" size={68} decorative />Nothing called that. Wrong tunnel?
               </p>
             ) : hits.map(row)}
           </div>

@@ -106,12 +106,14 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   const [saving, setSaving] = useState(false)
   const [down, setDown] = useState(false)
   /** The small card after a skip: what happened, and the way back. */
-  const [note, setNote] = useState<{ text: string; undo: (() => void) | null } | null>(null)
+  const [note, setNoteRaw] = useState<{ id: number; text: string; undo: (() => void) | null } | null>(null)
+  const noteCount = useRef(0)
+  const setNote = useCallback((n: { text: string; undo: (() => void) | null } | null) => setNoteRaw(n && { ...n, id: ++noteCount.current }), [])
   useEffect(() => {
     if (!note) return
     const id = setTimeout(() => setNote(null), 6000)
     return () => clearTimeout(id)
-  }, [note])
+  }, [note, setNote])
 
   const queue = useRef(new Map<number, { changes: Record<string, unknown>; timer: ReturnType<typeof setTimeout> }>())
   const inflight = useRef(0)
@@ -309,7 +311,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
       record(`${word}: “${name}”`, undo)
       setNote({ text: `${word}: “${name}”.`, undo })
     }, true)
-  }, [data, run, record])
+  }, [data, run, record, setNote])
 
   const skip = useCallback((todo: Todo) => {
     const today = data?.date ?? todayStr()
@@ -339,7 +341,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
       record(`Skipped “${name}”`, undo)
       setNote({ text: `Skipped “${name}”. Next: ${relDate(to, today)}.`, undo })
     }, true)
-  }, [data?.date, run, record])
+  }, [data?.date, run, record, setNote])
 
   /** Deletes a node, keeping what is needed to put it back. */
   const destroy = useCallback((id: number, label: string) => {
@@ -466,14 +468,20 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     <TodosContext.Provider value={value}>
       {children}
       {note && (
-        <div role="status" aria-live="polite" className={`fixed z-[65] left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-24 flex items-center gap-3 max-w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border/70 bg-card px-3.5 py-2.5 text-[13.5px] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]`}>
-          <span className="min-w-0 [overflow-wrap:anywhere]">{note.text}</span>
-          {note.undo && (
-            <button onClick={note.undo} className="shrink-0 rounded-md px-2 py-1 font-semibold text-primary hover:bg-foreground/[0.06]">Undo</button>
-          )}
-          <button onClick={() => setNote(null)} aria-label="Dismiss" className="shrink-0 grid place-items-center w-6 h-6 -mr-1.5 rounded-md text-muted-foreground hover:text-foreground">
-            <X className="w-3.5 h-3.5" />
-          </button>
+        <div role="status" aria-live="polite" className="acture-toast fixed z-[65] left-1/2 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-24 w-[min(440px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_2px_4px_rgb(0_0_0/0.06),0_16px_40px_rgb(0_0_0/0.18)]">
+          <div className="flex items-center gap-3 pl-2 pr-2.5 py-2.5">
+            {/* Tuck has put it away, and holds the way back. */}
+            <Tuck state={note.undo ? 'confirmed' : 'looking'} size={72} decorative className="shrink-0 -my-3" />
+            <span className="flex-1 min-w-0 text-[14px] leading-snug [overflow-wrap:anywhere]">{note.text}</span>
+            {note.undo && (
+              <button onClick={note.undo} className="shrink-0 rounded-full bg-primary text-primary-foreground px-3.5 py-1.5 text-[13px] font-semibold hover:opacity-90 active:scale-[0.97] transition">Undo</button>
+            )}
+            <button onClick={() => setNote(null)} aria-label="Dismiss" className="shrink-0 grid place-items-center w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {/* The time left to change your mind. */}
+          <div key={note.id} className="acture-toast-timer h-[3px] bg-primary/60" aria-hidden />
         </div>
       )}
       {ringing.length > 0 && (
@@ -485,7 +493,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
               <div key={r.key} className="rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
                 <div className="flex items-start gap-3">
                   {/* Tuck rings the bell: a reminder is a nudge, never an alarm. */}
-                  <Tuck state="nudge" size={44} decorative className="-ml-1.5 -mt-1.5" />
+                  <Tuck state="nudge" size={60} decorative className="-ml-2 -mt-2" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-medium truncate">{r.title}</p>
                     <p className="text-[12.5px] text-muted-foreground tabular-nums">{r.body}</p>
@@ -494,7 +502,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[38px]">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[52px]">
                   {todo && !todo.done && (
                     <button onClick={() => { toggle(todo); away() }} className="rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-[12.5px] font-semibold hover:opacity-90">Done</button>
                   )}

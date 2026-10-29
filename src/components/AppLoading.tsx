@@ -22,7 +22,7 @@ import { Tuck } from '@/components/ui/Tuck'
 export function AppLoading() {
   return (
     <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-1 bg-background" role="status" aria-label="Loading">
-      <Tuck state="loading-1" size={112} decorative />
+      <Tuck state="loading-1" size={144} decorative />
       <p className="text-[13px] text-muted-foreground" aria-hidden>Digging…</p>
     </div>
   )

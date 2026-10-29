@@ -41,7 +41,7 @@ export function CheckIn({ date }: { date: string }) {
   return (
     <div className="mb-5 flex items-start gap-3 rounded-lg bg-indigo-500/[0.08] dark:bg-indigo-400/[0.1] pl-2 pr-3.5 py-2">
       {/* Tuck with the lantern, looking back over the day with you. */}
-      <Tuck state="evening-wrap" size={76} decorative />
+      <Tuck state="evening-wrap" size={104} decorative />
       <div className="flex-1 min-w-0 py-1">
         <p className="font-semibold">How did today go?</p>
         <p className="text-[13px] text-foreground/70">Tell Acture what you got done and when. It learns your days from this, and plans tomorrow better.</p>
