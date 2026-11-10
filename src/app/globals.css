@@ -33,6 +33,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  /* Theme colour for text: darkened toward the text colour so it reads on the page (the plain colour is for fills). */
+  --color-primary-ink: color-mix(in oklch, var(--primary) 55%, var(--foreground));
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -66,7 +68,7 @@
   /* Darkened from the original 0.50 — against the near-white #fcfdfa
      background, muted-foreground text at its typical /25–/40 opacity
      measured at only 1.4–1.8:1 contrast (WCAG's floor is 3:1). */
-  --muted-foreground: oklch(0.26 0.008 75);
+  --muted-foreground: oklch(0.42 0.008 75);
   --accent: oklch(0.925 0.005 80);
   --accent-foreground: oklch(0.19 0.005 255);
   --destructive: oklch(0.57 0.22 25);
@@ -151,6 +153,13 @@
   /* One face for everything: Inter (see --font-sans). */
   html {
     font-family: var(--font-sans);
+    /* Text scale: every font size in the app is multiplied by this (phones are already sized up). */
+    --ts: 1.24;
+    --sb: 284px; /* sidebar width: wide enough for the larger text */
+    font-size: calc(16px * var(--ts));
+  }
+  @media (max-width: 767px) {
+    html { --ts: 1.14; }
   }
 }
 
@@ -161,14 +170,23 @@
   with no way to reach the rest. Widened and darkened so it reads as an
   obvious, grabbable scrollbar instead.
 */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
+/* A floating pill: the transparent border is the gap round it. */
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.5 0 0 / 0.35);
-  border-radius: 3px;
+  background: color-mix(in oklab, var(--foreground) 24%, transparent);
+  background-clip: padding-box;
+  border: 3.5px solid transparent;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.5 0 0 / 0.55);
+  background: color-mix(in oklab, var(--primary) 70%, transparent);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner { background: transparent; }
+/* Firefox has no pseudo-elements, only these two. */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--foreground) 28%, transparent) transparent; }
 }
 
 /* ─── Themes ──────────────────────────────────────────── */
@@ -333,9 +351,9 @@
   --accent: #f8ddd2;
   --accent-foreground: #2e1613;
   --primary: #ff8552;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #2e1613;
   --sidebar-primary: #ff8552;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary-foreground: #2e1613;
   --sidebar-accent: #f8ddd2;
   --sidebar-accent-foreground: #2e1613;
   --border: rgb(46 22 19 / 14%);
@@ -690,17 +708,26 @@
   .acture-voice-bar { animation: none; transform: scaleY(0.6); }
 }
 
+/* A tick: the box pops, and a ring goes out from it. */
+@keyframes acture-tick-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes acture-tick-ring { from { opacity: 0.8; transform: scale(1); } to { opacity: 0; transform: scale(2.2); } }
+.acture-tick { animation: acture-tick-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.acture-tick-ring { animation: acture-tick-ring 0.55s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .acture-tick, .acture-tick-ring { animation: none; }
+}
+
 /* The undo card: it rises into place, and a thin line runs down the six
    seconds in which the change can still be reversed. */
 @keyframes acture-toast-in {
-  from { opacity: 0; transform: translate(-50%, 14px) scale(0.97); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes acture-toast-timer {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
-.acture-toast { transform: translateX(-50%); animation: acture-toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.acture-toast { animation: acture-toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .acture-toast-timer { transform-origin: left; animation: acture-toast-timer 6s linear forwards; }
 @media (prefers-reduced-motion: reduce) {
   .acture-toast { animation: none; }

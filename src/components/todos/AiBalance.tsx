@@ -40,8 +40,8 @@ export function AiBalance() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 bottom-full left-0 mb-1 w-[210px] p-3 rounded-lg border border-border/70 bg-popover shadow-xl text-[13px] space-y-1.5">
-            <div className="text-[11.5px] font-medium text-muted-foreground uppercase tracking-wide">AI spent</div>
+          <div className="absolute z-50 bottom-full left-0 mb-1 w-[210px] p-3 rounded-lg border border-border/70 bg-popover shadow-xl text-[length:calc(13px*var(--ts))] space-y-1.5">
+            <div className="text-[length:calc(11.5px*var(--ts))] font-medium text-muted-foreground uppercase tracking-wide">AI spent</div>
             {row('Today', money(usage.today.usd))}
             {row('This month', money(usage.month.usd))}
             {row('All time', money(usage.total.usd))}
@@ -49,7 +49,7 @@ export function AiBalance() {
               {row('Calls this month', String(usage.month.calls))}
               {usage.savedThisMonth > 0 && row('Saved by cache', money(usage.savedThisMonth))}
             </div>
-            <p className="pt-1 text-[11.5px] leading-snug text-muted-foreground">An estimate from tokens used, not the provider’s bill.</p>
+            <p className="pt-1 text-[length:calc(11.5px*var(--ts))] leading-snug text-muted-foreground">An estimate from tokens used, not the provider’s bill.</p>
           </div>
         </>
       )}
@@ -58,7 +58,7 @@ export function AiBalance() {
         title="What the AI has cost so far"
         aria-label={`AI spent: ${money(usage.total.usd)}`}
         aria-expanded={open}
-        className="flex items-center gap-1 px-1.5 py-1 rounded-md text-[12px] font-medium tabular-nums text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
+        className="flex items-center gap-1 px-1.5 py-1 rounded-md text-[length:calc(12px*var(--ts))] font-medium tabular-nums text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
       >
         <Coins className="w-3.5 h-3.5" /> {money(usage.total.usd)}
       </button>

@@ -38,23 +38,23 @@ export default function LoginPage() {
       <div className="w-full max-w-[340px]">
         {/* Signing in is asking for a key: Tuck holds one up. */}
         <Tuck state="permission-key" size={230} alt="Tuck holding up a key" className="-ml-4 mb-1" />
-        <h1 className="text-[22px] font-bold leading-7 tracking-tight">Acture</h1>
-        <p className="mt-1 mb-6 text-[14px] text-foreground/75">
+        <h1 className="text-[length:calc(22px*var(--ts))] font-bold leading-7 tracking-tight">Acture</h1>
+        <p className="mt-1 mb-6 text-[length:calc(14px*var(--ts))] text-foreground/75">
           Say what needs to happen. It becomes your to-dos, and finds them a time.
         </p>
 
         <button
           onClick={signIn}
           disabled={busy}
-          className="w-full flex items-center justify-center gap-2.5 px-4 py-2 rounded-md border border-border/80 bg-card hover:bg-foreground/[0.04] transition-colors text-[14px] font-medium disabled:opacity-60"
+          className="w-full flex items-center justify-center gap-2.5 px-4 py-2 rounded-md border border-border/80 bg-card hover:bg-foreground/[0.04] transition-colors text-[length:calc(14px*var(--ts))] font-medium disabled:opacity-60"
         >
           <GoogleMark />
           {busy ? 'Redirecting…' : 'Continue with Google'}
         </button>
 
-        {error && <p className="mt-4 text-[13px] text-red-500">{error}</p>}
+        {error && <p className="mt-4 text-[length:calc(13px*var(--ts))] text-red-500">{error}</p>}
 
-        <p className="mt-8 text-[12.5px] text-muted-foreground">
+        <p className="mt-8 text-[length:calc(12.5px*var(--ts))] text-muted-foreground">
           A private instance: only approved accounts can sign in.
         </p>
       </div>

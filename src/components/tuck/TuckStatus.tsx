@@ -8,7 +8,7 @@ import { wallNow } from '@/lib/wallclock'
 import { dayFacts, momentFor, type Mood } from '@/lib/tuck/mood'
 import { PROPOSAL_NEW, SAVE_FAILED, SAY, TICKED } from '@/lib/tuck/events'
 import { progress } from '@/lib/todo-views'
-import { useOnline } from '@/lib/tuck/useTuckMood'
+import { useOnline } from '@/lib/tuck/useOnline'
 import type { TuckState } from '@/lib/tuck/states'
 
 /** How long a word of thanks stays up. */
@@ -16,7 +16,9 @@ const TOAST_MS = 3600
 /** A save quicker than this is not worth a mention. */
 const SLOW_SAVE_MS = 900
 
-interface Toast { id: number; mood: Pick<Mood, 'state' | 'line'>; action?: { label: string; run: () => void } }
+interface Toast { id: number; mood: Pick<Mood, 'state' | 'line'>; action?: { label: string; run: () => void }; /** "+1 a runner": which identity the tick counted for. */ chip?: { text: string; color: string } }
+
+/** Counts worth a word: a first, then round numbers. Gains only, never a loss. */
 
 /**
  * Tuck in the corner, saying what is happening behind the screen: a to-do
@@ -43,10 +45,10 @@ export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void
   const latest = useRef({ todos, lists, events })
   useEffect(() => { latest.current = { todos, lists, events } })
 
-  const say = useCallback((mood: Toast['mood'], action?: Toast['action']) => {
+  const say = useCallback((mood: Toast['mood'], action?: Toast['action'], chip?: Toast['chip']) => {
     const id = ++seq.current
     // One at a time: the newest replaces what was up, so a run of ticks is not a queue.
-    setToasts([{ id, mood, action }])
+    setToasts([{ id, mood, action, chip }])
     setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), TOAST_MS)
   }, [])
 
@@ -57,9 +59,9 @@ export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void
       const done = before.find((t) => t.id === id)
       if (!done) return
       const now = wallNow()
-      const was = dayFacts({ now, todos: before, lists: ls, events: ev, daysAway: 0 })
+      const was = dayFacts({ now, todos: before, lists: ls, events: ev })
       const after = before.map((t) => (t.id === id ? { ...t, done: true, doneAt: new Date().toISOString() } : t))
-      const is = dayFacts({ now, todos: after, lists: ls, events: ev, daysAway: 0 })
+      const is = dayFacts({ now, todos: after, lists: ls, events: ev })
       // The project this was the last open step of.
       const list = done.listId ? ls.find((l) => l.id === done.listId && !l.done) : undefined
       const finished = list && progress(list, before) < 1 && progress(list, after) === 1 ? list : null
@@ -95,20 +97,26 @@ export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void
   if (!standing && toasts.length === 0) return null
   const shown = standing ?? toasts[0].mood
   const action = standing ? undefined : toasts[0].action
+  const chip = standing ? undefined : toasts[0].chip
 
   return (
     <div
       role="status"
       aria-live="polite"
       data-tuck-status={shown.state}
-      className="pointer-events-none fixed z-[45] top-2 inset-x-0 md:left-[240px] flex justify-center px-3"
+      className="pointer-events-none fixed z-[45] top-[calc(env(safe-area-inset-top)+52px)] md:top-2 inset-x-0 md:left-[var(--sb)] flex justify-center px-3"
     >
       <div className="pointer-events-auto flex max-w-[360px] items-center gap-1.5 rounded-2xl border border-border/70 bg-card pl-1 pr-3.5 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
         <Tuck state={shown.state} size={52} decorative />
         <div className="min-w-0 py-1">
-          <p className="text-[13.5px] leading-snug">{shown.line}</p>
+          <p className="text-[length:calc(13.5px*var(--ts))] leading-snug">{shown.line}</p>
+          {chip && (
+            <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-foreground/[0.07] px-2 py-0.5 text-[length:calc(12px*var(--ts))] font-semibold">
+              <span className="h-2 w-2 rounded-full" style={{ background: chip.color }} />{chip.text}
+            </span>
+          )}
           {action && (
-            <button onClick={action.run} className="mt-0.5 text-[12.5px] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground">
+            <button onClick={action.run} className="mt-0.5 text-[length:calc(12.5px*var(--ts))] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground">
               {action.label}
             </button>
           )}

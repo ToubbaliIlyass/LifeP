@@ -59,9 +59,9 @@ export function ContentPage({ seo, h1, lede, sections, children }: {
         {sections.map((s) => (
           <section key={s.h} className="mt-14">
             <h2 className="text-[clamp(24px,3vw,30px)] font-bold leading-tight tracking-[-0.03em] text-balance">{s.h}</h2>
-            {s.p?.map((para, i) => <p key={i} className="mt-3 text-[17px] leading-[1.65] text-[#4a4a48] text-pretty">{para}</p>)}
+            {s.p?.map((para, i) => <p key={i} className="mt-3 text-[length:calc(17px*var(--ts))] leading-[1.65] text-[#4a4a48] text-pretty">{para}</p>)}
             {s.list && (
-              <ul className="mt-3 space-y-2.5 text-[17px] leading-[1.6] text-[#4a4a48]">
+              <ul className="mt-3 space-y-2.5 text-[length:calc(17px*var(--ts))] leading-[1.6] text-[#4a4a48]">
                 {s.list.map((li, i) => (
                   <li key={i} className="flex gap-3"><span aria-hidden className="mt-[0.7em] h-1.5 w-1.5 flex-none rounded-full bg-[#F5A524]" /><span>{li}</span></li>
                 ))}
@@ -81,7 +81,7 @@ export function ContentPage({ seo, h1, lede, sections, children }: {
           </div>
         </section>
 
-        <aside aria-label="More about Acture" className="mt-12 border-t border-[#ebe9e5] pt-6 text-[15px] text-[#6b6a66]">
+        <aside aria-label="More about Acture" className="mt-12 border-t border-[#ebe9e5] pt-6 text-[length:calc(15px*var(--ts))] text-[#6b6a66]">
           <p className="font-semibold text-[#1b1c1f]">More about Acture</p>
           <ul className="mt-2 space-y-1">
             <li><Link href="/" className="underline underline-offset-4 hover:text-[#1b1c1f]">The whole story, in one scroll</Link></li>

@@ -1,6 +1,5 @@
 import { PRAYERS, PRAYER_LABELS, computePrayerTimes, utcOffsetHours, type Prayer } from '@/lib/prayer-times'
 import type { Settings } from '@/lib/settings'
-import type { Node } from '@/lib/db/schema'
 
 /** Long enough to pray without the slot pretending to own the hour. */
 export const PRAYER_MINUTES = 15
@@ -48,17 +47,38 @@ export function prayerTimesFor(
     .filter((p) => p.time !== '--:--')
 }
 
-/**
- * The Habit the five tick off: the one remembered in settings, or else the
- * one whose name says prayer. Pure, so Today and ticking a prayer agree on
- * it — Today used to know it only after the first prayer was ticked, and
- * listed "Pray five prayers" beside the five prayers themselves until then.
+/*
+ * The five are to-dos like any other, with two differences: they repeat every
+ * day, and their time is worked out rather than typed.
+ *
+ * One Task per prayer, kept open for good: `prayer` says which of the five,
+ * `doneDates` holds the days it was prayed. That shape is deliberate.
+ * The usual way a repeating to-do works (finish it and a new copy is made
+ * for the next day) would leave five finished rows a day in the Logbook,
+ * and an unticked Fajr would sit on Today as overdue for as long as it was
+ * missed. Here a day not prayed leaves nothing behind, and tomorrow starts
+ * clean. The time is never stored, since it moves every day: it is read from
+ * `prayerTimesFor` when the list is built.
  */
-export function findPrayerHabit(habits: Node[], stored: number | null): number | null {
-  if (stored !== null && habits.some((h) => h.id === stored)) return stored
-  const found = habits.find((h) => {
-    const p = h.properties as Record<string, unknown>
-    return typeof p.name === 'string' && /\bpray(er|ers|ing)?\b|salah|salat/i.test(p.name)
-  })
-  return found?.id ?? null
+
+/** The 'prayer' field of a node's properties, when it is one of the five. */
+export function prayerKeyOf(props: Record<string, unknown>): Prayer | null {
+  const k = props.prayer
+  return typeof k === 'string' && (PRAYERS as readonly string[]).includes(k) ? (k as Prayer) : null
+}
+
+/** The days a prayer was prayed, as stored. */
+export function doneDatesOf(props: Record<string, unknown>): string[] {
+  return Array.isArray(props.doneDates) ? props.doneDates.filter((d): d is string => typeof d === 'string') : []
+}
+
+/** Days kept: long enough for any "this week" or "last month" a person might look at. */
+const KEEP_DAYS = 400
+
+/** `doneDates` with `date` added or taken out, oldest dropped past a year or so. */
+export function withPrayerDone(props: Record<string, unknown>, date: string, done: boolean): string[] {
+  const days = new Set(doneDatesOf(props))
+  if (done) days.add(date)
+  else days.delete(date)
+  return [...days].sort().slice(-KEEP_DAYS)
 }

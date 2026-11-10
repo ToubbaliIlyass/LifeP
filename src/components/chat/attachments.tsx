@@ -165,7 +165,7 @@ export function AttachmentStrip({ items, onRemove, error, round = false }: {
           ))}
         </div>
       )}
-      {error && <p className="text-[11px] text-destructive mt-1">{error}</p>}
+      {error && <p className="text-[length:calc(11px*var(--ts))] text-destructive mt-1">{error}</p>}
     </div>
   )
 }
@@ -180,7 +180,7 @@ export function FilePreview({ part, size = 'md', round = false }: { part: FileUI
   return (
     <div className={`${size === 'sm' ? 'h-14' : 'h-12'} flex items-center gap-2 px-3 ${corner} border border-border/60 bg-muted/40 max-w-[220px]`}>
       <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-      <span className="text-[12px] truncate">{part.filename ?? 'document.pdf'}</span>
+      <span className="text-[length:calc(12px*var(--ts))] truncate">{part.filename ?? 'document.pdf'}</span>
     </div>
   )
 }

@@ -1,8 +1,10 @@
 'use client'
 
+import { BTN_PRIMARY } from '@/components/ui/buttons'
+import { startListening } from '@/components/today/TodayAssistant'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
-  Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Flag, Flame, Heading, Inbox, Layers, ListChecks, Loader2, Moon, Plus,
+  Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
   Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import type { EventStatus } from '@/lib/event-status'
@@ -29,22 +31,22 @@ import { EVENING_TONE, ProgressRing, SOMEDAY_TONE, TodoCheck, VIEW_META } from '
 type Ctx = 'today' | 'inbox' | 'upcoming' | 'anytime' | 'someday' | 'project' | 'area' | 'logbook' | 'tag'
 type PopState = { kind: PopKind | 'list' | 'heading' | 'event'; event?: DayEvent; rect: DOMRect; todoId?: number; headingId?: string; batch?: boolean }
 
-const MENU = 'flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[7px] text-[14px] hover:bg-foreground/[0.045] focus-visible:bg-foreground/[0.045] outline-none'
+const MENU = 'flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[7px] text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] max-md:py-3 max-md:gap-3 hover:bg-foreground/[0.045] focus-visible:bg-foreground/[0.045] outline-none'
 /*
  * One left edge. The list's icon, its notes, the tag filter, every heading and
  * every checkbox start on the same line down the page; a row's highlight is
  * the only thing allowed to reach past it. Sizes follow Things: a quiet 14px
  * list under a 22px title, with headings as coloured rules.
  */
-const SECTION_BASE = 'flex items-center gap-2 text-[14px] font-bold mt-8 mb-1 pb-1.5 border-b border-border/80'
-const SECTION = `${SECTION_BASE} text-primary`
-const ROW = 'relative flex items-start gap-2 px-2 -mx-2 py-1 rounded-md leading-[22px] cursor-default'
-const DATE_CHIP = 'shrink-0 rounded-[4px] bg-foreground/[0.07] px-1.5 text-[11.5px] font-medium leading-[18px] text-muted-foreground tabular-nums'
-const TAG_PILL = 'shrink-0 rounded-full border border-border px-1.5 text-[11px] leading-4 text-muted-foreground'
-const ICON_BTN = 'grid place-items-center w-7 h-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] disabled:opacity-50'
+const SECTION_BASE = 'flex items-center gap-2 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] font-bold mt-8 mb-1 pb-1.5 border-b border-border/80'
+const SECTION = `${SECTION_BASE} text-primary-ink`
+const ROW = 'relative flex items-start gap-2 px-2 -mx-2 py-1 rounded-md leading-[22px] cursor-default max-md:gap-3 max-md:py-2.5 max-md:leading-6'
+const DATE_CHIP = 'shrink-0 rounded-[4px] bg-foreground/[0.07] px-1.5 text-[length:calc(11.5px*var(--ts))] max-md:text-[length:calc(13px*var(--ts))] font-medium leading-[18px] max-md:leading-5 text-muted-foreground tabular-nums'
+const TAG_PILL = 'shrink-0 rounded-full border border-border px-1.5 max-md:px-2 text-[length:calc(11px*var(--ts))] max-md:text-[length:calc(12.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground'
+const ICON_BTN = 'grid place-items-center w-9 h-9 max-md:w-11 max-md:h-11 shrink-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] disabled:opacity-50'
 
 /** A menu, placed under whatever opened it and kept on the screen. */
-function Pop({ rect, onClose, children }: { rect: DOMRect; onClose: () => void; children: React.ReactNode }) {
+function Pop({ rect, onClose, wide = false, children }: { rect: DOMRect; onClose: () => void; wide?: boolean; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   useLayoutEffect(() => {
@@ -63,7 +65,7 @@ function Pop({ rect, onClose, children }: { rect: DOMRect; onClose: () => void; 
         data-pop
         role="menu"
         style={pos ?? { left: 0, top: 0, visibility: 'hidden' }}
-        className="fixed z-[56] min-w-[220px] max-w-[280px] max-h-[min(420px,70vh)] overflow-y-auto p-1.5 rounded-xl border border-border/70 bg-popover shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]"
+        className={`fixed z-[56] overflow-y-auto p-1.5 rounded-xl ${wide ? 'w-[400px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-16px)]' : 'min-w-[220px] max-w-[280px] max-h-[min(420px,70vh)]'} border border-border/70 bg-popover shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]`}
       >
         {children}
       </div>
@@ -72,7 +74,7 @@ function Pop({ rect, onClose, children }: { rect: DOMRect; onClose: () => void; 
 }
 
 const PopHead = ({ children }: { children: React.ReactNode }) => (
-  <div className="px-2.5 pt-1.5 pb-1 text-[12px] font-semibold text-muted-foreground">{children}</div>
+  <div className="px-2.5 pt-1.5 pb-1 text-[length:calc(12px*var(--ts))] font-semibold text-muted-foreground">{children}</div>
 )
 
 function DateRow({ Icon, label, value, onPick }: { Icon: React.ComponentType<{ className?: string }>; label: string; value: string | null; onPick: (date: string) => void }) {
@@ -85,7 +87,7 @@ function DateRow({ Icon, label, value, onPick }: { Icon: React.ComponentType<{ c
         defaultValue={value ?? ''}
         aria-label={label}
         onChange={(e) => { if (e.target.value) onPick(e.target.value) }}
-        className="max-w-[132px] text-[13px] rounded-md border border-border/70 bg-background px-1 py-0.5"
+        className="max-w-[132px] text-[length:calc(13px*var(--ts))] rounded-md border border-border/70 bg-background px-1 py-0.5"
       />
     </label>
   )
@@ -320,9 +322,9 @@ export function TodoView({
         }
         case 'ArrowDown': e.preventDefault(); move(1); break
         case 'ArrowUp': e.preventDefault(); move(-1); break
-        case 'Enter': if (current && current.type !== 'Prayer') { e.preventDefault(); open(current.id, true) } break
+        case 'Enter': if (current && !current.prayerKey) { e.preventDefault(); open(current.id, true) } break
         case ' ': if (current) { e.preventDefault(); for (const t of targets(current)) complete(t) } break
-        case 'Backspace': case 'Delete': if (current && current.type !== 'Prayer') { e.preventDefault(); for (const t of targets(current)) destroy(t); setPicked(new Set()) } break
+        case 'Backspace': case 'Delete': if (current && !current.prayerKey) { e.preventDefault(); for (const t of targets(current)) destroy(t); setPicked(new Set()) } break
         case 't': if (current?.type === 'Task') { for (const t of targets(current)) patch(t.id, { when: today, evening: false }); break }
         // falls through: with nothing selected, t is the start of a word
         case 'e': if (e.key === 'e' && current?.type === 'Task') { for (const t of targets(current)) patch(t.id, { when: today, evening: true }); break }
@@ -372,18 +374,16 @@ export function TodoView({
   function trail(t: Todo) {
     const m: React.ReactNode[] = []
     const mark = 'w-[13px] h-[13px] shrink-0 text-muted-foreground/70'
-    if (t.repeats && t.type !== 'Prayer') m.push(<span key="rep" title={repeatLabel(t.repeats)}><Repeat className={mark} /></span>)
+    if (t.repeats && !t.prayerKey) m.push(<span key="rep" title={repeatLabel(t.repeats)}><Repeat className={mark} /></span>)
     if (t.notes.trim()) m.push(<span key="notes" title="Has notes"><FileText className={mark} /></span>)
     if (t.checklist.length) {
       m.push(
-        <span key="cl" className="inline-flex items-center gap-0.5 text-[11.5px] text-muted-foreground/80 tabular-nums">
+        <span key="cl" className="inline-flex items-center gap-0.5 text-[length:calc(11.5px*var(--ts))] text-muted-foreground/80 tabular-nums">
           <ListChecks className={mark} />{t.checklist.filter((c) => c.done).length}/{t.checklist.length}
         </span>,
       )
     }
-    if (t.streak && t.streak > 1) {
-      m.push(<span key="streak" className="inline-flex items-center gap-0.5 text-[11.5px] text-amber-600 dark:text-amber-400"><Flame className="w-[13px] h-[13px]" />{t.streak}</span>)
-    }
+    // Which person this counts toward, as a dot: the meaning is visible before the tick.
     for (const g of t.tags) m.push(<span key={`#${g}`} className={TAG_PILL}>{g}</span>)
     return m
   }
@@ -394,7 +394,7 @@ export function TodoView({
     const l = lists.find((x) => x.id === t.listId)
     if (!l || (l.kind === 'area' && ctx === 'area')) return null
     return (
-      <div className="flex items-center gap-1 text-[12px] leading-4 text-muted-foreground">
+      <div className="flex items-center gap-1 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground">
         {l.kind === 'project' && <ProgressRing value={progress(l, todos)} size={11} />}
         <span className="truncate">{l.title || (l.kind === 'project' ? 'Untitled project' : 'Untitled area')}</span>
       </div>
@@ -455,7 +455,7 @@ export function TodoView({
         />
       )
     }
-    const fixed = t.type === 'Prayer'
+    const fixed = !!t.prayerKey
     const due = t.deadline && !t.done ? deadlineLabel(t.deadline, today) : null
     return (
       <li
@@ -487,7 +487,7 @@ export function TodoView({
         {hint?.id === t.id && (
           <span className={`absolute left-2 right-2 h-0.5 rounded bg-primary ${hint.before ? '-top-px' : '-bottom-px'}`} />
         )}
-        <TodoCheck done={t.done} onClick={() => complete(t)} />
+        <TodoCheck done={t.done} label={t.done ? `Mark “${t.title}” as not done` : `Complete “${t.title}”`} onClick={() => complete(t)} />
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-1.5">
             {lead(t, ctx)}
@@ -499,7 +499,7 @@ export function TodoView({
           {place(t, ctx)}
         </div>
         {due && (
-          <span className={`shrink-0 inline-flex items-center gap-1 text-[12px] ${due.tone === 'over' ? 'text-red-500 font-semibold' : due.tone === 'soon' ? 'text-amber-500' : 'text-muted-foreground'}`}>
+          <span className={`shrink-0 inline-flex items-center gap-1 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] ${due.tone === 'over' ? 'text-red-600 dark:text-red-400 font-semibold' : due.tone === 'soon' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
             <Flag className="w-3 h-3" />{due.text}
           </span>
         )}
@@ -527,8 +527,8 @@ export function TodoView({
   const ghosts = (day: string) => {
     const dow = parseDay(day).getDay()
     return todos
-      .filter((t) => t.repeats && !t.done && t.type !== 'Prayer' && tagged(t)
-        && (t.type === 'Habit' || (t.when !== null && t.when < day))
+      .filter((t) => t.repeats && !t.done && !t.prayerKey && tagged(t)
+        && t.when !== null && t.when < day
         // Nothing comes round after its deadline.
         && (!t.deadline || day <= t.deadline)
         && (t.repeatDays === null || t.repeatDays.includes(dow)))
@@ -536,7 +536,7 @@ export function TodoView({
       .map((t) => (
         <li key={`ghost-${t.id}-${day}`} className={`${ROW} opacity-55`} title="Comes round on this day">
           <span className="w-[15px] h-[15px] mt-[3.5px] shrink-0 rounded-[4px] border-[1.5px] border-dashed border-muted-foreground/50" />
-          <span className="min-w-0 flex-1 truncate">{t.title}</span>
+          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{t.title}</span>
           <Repeat className="w-[13px] h-[13px] mt-1 shrink-0 text-muted-foreground" />
         </li>
       ))
@@ -571,15 +571,15 @@ export function TodoView({
    * it off the day. Not going is never marked as a failure: no red, no count.
    */
   const eventRows = (items: DayEvent[], settle = false) => items.length > 0 && (
-    <ul className="my-2 rounded-md bg-foreground/[0.05] px-2.5 py-1.5 text-[13px] leading-[19px]">
+    <ul className="my-2 rounded-md bg-foreground/[0.05] px-2.5 py-1.5 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] leading-[19px] max-md:leading-6 max-md:px-3 max-md:py-2">
       {items.map((e) => {
         const key = `${e.id}:${e.date}`
         return (
-          <li key={key} onClick={(ev) => setPop({ kind: 'event', rect: ev.currentTarget.getBoundingClientRect(), event: e })} className="group/ev relative flex items-baseline gap-1.5 cursor-pointer hover:text-primary">
+          <li key={key} onClick={(ev) => setPop({ kind: 'event', rect: ev.currentTarget.getBoundingClientRect(), event: e })} className="group/ev relative flex items-baseline gap-1.5 cursor-pointer hover:text-primary-ink">
             <span className="w-[3px] h-[11px] self-center shrink-0 rounded-full bg-sky-500/70" />
             {e.time && <span className="shrink-0 tabular-nums font-medium text-sky-700 dark:text-sky-400">{e.time}</span>}
-            <span className="min-w-0 truncate">{e.title}</span>
-            {e.location && <span className="min-w-0 truncate text-muted-foreground">· {e.location}</span>}
+            <span className="min-w-0 [overflow-wrap:anywhere]">{e.title}</span>
+            {e.location && <span className="min-w-0 [overflow-wrap:anywhere] text-muted-foreground">· {e.location}</span>}
             {settle && (
               <span
                 onClick={(ev) => ev.stopPropagation()}
@@ -600,7 +600,7 @@ export function TodoView({
                     <X className="w-[15px] h-[15px]" />
                   </button>
                   {eventMenu === key && (
-                    <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-[150px] rounded-lg border border-border/70 bg-card p-1 text-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
+                    <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-[150px] rounded-lg border border-border/70 bg-card p-1 text-[length:calc(13px*var(--ts))] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
                       {(['cancelled', 'missed'] as const).map((s) => (
                         <button key={s} role="menuitem" autoFocus={s === 'cancelled'} onClick={() => { setEventMenu(null); resolveEvent(e, s) }} className={MENU}>
                           {STATUS_WORD[s]}
@@ -619,13 +619,13 @@ export function TodoView({
 
   /** Today's events already settled: out of the way, one tap from being put back. */
   const settledEvents = (items: DayEvent[]) => items.length > 0 && (
-    <details className="my-2 text-[13px] text-muted-foreground">
+    <details className="my-2 text-[length:calc(13px*var(--ts))] text-muted-foreground">
       <summary className="cursor-pointer select-none rounded-md px-0.5 py-0.5 hover:text-foreground">Done today · {items.length}</summary>
       <ul className="mt-1 px-0.5">
         {items.map((e) => (
           <li key={`${e.id}:${e.date}`} className="flex items-baseline gap-1.5 py-0.5">
             <span className="shrink-0 tabular-nums">{e.time ?? ''}</span>
-            <span className={`min-w-0 truncate ${e.status === 'attended' ? 'line-through' : ''}`}>{e.title}</span>
+            <span className={`min-w-0 [overflow-wrap:anywhere] ${e.status === 'attended' ? 'line-through' : ''}`}>{e.title}</span>
             <span className="shrink-0">· {e.status ? STATUS_WORD[e.status] : ''}</span>
             <button onClick={() => resolveEvent(e, null)} aria-label={`Put “${e.title}” back on today`} title="Put back on today" className="ml-auto shrink-0 rounded-md px-1.5 text-primary hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] outline-none">Undo</button>
           </li>
@@ -647,7 +647,7 @@ export function TodoView({
         <div className={`leading-[22px] ${l.done ? 'text-muted-foreground line-through' : ''}`}>
           {l.title || (l.kind === 'project' ? 'Untitled project' : 'Untitled area')}
         </div>
-        <div className="flex flex-wrap gap-x-2.5 text-[12px] leading-4 text-muted-foreground">
+        <div className="flex flex-wrap gap-x-2.5 text-[length:calc(12px*var(--ts))] leading-4 text-muted-foreground">
           {note && <span>{note}</span>}
           {l.deadline && !l.done && <span className="inline-flex items-center gap-1"><Flag className="w-[13px] h-[13px]" />Due {relDate(l.deadline, today)}</span>}
         </div>
@@ -689,20 +689,25 @@ export function TodoView({
    */
   const phoneBar = (
     <div className="md:hidden flex items-center h-9 -mx-1.5 mb-2">
-      <button onClick={onOpenMenu} aria-label="Back to lists" className="grid place-items-center w-9 h-9 rounded-md text-muted-foreground active:bg-foreground/[0.06]">
+      <button onClick={onOpenMenu} aria-label="Back to lists" className="grid place-items-center w-11 h-11 -ml-1 rounded-md text-muted-foreground active:bg-foreground/[0.06]">
         <ChevronLeft className="w-6 h-6" />
       </button>
     </div>
   )
-  const TITLE = 'min-w-0 flex items-center gap-2.5 text-[22px] font-bold leading-7 tracking-tight'
+  const TITLE = 'min-w-0 flex items-center gap-2.5 text-[length:calc(22px*var(--ts))] max-md:text-[length:calc(26px*var(--ts))] font-bold leading-7 max-md:leading-8 tracking-tight'
   const head = (icon: React.ReactNode, title: React.ReactNode, actions?: React.ReactNode, sub?: React.ReactNode) => (
     <>
-      <header className="flex items-center gap-2 mb-2">
-        <h1 className={TITLE}>{icon}{title}</h1>
-        <span className="flex-1" />
-        {actions}
-      </header>
-      {sub ? <div className="mb-4 text-[14px] text-foreground/75">{sub}</div> : <div className="h-2" />}
+      {/* The title, date and buttons stay at the top of the page while the list scrolls under them. */}
+      <div className={`sticky top-0 z-20 -mx-12 max-md:-mx-[18px] px-12 max-md:px-[18px] bg-background pt-2 pb-1`}>
+        <header className="flex items-center gap-2 mb-2">
+          <h1 className={TITLE}>{icon}{title}</h1>
+          <span className="flex-1" />
+          {actions}
+        </header>
+        {sub ? <div className="mb-2 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] text-foreground/75">{sub}</div> : null}
+      </div>
+      <div className="h-2" />
+      {banner}
     </>
   )
   const standardHead = (id: StandardView, actions?: React.ReactNode, sub?: React.ReactNode) => {
@@ -713,7 +718,7 @@ export function TodoView({
     const tags = [...new Set(pool.flatMap((t) => t.tags))].sort()
     if (!tags.length) return null
     const chip = (on: boolean) =>
-      `text-[12.5px] leading-5 rounded-full px-2.5 font-semibold ${on ? 'bg-foreground/[0.14] text-foreground' : 'text-muted-foreground hover:text-foreground'}`
+      `text-[length:calc(12.5px*var(--ts))] max-md:text-[length:calc(14px*var(--ts))] leading-5 max-md:leading-8 rounded-full px-2.5 max-md:px-3.5 font-semibold ${on ? 'bg-foreground/[0.14] text-foreground' : 'text-muted-foreground hover:text-foreground'}`
     return (
       <div className="flex flex-wrap items-center gap-1 mt-3 mb-2 -ml-px">
         <button className={chip(!tag)} onClick={() => setTag(null)}>All</button>
@@ -722,12 +727,17 @@ export function TodoView({
     )
   }
   /** Nothing here yet, with Tuck beside it: quiet for a clear inbox or day, a bare bed for the rest. */
+  /**
+   * A list with nothing in it, or a day finished: Tuck is the page. Big,
+   * animated and in the middle, with a short line under it — the words
+   * support the picture, not the other way round.
+   */
   const empty = (title: string, text: string, tuck: TuckState = 'empty-garden') => (
-    <div className="mt-8 flex items-center gap-5 max-w-[60ch] text-muted-foreground max-sm:flex-col max-sm:items-start max-sm:gap-2">
-      <Tuck state={tuck} size={200} decorative className="max-sm:-ml-2" />
-      <div>
-        <b className="block mb-1 font-semibold text-foreground">{title}</b>
-        {text}
+    <div className="flex min-h-[min(70vh,640px)] flex-col items-center justify-center gap-4 px-4 py-6 text-center text-muted-foreground animate-in fade-in zoom-in-90 duration-500">
+      <Tuck state={tuck} size={tuck === 'all-done' ? 380 : 320} decorative className="max-w-[88vw] !h-auto aspect-[320/300]" />
+      <div className="max-w-[44ch]">
+        <b className="block mb-1 text-[length:calc(22px*var(--ts))] font-bold tracking-tight text-foreground">{title}</b>
+        <span className="text-[length:calc(15px*var(--ts))] leading-snug">{text}</span>
       </div>
     </div>
   )
@@ -744,7 +754,7 @@ export function TodoView({
       if (!mine.length) return null
       return (
         <div key={p.id}>
-          <h3 onClick={() => onNavigate(`project:${p.id}`)} className="flex items-center gap-2 mt-5 mb-0.5 text-[13.5px] font-semibold cursor-pointer hover:text-primary">
+          <h3 onClick={() => onNavigate(`project:${p.id}`)} className="flex items-center gap-2 mt-5 mb-0.5 text-[length:calc(13.5px*var(--ts))] font-semibold cursor-pointer hover:text-primary-ink">
             <ProgressRing value={progress(p, todos)} size={15} className="text-primary" />{p.title || 'Untitled project'}
           </h3>
           {rows(mine, 'project', `p:${p.id}`)}
@@ -759,7 +769,7 @@ export function TodoView({
       if (!own.length && !inner.length) continue
       out.push(
         <div key={a.id}>
-          <h2 onClick={() => onNavigate(`area:${a.id}`)} className={`${SECTION} cursor-pointer hover:text-primary`}>
+          <h2 onClick={() => onNavigate(`area:${a.id}`)} className={`${SECTION} cursor-pointer hover:text-primary-ink`}>
             <Square className="w-[15px] h-[15px]" />{a.title || 'Untitled area'}
           </h2>
           {own.length > 0 && rows(own, 'area', `a:${a.id}`)}
@@ -774,24 +784,23 @@ export function TodoView({
 
   function body(): React.ReactNode {
     if (view === 'today') {
-      const all = todos.filter((t) => live(t) && isToday(t, today)).sort(byDay)
+      const all = todos.filter((t) => live(t) && isToday(t, today, lists)).sort(byDay)
       const f = all.filter(tagged)
       const evening = f.filter((t) => t.evening)
       const d = parseDay(today)
       const todayEvents = events.filter((e) => e.date === today && !e.status)
       const settled = events.filter((e) => e.date === today && !!e.status)
-      const canPlan = all.some((t) => !t.done && t.type !== 'Prayer' && !t.time)
+      const canPlan = all.some((t) => !t.done && !t.prayerKey && !t.time)
       return (
         <>
           {standardHead(
             'today',
             <>
               {canPlan && (
-                <button onClick={planDay} disabled={planning} title="Plan my day: give everything left a time" aria-label="Plan my day" className={ICON_BTN}>
-                  {planning ? <Loader2 className="w-[17px] h-[17px] animate-spin" /> : <Sparkles className="w-[17px] h-[17px]" />}
+                <button onClick={planDay} disabled={planning} title="Plan my day: give everything left a time" aria-label="Plan my day" className="inline-flex h-9 max-md:h-11 shrink-0 items-center gap-1.5 rounded-md px-2 max-md:px-3 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-50">
+                  {planning ? <Loader2 className="w-[17px] h-[17px] animate-spin" /> : <Sparkles className="w-[17px] h-[17px]" />}Plan
                 </button>
               )}
-              {eventButton(today)}
               {addButton()}
             </>,
             // Only once loaded: until then `today` is the server's clock on
@@ -803,7 +812,7 @@ export function TodoView({
           {all.length === 0 && todayEvents.length === 0
             ? settled.length > 0
               ? empty('Day complete.', 'Everything you had on today is settled. Nothing left to do.', 'all-done')
-              : empty('A clear day.', 'Say what needs to happen, or press N and type it: “call the bank 3pm”. For something you show up to, use the calendar button above.', 'empty-inbox')
+              : empty('A clear day.', 'Say what needs to happen, or press N and type it: “call the bank 3pm”. For something you show up to, add it and switch it to Event.', 'empty-inbox')
             : rows(f.filter((t) => !t.evening), 'today', 'today')}
           {evening.length > 0 && (
             <>
@@ -852,8 +861,8 @@ export function TodoView({
                   onDrop={(e) => { if (plusDragging()) { e.preventDefault(); setPlusDragging(false); insertAt({ when: day }) } }}
                   className={`flex items-baseline gap-2 mt-7 mb-1 pb-1.5 border-b border-border/80 ${items.length || dayEvents.length ? '' : 'opacity-55'}`}
                 >
-                  <span className="text-[22px] font-bold leading-none tracking-tight min-w-[26px]">{d.getDate()}</span>
-                  <span className="text-[13px] font-semibold text-muted-foreground">{i === 0 ? 'Tomorrow' : DAYS[d.getDay()]}</span>
+                  <span className="text-[length:calc(22px*var(--ts))] font-bold leading-none tracking-tight min-w-[26px]">{d.getDate()}</span>
+                  <span className="text-[length:calc(13px*var(--ts))] font-semibold text-muted-foreground">{i === 0 ? 'Tomorrow' : DAYS[d.getDay()]}</span>
                 </div>
                 {eventRows(dayEvents)}
                 {rows(items, 'upcoming', `day:${day}`)}
@@ -877,31 +886,22 @@ export function TodoView({
 
     if (view === 'anytime' || view === 'someday') {
       const all = todos.filter((t) => live(t) && (view === 'anytime' ? isAnytime(t, today) : isSomeday(t)))
-      // Habits come round on their own days, so they have no list of their
-      // own to wait in; Anytime is where one can be found between times.
-      const habits = view === 'anytime' ? todos.filter((t) => t.type === 'Habit' && !t.listId && tagged(t)).sort(byOrder) : []
       return (
         <>
-          {standardHead(view, addButton())}
+          {standardHead(view, addButton(), view === 'anytime' ? 'Things you could do whenever. Nothing here is scheduled.' : view === 'someday' ? 'Parked for later. Kept out of Today and out of your plan.' : undefined)}
           {tagBar(all)}
-          {all.length === 0 && habits.length === 0
+          {all.length === 0
             ? view === 'anytime'
               ? empty('Nothing here yet.', 'To-dos that have a project or a day, and could be done now, collect here.')
               : empty('No someday ideas.', 'Park things you might do later here, so they stay out of your way — and out of your plan.')
             : byPlace(all.filter(tagged), view)}
-          {habits.length > 0 && (
-            <>
-              <h2 className={SECTION}><Repeat className="w-[15px] h-[15px]" />Repeating</h2>
-              {rows(habits, 'anytime', 'habits')}
-            </>
-          )}
         </>
       )
     }
 
     if (view === 'logbook') {
       const items = [
-        ...todos.filter((t) => t.type === 'Task' && t.done).map((t) => ({ at: t.doneAt ?? '', todo: t, list: null as TodoList | null })),
+        ...todos.filter((t) => t.done && !t.prayerKey).map((t) => ({ at: t.doneAt ?? '', todo: t, list: null as TodoList | null })),
         ...lists.filter((l) => l.done).map((l) => ({ at: l.doneAt ?? '', todo: null as Todo | null, list: l })),
       ].sort((a, b) => b.at.localeCompare(a.at))
       const days = new Map<string, typeof items>()
@@ -939,7 +939,7 @@ export function TodoView({
                 type="button"
                 onClick={() => setArchiveOpen((o) => !o)}
                 aria-expanded={archiveOpen}
-                className="mt-6 flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+                className="mt-6 flex items-center gap-1.5 text-[length:calc(13px*var(--ts))] font-medium text-muted-foreground hover:text-foreground"
               >
                 <Archive className="w-[15px] h-[15px]" />
                 Archive · {archived} from before {relDate(cutoff, today)}
@@ -953,7 +953,7 @@ export function TodoView({
     }
 
     if (tagView !== null) {
-      const all = todos.filter((t) => live(t) && t.tags.includes(tagView) && t.type !== 'Prayer')
+      const all = todos.filter((t) => live(t) && t.tags.includes(tagView) && !t.prayerKey)
       return (
         <>
           {head(<Tag className="w-[22px] h-[22px] shrink-0 text-muted-foreground" />, tagView, undefined, 'Everything with this tag, in every list.')}
@@ -970,17 +970,16 @@ export function TodoView({
       </button>
     )
     const titleInput = (
-      <input
+      // A textarea, so a long name wraps instead of running off the side.
+      <AutoTextarea
         key={list.id}
         value={list.title}
         autoFocus={!list.title}
-        onChange={(e) => patchList(list.id, { title: e.target.value })}
-        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        onChange={(e) => patchList(list.id, { title: e.target.value.replace(/\n/g, ' ') })}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
         placeholder={list.kind === 'project' ? 'Untitled project' : 'Untitled area'}
         aria-label="Name"
-        // As wide as the name, so the ··· sits straight after it.
-        size={Math.max(list.title.length, 14) + 1}
-        className="min-w-0 max-w-full bg-transparent outline-none placeholder:text-muted-foreground/50"
+        className="min-w-0 flex-1 resize-none overflow-hidden [overflow-wrap:anywhere] bg-transparent outline-none placeholder:text-muted-foreground/50"
       />
     )
     const notes = (
@@ -989,12 +988,12 @@ export function TodoView({
         onChange={(e) => patchList(list.id, { notes: e.target.value })}
         placeholder="Notes"
         aria-label="Notes"
-        className="block w-full mt-1 mb-2 bg-transparent outline-none resize-none overflow-hidden text-[14px] text-foreground/75 leading-normal min-h-[21px] placeholder:text-muted-foreground/50"
+        className="block w-full mt-1 mb-2 bg-transparent outline-none resize-none overflow-hidden text-[length:calc(14px*var(--ts))] text-foreground/75 leading-normal min-h-[21px] placeholder:text-muted-foreground/50"
       />
     )
     const due = list.deadline ? deadlineLabel(list.deadline, today) : null
     const facts = (area: TodoList | null) => (due || area || list.done) && (
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[length:calc(12.5px*var(--ts))] text-muted-foreground">
         {area && <button className="hover:text-foreground" onClick={() => onNavigate(`area:${area.id}`)}>{area.title || 'Untitled area'}</button>}
         {due && !list.done && (
           <span className={`inline-flex items-center gap-1 ${due.tone === 'over' ? 'text-red-500 font-semibold' : due.tone === 'soon' ? 'text-amber-500' : ''}`}>
@@ -1014,7 +1013,7 @@ export function TodoView({
       const logged = all.filter((t) => t.done && !justDone.has(t.id)).sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''))
       return (
         <>
-          <header className="flex items-center gap-2 mb-2">
+          <div className="sticky top-0 z-20 -mx-12 max-md:-mx-[18px] bg-background px-12 pt-2 pb-1 max-md:px-[18px]"><header className="flex items-center gap-2 mb-2">
             <h1 className={TITLE}>
               <ProgressRing value={progress(list, todos)} size={22} className="text-primary" />
               {titleInput}
@@ -1027,7 +1026,7 @@ export function TodoView({
               </button>
             )}
             {!list.done && addButton()}
-          </header>
+          </header></div>
           {facts(lists.find((l) => l.id === list.areaId) ?? null)}
           {notes}
           {tagBar(all.filter((t) => !t.done))}
@@ -1099,7 +1098,7 @@ export function TodoView({
                   onBlur={(e) => { if (!e.target.value.trim()) setHeadings(list.headings.map((x) => (x.id === h.id ? { id: x.id, title: x.title } : x))) }}
                   placeholder="Notes for this part"
                   aria-label={`Notes for ${h.title || 'this heading'}`}
-                  className="block w-full mb-1 bg-transparent outline-none resize-none overflow-hidden text-[13.5px] text-foreground/70 leading-normal placeholder:text-muted-foreground/50"
+                  className="block w-full mb-1 bg-transparent outline-none resize-none overflow-hidden text-[length:calc(13.5px*var(--ts))] text-foreground/70 leading-normal placeholder:text-muted-foreground/50"
                 />
               )}
               {rows(openOnes.filter((t) => t.headingId === h.id), 'project', `h:${h.id}`)}
@@ -1107,7 +1106,7 @@ export function TodoView({
           ))}
           {logged.length > 0 && (
             <>
-              <button onClick={() => setShowLogged((v) => !v)} className="mt-3 ml-[15px] px-2 py-0.5 rounded-md text-[12.5px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045]">
+              <button onClick={() => setShowLogged((v) => !v)} className="mt-3 ml-[15px] px-2 py-0.5 rounded-md text-[length:calc(12.5px*var(--ts))] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045]">
                 {showLogged ? 'Hide' : 'Show'} {logged.length} completed
               </button>
               {showLogged && rows(logged, 'project', 'logged')}
@@ -1121,7 +1120,7 @@ export function TodoView({
     const projects = lists.filter((l) => l.kind === 'project' && l.areaId === list.id && !l.done).sort(byOrder)
     return (
       <>
-        <header className="flex items-center gap-2 mb-2">
+        <div className="sticky top-0 z-20 -mx-12 max-md:-mx-[18px] bg-background px-12 pt-2 pb-1 max-md:px-[18px]"><header className="flex items-center gap-2 mb-2">
           <h1 className={TITLE}>
             <Square className="w-[22px] h-[22px] shrink-0 text-muted-foreground" />
             {titleInput}
@@ -1129,7 +1128,7 @@ export function TodoView({
           {more}
             <span className="flex-1" />
           {!list.done && addButton()}
-        </header>
+        </header></div>
         {facts(null)}
         {notes}
         {tagBar(own)}
@@ -1153,7 +1152,7 @@ export function TodoView({
 
     if (pop.kind === 'event' && pop.event) {
       return (
-        <Pop rect={pop.rect} onClose={close}>
+        <Pop rect={pop.rect} onClose={close} wide>
           <EventEditor event={pop.event} onDone={(changed) => { close(); if (changed) { notifyDataChanged(); reload() } }} />
         </Pop>
       )
@@ -1230,21 +1229,25 @@ export function TodoView({
             <>
               <hr className="my-1.5 mx-1 border-border/70" />
               <PopHead>Area</PopHead>
-              <button className={`${MENU} ${list.areaId ? '' : 'text-primary font-semibold'}`} onClick={() => set({ areaId: null })}>
+              <button className={`${MENU} ${list.areaId ? '' : 'text-primary-ink font-semibold'}`} onClick={() => set({ areaId: null })}>
                 <Layers className="w-[18px] h-[18px]" />No area
               </button>
               {areas.map((a) => (
-                <button key={a.id} className={`${MENU} ${list.areaId === a.id ? 'text-primary font-semibold' : ''}`} onClick={() => set({ areaId: a.id })}>
+                <button key={a.id} className={`${MENU} ${list.areaId === a.id ? 'text-primary-ink font-semibold' : ''}`} onClick={() => set({ areaId: a.id })}>
                   <Square className="w-[18px] h-[18px]" />{a.title || 'Untitled area'}
                 </button>
               ))}
             </>
           )}
           <hr className="my-1.5 mx-1 border-border/70" />
+          <button className={MENU} onClick={() => set({ hideFromToday: !list.hideFromToday })}>
+            {list.hideFromToday ? <Eye className="w-[18px] h-[18px]" /> : <EyeOff className="w-[18px] h-[18px]" />}
+            {list.hideFromToday ? 'Show on Today' : 'Hide from Today'}
+          </button>
           <button className={MENU} onClick={() => set({ done: !list.done })}>
             <Check className="w-[18px] h-[18px]" />{list.done ? 'Reopen' : list.kind === 'project' ? 'Complete project' : 'Complete area'}
           </button>
-          <button className={`${MENU} text-red-500`} onClick={() => { close(); removeList(list); onNavigate('anytime') }}>
+          <button className={`${MENU} text-red-500`} onClick={() => { close(); if (!window.confirm(`Delete “${list.title || 'Untitled'}”?`)) return; removeList(list); onNavigate('anytime') }}>
             <Trash2 className="w-[18px] h-[18px]" />Delete {list.kind}
           </button>
         </Pop>
@@ -1277,10 +1280,10 @@ export function TodoView({
                   placeholder="tom, sat, in 4 days, fri 8pm…"
                   title="A time typed here (8pm, 14:30) becomes the to-do's time"
                   aria-label="Type a day"
-                  className="w-full rounded-md bg-foreground/[0.05] px-2 py-1 text-[13.5px] outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-md bg-foreground/[0.05] px-2 py-1 text-[length:calc(13.5px*var(--ts))] outline-none focus:ring-1 focus:ring-primary"
                 />
                 {jump.trim() && (
-                  <button onClick={apply} disabled={!guess} className={`${MENU} mt-1 ${guess ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                  <button onClick={apply} disabled={!guess} className={`${MENU} mt-1 ${guess ? 'text-primary-ink font-semibold' : 'text-muted-foreground'}`}>
                     <CalendarDays className="w-[18px] h-[18px]" />{guess ? guess.label : 'Not a day I know'}
                   </button>
                 )}
@@ -1303,7 +1306,7 @@ export function TodoView({
     }
     if (pop.kind === 'time') {
       const lengths = [15, 30, 45, 60, 90, 120]
-      const chip = (on: boolean) => `rounded-md px-2 py-1 text-[12.5px] font-medium tabular-nums ${on ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.05] hover:bg-foreground/[0.09]'}`
+      const chip = (on: boolean) => `rounded-md px-2 py-1 text-[length:calc(12.5px*var(--ts))] font-medium tabular-nums ${on ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.05] hover:bg-foreground/[0.09]'}`
       const remind = t.reminder !== null && t.reminder === t.time
       // Picking a time reminds you then, as in Things; untick to keep it quiet.
       const at = (time: string) => {
@@ -1317,7 +1320,7 @@ export function TodoView({
             {[['Morning', '09:00'], ['Noon', '12:00'], ['Afternoon', '15:00'], ['Evening', '19:00']].map(([label, time]) => (
               <button key={time} onClick={() => at(time)} className={`${chip(t.time === time)} flex flex-col items-center leading-tight py-1.5`}>
                 <span>{time}</span>
-                <span className={`text-[10.5px] font-normal ${t.time === time ? '' : 'text-muted-foreground'}`}>{label}</span>
+                <span className={`text-[length:calc(10.5px*var(--ts))] font-normal ${t.time === time ? '' : 'text-muted-foreground'}`}>{label}</span>
               </button>
             ))}
           </div>
@@ -1330,7 +1333,7 @@ export function TodoView({
               defaultValue={t.time ?? ''}
               aria-label="Time"
               onChange={(e) => { if (e.target.value) at(e.target.value) }}
-              className="text-[13px] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
+              className="text-[length:calc(13px*var(--ts))] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
             />
           </label>
           <PopHead>Takes</PopHead>
@@ -1375,7 +1378,7 @@ export function TodoView({
       }
       const on = (r: Partial<Todo>) => Object.entries(r).every(([k, v]) => t[k as keyof Todo] === v)
       const item = (label: string, r: Partial<Todo>, Icon: React.ComponentType<{ className?: string }> = Bell) => (
-        <button key={label} className={`${MENU} ${on(r) ? 'text-primary font-semibold' : ''}`} onClick={() => choose(r)}>
+        <button key={label} className={`${MENU} ${on(r) ? 'text-primary-ink font-semibold' : ''}`} onClick={() => choose(r)}>
           <Icon className="w-[18px] h-[18px]" />{label}
         </button>
       )
@@ -1390,17 +1393,17 @@ export function TodoView({
               {[10, 30, 60, 1440].map((m) => item(`${leadTime(m)} before`, { remindBefore: m }, Clock))}
             </>
           ) : (
-            <p className="px-2.5 pb-1.5 text-[12.5px] text-muted-foreground">Give it a time to be reminded before it.</p>
+            <p className="px-2.5 pb-1.5 text-[length:calc(12.5px*var(--ts))] text-muted-foreground">Give it a time to be reminded before it.</p>
           )}
           <label className={`${MENU} cursor-pointer`}>
             <Clock className="w-[18px] h-[18px]" />
-            <span className="flex-1">{t.type === 'Habit' ? 'Each day at' : t.when ? `${relDate(day, today)} at` : 'Today at'}</span>
+            <span className="flex-1">{t.when ? `${relDate(day, today)} at` : 'Today at'}</span>
             <input
               type="time"
               defaultValue={t.reminder ?? ''}
               aria-label="Remind at a time"
               onChange={(e) => { if (e.target.value) choose({ reminder: e.target.value, ...(t.type === 'Task' && !t.when ? { when: today } : {}) }) }}
-              className="text-[13px] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
+              className="text-[length:calc(13px*var(--ts))] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
             />
           </label>
           {t.type === 'Task' && (
@@ -1413,7 +1416,7 @@ export function TodoView({
                 min={`${nowDate}T${nowTime}`}
                 aria-label="Remind on a day and time"
                 onChange={(e) => { if (e.target.value) choose({ remindAt: e.target.value.slice(0, 16) }) }}
-                className="text-[12.5px] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
+                className="text-[length:calc(12.5px*var(--ts))] rounded-md border border-border/70 bg-background px-1 py-0.5 tabular-nums"
               />
             </label>
           )}
@@ -1428,7 +1431,7 @@ export function TodoView({
     }
     if (pop.kind === 'repeat') {
       const option = (value: string | null, label: string) => (
-        <button key={label} className={`${MENU} ${t.repeats === value ? 'text-primary font-semibold' : ''}`} onClick={() => set({ repeats: value })}>
+        <button key={label} className={`${MENU} ${t.repeats === value ? 'text-primary-ink font-semibold' : ''}`} onClick={() => set({ repeats: value })}>
           <Repeat className={`w-[18px] h-[18px] ${value ? '' : 'opacity-30'}`} />{label}
         </button>
       )
@@ -1451,7 +1454,7 @@ export function TodoView({
     const fits = (label: string) => !q || label.toLowerCase().includes(q)
     const firstFit = [...projects, ...areas].find((l) => fits(l.title || ''))
     const item = (id: number | null, label: string, icon: React.ReactNode, indent = false) => !fits(label) ? null : (
-      <button key={id ?? 'none'} className={`${MENU} ${indent ? 'pl-[30px]' : ''} ${t.listId === id ? 'text-primary font-semibold' : ''}`} onClick={() => set({ listId: id })}>
+      <button key={id ?? 'none'} className={`${MENU} ${indent ? 'pl-[30px]' : ''} ${t.listId === id ? 'text-primary-ink font-semibold' : ''}`} onClick={() => set({ listId: id })}>
         {icon}<span className="truncate">{label}</span>
       </button>
     )
@@ -1467,7 +1470,7 @@ export function TodoView({
             onKeyDown={(e) => { if (e.key === 'Enter' && firstFit) { e.preventDefault(); setQuickFilter(''); set({ listId: firstFit.id }) } }}
             placeholder="Type to find a list"
             aria-label="Find a list"
-            className="w-full rounded-md bg-foreground/[0.05] px-2 py-1 text-[13.5px] outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-md bg-foreground/[0.05] px-2 py-1 text-[length:calc(13.5px*var(--ts))] outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         {item(null, t.type === 'Task' ? 'Inbox' : 'No list', <Inbox className="w-[18px] h-[18px]" />)}
@@ -1486,19 +1489,18 @@ export function TodoView({
 
   return (
     <div ref={scroller} className="h-full overflow-y-auto flex flex-col">
-      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 text-[14px] max-md:text-[15px] transition-opacity duration-150 ${ready || down ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 max-md:pb-36 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] transition-opacity duration-150 ${ready || down ? 'opacity-100' : 'opacity-0'}`}>
         {phoneBar}
         {!ready && down ? (
           // The server is not answering: say so, kindly, with a way to try again.
           <div className="mt-20 flex flex-col items-center text-center" role="status">
             <Tuck state="maintenance" size={240} decorative />
-            <p className="mt-2 text-[16px] font-semibold">Fixing something. Back soon.</p>
-            <p className="mt-1 text-[13.5px] text-muted-foreground">Your lists are safe. This is on our side.</p>
-            <button onClick={reload} className="mt-4 rounded-md border border-border/80 px-3 py-1.5 text-[13px] font-medium hover:bg-foreground/[0.05]">Try again</button>
+            <p className="mt-2 text-[length:calc(16px*var(--ts))] font-semibold">Fixing something. Back soon.</p>
+            <p className="mt-1 text-[length:calc(13.5px*var(--ts))] text-muted-foreground">Your lists are safe. This is on our side.</p>
+            <button onClick={reload} className={`${BTN_PRIMARY} mt-4`}>Try again</button>
           </div>
         ) : (
           <>
-            {banner}
             {known ? body() : null}
           </>
         )}
@@ -1513,23 +1515,27 @@ export function TodoView({
         <div className="group sticky bottom-0 z-10 pointer-events-none">
           {/* A phone adds with its thumb: the round button, bottom right —
               stepping aside while the assistant's island is up. */}
-          {!list?.done && view !== 'logbook' && (
-            <div className={`${column} md:hidden flex justify-end pb-[calc(env(safe-area-inset-bottom)+12px)]`}>
-              <button onClick={() => newTodo()} aria-label="New to-do" className="pointer-events-auto grid place-items-center w-[52px] h-[52px] rounded-full bg-primary text-primary-foreground shadow-[0_2px_10px_rgb(0_0_0/0.25)] active:scale-95 transition-[opacity,scale] duration-200 group-has-[[data-island]]:opacity-0 group-has-[[data-island]]:scale-75 group-has-[[data-island]]:pointer-events-none">
+          {!list?.done && view !== 'logbook' && openId === null && (
+            <div className={`${column} md:hidden flex items-center justify-end gap-3 pb-[calc(env(safe-area-inset-bottom)+12px)]`}>
+              {/* Voice first: the mic is the main button, the plus is the quiet one beside it. Both step aside for the assistant's island. */}
+              <button onClick={() => newTodo()} aria-label="New to-do" className="pointer-events-auto grid place-items-center w-[52px] h-[52px] rounded-full border border-border/70 bg-card text-foreground shadow-[0_2px_10px_rgb(0_0_0/0.18)] active:scale-95 transition-[opacity,scale] duration-200 group-has-[[data-island]]:opacity-0 group-has-[[data-island]]:scale-75 group-has-[[data-island]]:pointer-events-none">
                 <Plus className="w-7 h-7" strokeWidth={2.2} />
+              </button>
+              <button onClick={() => startListening()} aria-label="Tell Tuck" className="pointer-events-auto grid place-items-center w-[60px] h-[60px] rounded-full bg-primary text-primary-foreground shadow-[0_2px_10px_rgb(0_0_0/0.25)] active:scale-95 transition-[opacity,scale] duration-200 group-has-[[data-island]]:opacity-0 group-has-[[data-island]]:scale-75 group-has-[[data-island]]:pointer-events-none">
+                <Mic className="w-7 h-7" strokeWidth={2.2} />
               </button>
             </div>
           )}
           {/*
             The assistant: an island at the foot of the list, centred on its
-            column, there only while in use (Quick Capture, in the sidebar).
+            column, there only while in use (Tell Tuck, in the sidebar).
             It rises over the list, and over the round button on a phone.
           */}
           <div className={`${column} absolute inset-x-0 bottom-0 z-10 pb-6 max-md:pb-[calc(env(safe-area-inset-bottom)+12px)]`}>{dock}</div>
         </div>
       )}
       {picked.size > 1 && (
-        <div data-pop className="fixed z-40 bottom-24 max-md:bottom-28 left-1/2 md:left-[calc(50%+120px)] -translate-x-1/2 flex items-center gap-1 rounded-xl border border-border/70 bg-popover px-2 py-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.16)] text-[13px]">
+        <div data-pop className="fixed z-40 bottom-24 max-md:bottom-28 left-1/2 md:left-[calc(50%+var(--sb)/2)] -translate-x-1/2 flex items-center gap-1 rounded-xl border border-border/70 bg-popover px-2 py-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.16)] text-[length:calc(13px*var(--ts))]">
           <span className="px-1.5 font-semibold tabular-nums">{picked.size} selected</span>
           {(() => {
             const first = byId([...picked][0])

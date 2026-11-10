@@ -1,9 +1,11 @@
 'use client'
 
+import { Download } from 'lucide-react'
+
 import { install, useInstall } from './InstallApp'
 import { Tuck } from '@/components/ui/Tuck'
 
-const BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-border/80 px-2.5 py-1 text-[13px] font-medium hover:bg-foreground/[0.05]'
+const BUTTON = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border/80 px-2.5 py-1 max-md:min-h-11 text-[length:calc(13px*var(--ts))] font-medium hover:bg-foreground/[0.05]'
 
 /**
  * Settings → Install: Acture on this device, for when the app was opened in
@@ -21,11 +23,12 @@ export function InstallControl() {
     : 'In Chrome or Edge, press Install in the address bar.'
 
   return (
-    <div className="flex items-center gap-3" data-install-control>
-      <Tuck state="greeting" size={96} decorative className="max-sm:hidden" />
-      <div className="min-w-0 space-y-2">
-        <p className="text-[13.5px]">Keep Acture one tap away: it opens in a window of its own, like any app.</p>
-        {how ? <p className="text-[13px] text-muted-foreground">{how}</p> : <button onClick={install} className={BUTTON}>Install Acture</button>}
+    <div className="flex items-center gap-4 max-sm:flex-col max-sm:items-start max-sm:gap-3" data-install-control>
+      <Tuck state="greeting" size={120} decorative className="shrink-0 max-sm:-ml-2" />
+      <div className="w-full min-w-0 flex-1">
+        <p className="text-[length:calc(15px*var(--ts))] font-semibold">Keep Acture one tap away</p>
+        <p className="mt-1 text-[length:calc(13px*var(--ts))] text-muted-foreground">{how ?? 'Opens in its own window, like any app.'}</p>
+        {!how && <button onClick={install} className={`${BUTTON} mt-3 w-full justify-center`}><Download className="w-3.5 h-3.5" />Install Acture</button>}
       </div>
     </div>
   )

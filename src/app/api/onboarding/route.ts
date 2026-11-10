@@ -2,8 +2,10 @@ import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createNode, createEdge, getNodeById } from '@/lib/graph/queries'
 import { readSettings, writeSettings } from '@/lib/settings'
 import { saveRule } from '@/lib/availability'
-import { todayStr } from '@/lib/date'
+import { isDueOn, nextDueDate, todayStr } from '@/lib/date'
 import { hiddenTypes } from '@/lib/modules'
+import { clockIn, zoneFor } from '@/lib/clock'
+import { createStarterProject } from '@/lib/starter'
 
 /**
  * The answers from the setup interview, written in one go.
@@ -36,20 +38,21 @@ interface Payload {
     /** The Course this is a meeting of, when it came from Canvas. */
     courseNodeId?: number
   }[]
-  habits?: {
+  /** Things that come back: each becomes a repeating to-do. */
+  routines?: {
     name: string
-    /** Index into `goals`, when the habit is in service of one. */
+    /** Index into `goals`, when it is in service of one. */
     goal?: number | null
     frequency?: string
     daysOfWeek?: number[]
     durationMinutes?: number
-    /** Whole-day habits (praying, water) never get a slot. */
-    anytime?: boolean
     /** When they usually do it, if they said. */
     usualTime?: string
   }[]
   goals?: { name: string; targetDate?: string | null }[]
   projects?: { name: string; goal?: number | null }[]
+  /** When they like to do things, said out loud: prefer / busy / free windows for the planner. */
+  rules?: { kind: string; days?: number[]; start: string; end: string; activity?: string }[]
   /** Hours they are simply not available, as stated rules. */
   busy?: { days: number[]; start: string; end: string; note?: string }[]
 }
@@ -62,10 +65,10 @@ export async function POST(request: Request) {
   if (!user) return unauthorized()
 
   const body = (await request.json().catch(() => ({}))) as Payload
-  const created: Record<string, number> = { commitments: 0, habits: 0, goals: 0, projects: 0, rules: 0, links: 0 }
+  const created: Record<string, number> = { commitments: 0, routines: 0, goals: 0, projects: 0, rules: 0, links: 0 }
 
   // Settings first: what follows is filtered by the modules chosen here, so a
-  // stray habit from a section they turned off cannot slip in behind it.
+  // stray routine from a section they turned off cannot slip in behind it.
   const settings = await readSettings(user.id)
   await writeSettings(user.id, {
     ...(body.modules ? { modules: { ...settings.modules, ...body.modules } } : {}),
@@ -145,20 +148,24 @@ export async function POST(request: Request) {
     created.commitments++
   }
 
-  for (const h of body.habits ?? []) {
+  for (const h of body.routines ?? []) {
     if (!h.name?.trim()) continue
     const frequency = FREQUENCIES.includes(h.frequency ?? '') ? h.frequency! : 'daily'
-    const node = await createNode(user.id, 'Habit', {
+    const daysOfWeek = h.daysOfWeek?.length ? h.daysOfWeek : null
+    // A to-do that comes back: on today if it is due today, else its next day.
+    const today = todayStr()
+    const dueDate = isDueOn(frequency, daysOfWeek, new Date(today + 'T00:00:00').getDay()) ? today : nextDueDate(today, frequency, daysOfWeek)
+    const node = await createNode(user.id, 'Task', {
       name: h.name.trim(),
-      frequency,
-      ...(h.daysOfWeek?.length ? { daysOfWeek: h.daysOfWeek } : {}),
-      ...(typeof h.durationMinutes === 'number' ? { durationMinutes: h.durationMinutes } : {}),
-      ...(h.anytime ? { anytime: true } : {}),
+      status: 'todo',
+      dueDate,
+      recurrence: { frequency, ...(daysOfWeek ? { daysOfWeek } : {}) },
+      ...(typeof h.durationMinutes === 'number' && h.durationMinutes > 0 ? { estimatedMinutes: h.durationMinutes } : {}),
     })
-    created.habits++
+    created.routines++
 
     /*
-     * A habit that serves a goal says so, in an edge.
+     * A routine that serves a goal says so, in an edge.
      *
      * Setup used to write a dozen nodes and almost no edges, which produced
      * exactly the graph it was meant to avoid: a ring of unconnected dots
@@ -167,16 +174,16 @@ export async function POST(request: Request) {
      * moment that link is unambiguous, so it is recorded rather than left
      * for a model to guess at later from two names sitting side by side.
      */
-    const habitGoalId = typeof h.goal === 'number' ? goalIdByIndex[h.goal] : undefined
-    if (habitGoalId) {
-      await createEdge(user.id, node.id, habitGoalId, 'supports', {})
+    const routineGoalId = typeof h.goal === 'number' ? goalIdByIndex[h.goal] : undefined
+    if (routineGoalId) {
+      await createEdge(user.id, node.id, routineGoalId, 'supports', {})
       created.links++
     }
 
     // "I train at seven" is a preference about a named activity, which is
     // exactly what a 'prefer' rule is for. The planner reads it on the very
     // first day, before any evidence exists.
-    if (h.usualTime && TIME.test(h.usualTime) && !h.anytime) {
+    if (h.usualTime && TIME.test(h.usualTime)) {
       const minutes = (typeof h.durationMinutes === 'number' && h.durationMinutes > 0 ? h.durationMinutes : 30)
       const [hh, mm] = h.usualTime.split(':').map(Number)
       const endTotal = Math.min(23 * 60 + 59, hh * 60 + mm + minutes)
@@ -204,5 +211,24 @@ export async function POST(request: Request) {
     created.rules++
   }
 
-  return Response.json({ ok: true, created, hiddenTypes: [...off] })
+  for (const r of (body.rules ?? []).slice(0, 20)) {
+    if (r.kind !== 'prefer' && r.kind !== 'busy' && r.kind !== 'free') continue
+    if (!TIME.test(r.start ?? '') || !TIME.test(r.end ?? '') || r.end <= r.start) continue
+    const activity = r.activity?.trim().slice(0, 60)
+    if (r.kind === 'prefer' && !activity) continue
+    await saveRule(user.id, {
+      kind: r.kind,
+      days: Array.isArray(r.days) ? r.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [],
+      start: r.start,
+      end: r.end,
+      ...(activity ? { activity } : {}),
+    })
+    created.rules++
+  }
+
+  // Setup done or skipped, the account is never empty: the first project teaches the app by being used.
+  const today = clockIn(zoneFor(request.headers.get('x-time-zone'), settings.timeZone, settings.timeZoneOverride)).date
+  const starter = await createStarterProject(user.id, today)
+
+  return Response.json({ ok: true, created, starter, hiddenTypes: [...off] })
 }

@@ -5,15 +5,15 @@ import { Bell, BellOff, Send } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
 import { disablePush, enablePush, pushState, type PushState } from '@/lib/push'
 
-const BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-border/80 px-2.5 py-1 text-[13px] font-medium hover:bg-foreground/[0.05] disabled:opacity-60'
+const BUTTON = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border/80 px-2.5 py-1 max-md:min-h-11 text-[length:calc(13px*var(--ts))] font-medium hover:bg-foreground/[0.05] disabled:opacity-60'
 
 /** What each state means, in a line. */
 const SAYS: Record<PushState, string> = {
-  on: 'On for this device. Reminders arrive even when Acture is closed.',
-  off: 'Off for this device. Reminders only show while Acture is open.',
-  blocked: 'Blocked in this browser’s settings. Allow notifications for this site, then come back.',
-  'needs-install': 'On iPhone and iPad, reminders arrive in the app added to the Home Screen: Share → Add to Home Screen, then open it from there.',
-  unsupported: 'This browser can’t receive reminders while Acture is closed. They still show while it’s open.',
+  on: 'Arrive even when Acture is closed.',
+  off: 'Only when something is due.',
+  blocked: 'Blocked. Allow notifications for this site in your browser.',
+  'needs-install': 'On iPhone: Share → Add to Home Screen, then open it from there.',
+  unsupported: 'Not supported here. They still show while Acture is open.',
 }
 
 /**
@@ -42,25 +42,33 @@ export function NotificationsControl() {
     setTested(res && res.sent > 0 ? `Sent to ${res.sent} device${res.sent > 1 ? 's' : ''}. It should be on your screen now.` : 'Nothing was sent: no device has reminders on.')
   }
 
-  if (!state) return <p className="text-[13px] text-muted-foreground">Checking this device…</p>
+  if (!state) return <p className="text-[length:calc(13px*var(--ts))] text-muted-foreground">Checking this device…</p>
+  const on = state === 'on'
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-center gap-4 max-sm:flex-col max-sm:items-start max-sm:gap-3">
       {/* Asking for the key: reminders need the browser's permission, and Tuck asks nicely. */}
-      {state === 'off' && <Tuck state="permission-key" size={92} alt="Tuck holding up a key" className="-mt-2 max-sm:hidden" />}
-    <div className="space-y-2.5 min-w-0">
-      {state === 'off' && <p className="text-[13.5px] font-medium">May I send you reminders? Only when something is due.</p>}
-      <p className="text-[13.5px]">{SAYS[state]}</p>
-      <div className="flex flex-wrap gap-2">
-        {state === 'off' && <button onClick={turnOn} disabled={busy} className={BUTTON}><Bell className="w-3.5 h-3.5" />Turn on</button>}
-        {state === 'on' && (
-          <>
-            <button onClick={test} disabled={busy} className={BUTTON}><Send className="w-3.5 h-3.5" />Send a test</button>
-            <button onClick={turnOff} disabled={busy} className={BUTTON}><BellOff className="w-3.5 h-3.5" />Turn off</button>
-          </>
+      {state === 'off' && <Tuck state="permission-key" size={120} alt="Tuck holding up a key" className="shrink-0 max-sm:-ml-2" />}
+      <div className="w-full min-w-0 flex-1">
+        <p className="flex items-center gap-2 text-[length:calc(15px*var(--ts))] font-semibold">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${on ? 'bg-emerald-500' : 'bg-foreground/25'}`} aria-hidden />
+          {on ? 'Reminders are on' : state === 'off' ? 'May I send you reminders?' : 'Reminders'}
+        </p>
+        <p className="mt-1 text-[length:calc(13px*var(--ts))] text-muted-foreground">
+          {SAYS[state]}
+        </p>
+        {(state === 'off' || on) && (
+          <div className={`mt-3 grid gap-2 ${on ? 'grid-cols-2' : 'grid-cols-1 sm:max-w-[16rem]'}`}>
+            {state === 'off' && <button onClick={turnOn} disabled={busy} className={`${BUTTON} justify-center`}><Bell className="w-3.5 h-3.5" />Turn on</button>}
+            {on && (
+              <>
+                <button onClick={test} disabled={busy} className={`${BUTTON} justify-center`}><Send className="w-3.5 h-3.5" />Send a test</button>
+                <button onClick={turnOff} disabled={busy} className={`${BUTTON} justify-center`}><BellOff className="w-3.5 h-3.5" />Turn off</button>
+              </>
+            )}
+          </div>
         )}
+        {tested && <p className="mt-2 text-[length:calc(12.5px*var(--ts))] text-muted-foreground" role="status">{tested}</p>}
       </div>
-      {tested && <p className="text-[12.5px] text-muted-foreground" role="status">{tested}</p>}
-    </div>
     </div>
   )
 }

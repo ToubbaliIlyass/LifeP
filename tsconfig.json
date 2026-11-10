@@ -44,7 +44,13 @@
     ".next-check/types/**/*.ts",
     ".next-check/dev/types/**/*.ts",
     ".next-dev-3001/types/**/*.ts",
-    ".next-dev-3001/dev/types/**/*.ts"
+    ".next-dev-3001/dev/types/**/*.ts",
+    ".next-test/types/**/*.ts",
+    ".next-test/dev/types/**/*.ts",
+    ".next-verify-b/types/**/*.ts",
+    ".next-verify-b/dev/types/**/*.ts",
+    ".next-verify-s/types/**/*.ts",
+    ".next-verify-s/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

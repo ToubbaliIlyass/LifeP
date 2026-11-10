@@ -75,7 +75,10 @@ const themeScript = `
   } catch(e){}
   try {
     var p = localStorage.getItem('acture-theme');
-    if (p && p !== 'default') document.documentElement.setAttribute('data-theme', p);
+    if (p && p.indexOf('custom:') === 0) {
+      var css = localStorage.getItem('acture-custom-css');
+      if (css) { var st = document.createElement('style'); st.id = 'acture-custom-theme'; st.textContent = css; document.head.appendChild(st); document.documentElement.setAttribute('data-theme', 'custom'); }
+    } else if (p && p !== 'default') document.documentElement.setAttribute('data-theme', p);
   } catch(e){}
 })()
 `

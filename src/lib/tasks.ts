@@ -40,8 +40,7 @@ export async function setTaskStatus(userId: number, taskId: number, status: stri
   const updated = (await updateNode(userId, taskId, props)) ?? task
 
   // A recurring Task completing shouldn't just vanish — it should hand off
-  // to its next occurrence, the same way a recurring Habit is never a
-  // one-shot. Only fires on the todo/in-progress -> done transition, never
+  // to its next occurrence. Only fires on the todo/in-progress -> done transition, never
   // on undo, so toggling done/undone repeatedly can't spawn duplicates.
   const recurrence = props.recurrence as Recurrence | undefined
   let spawned: { id: number } | null = null

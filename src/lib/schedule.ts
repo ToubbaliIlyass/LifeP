@@ -19,8 +19,6 @@ export const DEFAULT_DAY = { start: '07:00', end: '23:00' } as const
 export const DEFAULT_TASK_MINUTES = 30
 /** Suggested times land on a 5-minute boundary; 10:24 reads as a glitch. */
 const SNAP_MINUTES = 5
-/** A habit with no stated length still needs a slot wide enough to see. */
-export const DEFAULT_HABIT_MINUTES = 15
 
 export interface SchedulableTask {
   id: number
@@ -28,10 +26,10 @@ export interface SchedulableTask {
   dueDate: string | null
   priority: string
   minutes: number
-  kind?: 'task' | 'habit'
+  kind?: 'task'
   /**
    * Minutes past midnight this usually happens, when it has a usual time.
-   * A habit is defined partly by when it is done — the morning stretch is a
+   * A repeating to-do is defined partly by when it is done — the morning stretch is a
    * morning thing — so a remembered slot is honoured before anything is
    * spread into free space.
    */
@@ -63,7 +61,7 @@ export interface BusyInterval {
 export interface Placement {
   taskId: number
   name: string
-  kind: 'task' | 'habit'
+  kind: 'task'
   startTime: string
   endTime: string
   minutes: number
@@ -122,7 +120,7 @@ const DAY_MINUTES = 24 * 60
 export interface Unplaced {
   taskId: number
   name: string
-  kind: 'task' | 'habit'
+  kind: 'task'
   minutes: number
   reason: string
 }
@@ -210,7 +208,7 @@ export function planSchedule({
     ...t,
     minutes: Number.isFinite(t.minutes) && t.minutes > 0
       ? Math.min(Math.round(t.minutes), dayEnd - dayStart)
-      : t.kind === 'habit' ? DEFAULT_HABIT_MINUTES : DEFAULT_TASK_MINUTES,
+      : DEFAULT_TASK_MINUTES,
     preferredStart: Number.isFinite(t.preferredStart) ? t.preferredStart : null,
     window: t.window && Number.isFinite(t.window.start) && Number.isFinite(t.window.end) && t.window.end > t.window.start
       ? t.window
@@ -242,7 +240,7 @@ export function planSchedule({
   }
 
   // Anything with a usual time gets first refusal on it, in time order, so a
-  // habit stays where it belongs instead of being shuffled somewhere new each
+  // routine stays where it belongs instead of being shuffled somewhere new each
   // morning. One that no longer fits falls through to be placed like the rest.
   const displaced: typeof items = []
   for (const item of items.filter((t) => t.preferredStart != null).sort((a, b) => a.preferredStart! - b.preferredStart!)) {
@@ -353,10 +351,10 @@ export function planSchedule({
       continue
     }
 
-    if ((item.kind ?? 'task') === 'task' && placeInChunks(item, lo, hi)) continue
+    if (placeInChunks(item, lo, hi)) continue
 
     // Not placed — and, unlike before, not the end of the plan: a two-hour
-    // task with no room says nothing about the fifteen-minute habit after it.
+    // task with no room says nothing about the fifteen-minute one after it.
     if (item.optional) continue
     const room = gapsIn(lo, hi).reduce((longest, g) => Math.max(longest, g.end - g.start), 0)
     unplaced.push({
@@ -377,7 +375,7 @@ export function planSchedule({
 
 function reasonFor(task: SchedulableTask, inGoodWindow = false): string {
   const parts: string[] = []
-  if (task.kind === 'habit') parts.push(task.preferredStart != null ? 'your usual time' : 'daily habit')
+  if (task.preferredStart != null) parts.push('your usual time')
   else if (task.optional) parts.push(task.dueDate ? `ahead of ${task.dueDate}` : 'from your list')
   else if (task.priority === 'high') parts.push('high priority')
   if (task.windowName) parts.push(task.windowName.toLowerCase())

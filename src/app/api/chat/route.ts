@@ -117,7 +117,25 @@ export async function POST(request: Request) {
 
   const availabilitySummary = availability.summary()
 
+  // What the user told Tuck about themselves (Settings → Profile). One line each, trimmed:
+  // it is their own words, but it should never be able to take over the prompt.
+  const profile = settings.profile
+  const pName = (profile?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+  const pAbout = (profile?.about ?? '').replace(/\s+/g, ' ').trim().slice(0, 300)
+  const pTone = profile?.tone === 'direct'
+    ? 'Be brief and direct: no cheering, just what to do.'
+    : profile?.tone === 'playful'
+      ? 'Be light and playful, with a little warmth and humour.'
+      : 'Be gentle and calm.'
+  const profileContext = pName || pAbout || (profile?.tone && profile.tone !== 'gentle')
+    ? '\n\n## About the user\n' +
+      (pName ? `Call them ${pName}.\n` : '') +
+      (pAbout ? `They say about themselves: ${pAbout}\n` : '') +
+      `Tone: ${pTone}`
+    : ''
+
   const personalContext =
+    profileContext +
     (memories ? `\n\n${memories}` : '') +
     (availabilitySummary ? `\n\n${availabilitySummary}` : '')
 

@@ -512,7 +512,7 @@ function Device({ F }: { F: Frame }) {
               <div style={{ ...row, fontWeight: 400 }}><Ring v={0.2} size={14} color="#8a8984" /><span>Machine Learning</span></div>
             </div>
             <div style={{ flex: 'none', width: 200, display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px 10px', boxSizing: 'border-box' }}>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 36, borderRadius: 12, background: th.prim, color: th.primFg, fontSize: 13.5, fontWeight: 600, transition: 'background .5s' }}><Icon n="mic" size={16} /> Quick Capture</div>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 36, borderRadius: 12, background: th.prim, color: th.primFg, fontSize: 13.5, fontWeight: 600, transition: 'background .5s' }}><Icon n="mic" size={16} /> Tell Tuck</div>
               <div style={{ width: 36, height: 36, borderRadius: 12, background: th.chipBg, display: 'grid', placeItems: 'center' }}><Icon n="kb" size={16} /></div>
             </div>
           </aside>

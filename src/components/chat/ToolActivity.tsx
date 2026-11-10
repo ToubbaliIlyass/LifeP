@@ -59,7 +59,7 @@ function Row({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 text-[11.5px] leading-tight ${
+      className={`flex items-center gap-1.5 text-[length:calc(11.5px*var(--ts))] leading-tight ${
         faint ? 'text-muted-foreground/45' : 'text-muted-foreground'
       }`}
     >
@@ -93,22 +93,43 @@ interface ToolActivityProps {
   onReviewProposals?: () => void
   /** After a day is planned: go and look at it. The plan shows as times on Today. */
   onOpenDay?: () => void
+  /** Open the Identity page, to see or change what counts. */
+  onOpenIdentity?: () => void
 }
 
-export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivityProps) {
+export function ToolActivity({ part, onReviewProposals, onOpenDay, onOpenIdentity }: ToolActivityProps) {
   const name = toolName(part)
   const input = (part.input ?? {}) as Record<string, unknown>
   const pending = part.state === 'input-streaming' || part.state === 'input-available'
 
   if (part.state === 'output-error') {
     return (
-      <div className="text-[11.5px] text-destructive/80">
+      <div className="text-[length:calc(11.5px*var(--ts))] text-destructive/80">
         {name} failed — {part.errorText}
       </div>
     )
   }
 
   // ── Proposals: the one thing that needs the user to act ──────────────
+  if (name === 'proposePlan' && !pending) {
+    const out = part.output as { proposed?: boolean; summary?: string; steps?: number; error?: string; revise?: boolean } | undefined
+    if (out?.revise) return null
+    if (out && out.proposed === false) return <Row icon={<Plus className={ICON} />} faint>{out.error ?? 'That plan could not be made.'}</Row>
+    return (
+      <div className="rounded-md bg-foreground/[0.05] px-3 py-2.5 flex items-start gap-2.5">
+        <Tuck state="proposing" size={68} decorative className="-ml-1.5 -my-1.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[length:calc(12px*var(--ts))] font-semibold text-muted-foreground">A plan, waiting for your yes</p>
+          <p className="text-[length:calc(13.5px*var(--ts))] font-medium text-foreground leading-snug mt-0.5">{out?.summary ?? 'Your plan'}{out?.steps ? ` · ${out.steps} steps` : ''}</p>
+          {onReviewProposals && (
+            <button onClick={onReviewProposals} className="mt-1.5 text-[length:calc(11px*var(--ts))] font-semibold px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors">Look it over</button>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (name === 'proposePlan') return <Row icon={doing('planning')} faint>Making a plan…</Row>
+
   if (name === 'batchPropose' || name === 'deleteNode' || name === 'proposeNodeType') {
     const ops = Array.isArray(input.operations) ? (input.operations as BatchOperation[]) : []
     const summary =
@@ -132,15 +153,15 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
       <div className="rounded-md bg-foreground/[0.05] px-3 py-2.5 flex items-start gap-2.5">
         <Tuck state="proposing" size={68} decorative className="-ml-1.5 -my-1.5" />
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-semibold text-muted-foreground">Waiting for your yes</p>
-          <p className="text-[13.5px] font-medium text-foreground leading-snug mt-0.5">{summary}</p>
+          <p className="text-[length:calc(12px*var(--ts))] font-semibold text-muted-foreground">Waiting for your yes</p>
+          <p className="text-[length:calc(13.5px*var(--ts))] font-medium text-foreground leading-snug mt-0.5">{summary}</p>
           {ops.length > 0 && (
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{describeOps(ops)}</p>
+            <p className="text-[length:calc(11px*var(--ts))] text-muted-foreground/70 mt-0.5">{describeOps(ops)}</p>
           )}
           {onReviewProposals && (
             <button
               onClick={onReviewProposals}
-              className="mt-2 text-[13px] font-semibold px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              className="mt-2 text-[length:calc(13px*var(--ts))] font-semibold px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
             >
               Review it
             </button>
@@ -215,7 +236,7 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
     return (
       <div className="border border-border/60 bg-muted/30 rounded-xl px-3 py-2.5 flex items-center gap-2.5">
         <Tuck state="confirmed" size={60} decorative className="-ml-1 -my-1.5" />
-        <p className="text-[12px] text-foreground/85 flex-1 min-w-0">
+        <p className="text-[length:calc(12px*var(--ts))] text-foreground/85 flex-1 min-w-0">
           {placed === 0 ? 'Nothing left to plan' : `${placed} on the calendar`}
           {out?.date && <span className="text-muted-foreground/60"> · {out.date}</span>}
           {missed > 0 && <span className="text-amber-600 dark:text-amber-400"> · {missed} didn&apos;t fit</span>}
@@ -223,10 +244,33 @@ export function ToolActivity({ part, onReviewProposals, onOpenDay }: ToolActivit
         {onOpenDay && (
           <button
             onClick={onOpenDay}
-            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors shrink-0"
+            className="text-[length:calc(11px*var(--ts))] font-semibold px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors shrink-0"
           >
             See Today
           </button>
+        )}
+      </div>
+    )
+  }
+
+  // ── Who the user is becoming, added: what was added and what counts toward it ──
+  if (name === 'addIdentity') {
+    const out = part.output as { added?: { name: string; counts: string[]; already?: boolean }[] } | undefined
+    if (pending) return <Row icon={doing('thinking')} faint>Adding who you’re becoming…</Row>
+    const added = out?.added ?? []
+    return (
+      <div className="border border-border/60 bg-muted/30 rounded-xl px-3 py-2.5 flex items-start gap-2.5">
+        <Tuck state="accepted" size={60} decorative className="-ml-1 -my-1.5 shrink-0" />
+        <div className="min-w-0 flex-1 text-[length:calc(12.5px*var(--ts))] text-foreground/85">
+          {added.map((a) => (
+            <p key={a.name}>
+              <b className="font-semibold">{a.already ? `${a.name} was already there` : `Added ${a.name}`}</b>
+              {a.counts.length > 0 ? <span className="text-muted-foreground"> · counts {a.counts.slice(0, 3).join(', ')}</span> : <span className="text-muted-foreground"> · nothing in your lists fits yet</span>}
+            </p>
+          ))}
+        </div>
+        {onOpenIdentity && (
+          <button onClick={onOpenIdentity} className="text-[length:calc(11px*var(--ts))] font-semibold px-2.5 py-1 rounded-lg border border-border/60 hover:bg-muted/50 transition-colors shrink-0">Review</button>
         )}
       </div>
     )

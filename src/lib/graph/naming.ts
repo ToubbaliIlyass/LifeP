@@ -17,7 +17,7 @@
  * write one at all. Every attempt came back "a JournalEntry needs a name".
  */
 const NAMELESS_TYPES = new Set([
-  'HabitLog', 'TimeBlock', 'SavedView', 'Settings',
+  'TimeBlock', 'SavedView', 'Settings',
   'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'AiUsage',
   'JournalEntry',
 ])
@@ -45,7 +45,7 @@ export function displayName(type: string, properties: Record<string, unknown>): 
   return identityOf(properties) ?? `Untitled ${type.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}`
 }
 
-/** A type's plural, as a heading: "Habits", "Journal", "Activities". */
+/** A type's plural, as a heading: "Tasks", "Journal", "Activities". */
 export function pluralize(type: string): string {
   const lower = type.toLowerCase()
   if (lower === 'journalentry') return 'Journal'
@@ -61,7 +61,7 @@ export function pluralize(type: string): string {
  * types the user has" — the colour picker, for one — hides exactly these.
  */
 export const HIDDEN_NODE_TYPES = new Set([
-  'habitlog', 'timeblock', 'savedview', 'settings',
+  'timeblock', 'savedview', 'settings',
   'memory', 'availabilityrule', 'activitysignal', 'apitoken',
   'canvascredential',
 ])

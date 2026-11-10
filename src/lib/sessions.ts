@@ -1,3 +1,4 @@
+import { doneDatesOf, prayerKeyOf } from '@/lib/prayers'
 import { displayName } from '@/lib/graph/naming'
 import { eventOccursOn } from '@/lib/date'
 import type { Edge, Node } from '@/lib/db/schema'
@@ -24,7 +25,7 @@ import type { Edge, Node } from '@/lib/db/schema'
  * 'hard' is a commitment: an appointment, a class, a shift, anything the user
  * put somewhere on purpose. Nothing may move or clear it.
  *
- * 'tentative' is where the plan currently puts something — a habit or a task
+ * 'tentative' is where the plan currently puts something — a task
  * laid into the day's gaps. Planning again is free to pick a different time,
  * because no promise was ever made about this one. That distinction is what
  * lets the calendar hold a plan without the plan pretending to be a diary.
@@ -71,9 +72,9 @@ export interface Session {
  * Whether a block falls on a date.
  *
  * A block used to be one day, so every reader compared `properties.date` to
- * the day it was drawing. A routine — a morning block with the same habits in
+ * the day it was drawing. A routine — a morning block with the same to-dos in
  * it every day — is one block with many occurrences, described by the same
- * frequency/daysOfWeek/until that Events and Habits already use. Asking here
+ * frequency/daysOfWeek/until that Events already use. Asking here
  * rather than comparing dates is what lets one definition appear all week.
  */
 export function blockOccursOn(block: Node, date: string): boolean {
@@ -89,16 +90,13 @@ export function blockOccursOn(block: Node, date: string): boolean {
   )
 }
 
-/** Whether a node counts as finished, by whichever field its type uses. */
-export function isDone(node: Node, habitLogs: Node[], date: string): boolean {
+/**
+ * Whether a node counts as finished on a day. A prayer is a to-do that never
+ * finishes for good: it is done on the days it was prayed (src/lib/prayers.ts).
+ */
+export function isDone(node: Node, date: string): boolean {
   const p = node.properties as Record<string, unknown>
-  if (node.type === 'Habit') {
-    // A habit has no status — completion lives in a HabitLog for the day.
-    return habitLogs.some((l) => {
-      const lp = l.properties as Record<string, unknown>
-      return lp.habitNodeId === node.id && lp.date === date && lp.completed === true
-    })
-  }
+  if (prayerKeyOf(p)) return doneDatesOf(p).includes(date)
   return p.status === 'done'
 }
 
@@ -121,12 +119,11 @@ export function tasksByBlock(edges: Edge[]): Map<number, number[]> {
  * otherwise be a query each, and a week of them a few hundred round trips.
  */
 export function buildSessions({
-  blocks, edges, byId, habitLogs, date,
+  blocks, edges, byId, date,
 }: {
   blocks: Node[]
   edges: Edge[]
   byId: Map<number, Node>
-  habitLogs: Node[]
   /**
    * The day being drawn. Passed in rather than read off the block: a routine
    * occurs on many days, and what is done in it is per-day.
@@ -146,7 +143,7 @@ export function buildSessions({
           id: n.id,
           type: n.type,
           name: displayName(n.type, n.properties as Record<string, unknown>),
-          done: isDone(n, habitLogs, date),
+          done: isDone(n, date),
         }))
 
       const frequency = typeof p.frequency === 'string' ? p.frequency : 'once'
@@ -169,7 +166,7 @@ export function buildSessions({
 /**
  * What a batch of things is called when it has no name of its own.
  *
- * Not "3 tasks". A morning block of habits is not three tasks, and calling it
+ * Not "3 tasks". A morning block of routines is not three tasks, and calling it
  * that miscounts the day's workload in the one place the user reads it — the
  * calendar said "3 tasks" over Brush Teeth, Make Bed and Weigh Myself. The
  * label follows what is actually in it, and only falls back to the vaguer
@@ -179,7 +176,7 @@ export function batchLabel(tasks: { type: string }[]): string {
   const kinds = new Set(tasks.map((t) => t.type))
   const word =
     kinds.size === 1
-      ? { Habit: 'habits', Task: 'tasks', Assignment: 'assignments', Exam: 'exams' }[[...kinds][0]] ?? 'things'
+      ? { Task: 'tasks', Assignment: 'assignments', Exam: 'exams' }[[...kinds][0]] ?? 'things'
       : 'things'
   return `${tasks.length} ${word}`
 }

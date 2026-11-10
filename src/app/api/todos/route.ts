@@ -2,12 +2,12 @@ import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createEdge, createNode, getEdges, getNodeById, getNodes } from '@/lib/graph/queries'
 import { clockIn, zoneFor } from '@/lib/clock'
 import { readSettings } from '@/lib/settings'
-import { prayerTimesFor, findPrayerHabit } from '@/lib/prayers'
+import { prayerTimesFor } from '@/lib/prayers'
+import { ensurePrayerTasks } from '@/lib/prayers-server'
 import { DEFAULT_TASK_MINUTES } from '@/lib/schedule'
 import { buildTodos } from '@/lib/todos'
 import { todayStr } from '@/lib/date'
 import { setTaskTime } from '@/lib/task-time'
-import type { PrayerSlot } from '@/lib/now'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const day = (v: unknown) => (typeof v === 'string' && DATE.test(v) ? v : null)
@@ -41,23 +41,15 @@ export async function GET(request: Request) {
   const zone = zoneFor(new URL(request.url).searchParams.get('tz'), settings.timeZone, settings.timeZoneOverride)
   const date = clockIn(zone).date
 
-  const [nodes, edges] = await Promise.all([getNodes(user.id), getEdges(user.id)])
+  const read = await Promise.all([getNodes(user.id), getEdges(user.id)])
+  const edges = read[1]
 
-  const times = prayerTimesFor(settings, date, zone)
-  let prayers: PrayerSlot[] | undefined
-  let prayerHabitId: number | null = null
-  if (times.length > 0) {
-    prayerHabitId = findPrayerHabit(nodes.filter((n) => n.type === 'Habit'), settings.prayer.habitNodeId)
-    const log = nodes.find((n) => {
-      const p = n.properties as Record<string, unknown>
-      return n.type === 'HabitLog' && p.habitNodeId === prayerHabitId && p.date === date
-    })
-    const raw = (log?.properties as Record<string, unknown> | undefined)?.prayers
-    const done = new Set(Array.isArray(raw) ? (raw as string[]) : [])
-    prayers = times.map((p) => ({ ...p, done: done.has(p.key) }))
-  }
+  // The five are to-dos with a time worked out for the day; the to-dos
+  // themselves are made the first time they are wanted.
+  const prayers = prayerTimesFor(settings, date, zone)
+  const nodes = prayers.length ? await ensurePrayerTasks(user.id, read[0]) : read[0]
 
-  return Response.json(buildTodos({ date, nodes, edges, prayers, prayerHabitId }))
+  return Response.json(buildTodos({ date, nodes, edges, prayers }))
 }
 
 /**

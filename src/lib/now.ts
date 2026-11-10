@@ -1,4 +1,4 @@
-import { isDueOn, eventOccursOn } from '@/lib/date'
+import { eventOccursOn } from '@/lib/date'
 import { statusOn } from '@/lib/event-status'
 import { blockOccursOn } from '@/lib/sessions'
 import { toMinutes, DEFAULT_TASK_MINUTES } from '@/lib/schedule'
@@ -15,13 +15,13 @@ export interface PrayerSlot {
 
 export interface NowItem {
   id: number
-  kind: 'block' | 'event' | 'habit' | 'task' | 'prayer' | 'due'
+  kind: 'block' | 'event' | 'task' | 'prayer' | 'due'
   label: string
   /** HH:MM, or null for things with no appointed time. */
   startTime: string | null
   endTime: string | null
   minutes: number | null
-  /** The node to act on — a block's underlying task/habit, not the block. */
+  /** The node to act on — a block's underlying task, not the block. */
   targetId: number | null
   targetType: string | null
   note: string | null
@@ -43,7 +43,7 @@ export interface NowItem {
   completed?: boolean
 }
 
-import { PRAYER_MINUTES } from '@/lib/prayers'
+import { PRAYER_MINUTES, prayerKeyOf } from '@/lib/prayers'
 /** Only so each slot has a stable id within its kind. */
 const PRAYER_ORDER = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
 
@@ -62,26 +62,21 @@ function minutesToTime(total: number): string {
 export function buildNowQueue({
   date,
   tasks,
-  habits,
-  habitLogs,
   events,
   timeBlocks,
   scheduledEdges,
   dueItems = [],
   prayers,
-  prayerHabitId,
 }: {
   date: string
   tasks: Node[]
-  habits: Node[]
-  habitLogs: Node[]
   events: Node[]
   timeBlocks: Node[]
   scheduledEdges: Edge[]
   /**
    * Anything from an enabled module with a date of its own — an Assignment
-   * due, an Exam sat, a ContentPiece going out. A day is not only tasks and
-   * habits, and these used to appear nowhere on it: the one screen the user
+   * due, an Exam sat, a ContentPiece going out. A day is not only tasks,
+   * and these used to appear nowhere on it: the one screen the user
    * actually lives in stayed silent about the exam tomorrow morning, because
    * Today only ever knew four node types.
    *
@@ -89,23 +84,14 @@ export function buildNowQueue({
    * in one place (src/lib/modules.ts) instead of being re-decided in here.
    */
   dueItems?: Node[]
-  /** Today's five, when the feature is on and a location is known. */
-  prayers?: PrayerSlot[]
   /**
-   * The Habit those five tick off. Excluded from the queue in its own right
-   * while they are shown — otherwise the day lists the same commitment twice,
-   * once as five timed slots and once as an untimed habit.
+   * Today's five, when the feature is on and a location is known. They are
+   * to-dos of their own (src/lib/prayers.ts) with a time worked out for the
+   * day, so they are listed here from the slots and never from `tasks`.
    */
-  prayerHabitId?: number | null
+  prayers?: PrayerSlot[]
 }): NowItem[] {
-  const dow = new Date(date + 'T00:00:00').getDay()
-  const nodeById = new Map([...tasks, ...habits].map((n) => [n.id, n]))
-
-  const habitDoneToday = (habitId: number) =>
-    habitLogs.some((l) => {
-      const lp = l.properties as Record<string, unknown>
-      return lp.habitNodeId === habitId && lp.date === date && lp.completed === true
-    })
+  const nodeById = new Map(tasks.map((n) => [n.id, n]))
 
   const describe = (id: number) => {
     const n = nodeById.get(id)
@@ -114,19 +100,12 @@ export function buildNowQueue({
     return {
       label: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `${n.type} #${n.id}`,
       type: n.type,
-      // A habit has no status — its completion lives in a HabitLog. Reading
-      // `status` for both is why ticking a habit off the queue used to leave
-      // it sitting there: the check could never be true for a habit, and
-      // habits reach this queue as calendar blocks because they are
-      // auto-filled onto the day.
-      done: n.type === 'Habit' ? habitDoneToday(n.id) : p.status === 'done',
+      done: p.status === 'done',
     }
   }
 
   const items: NowItem[] = []
   const scheduledTargets = new Set<number>()
-  const showingPrayers = !!prayers?.length
-  const hiddenHabitId = showingPrayers ? prayerHabitId ?? null : null
 
   for (const prayer of prayers ?? []) {
     if (prayer.done) continue
@@ -156,8 +135,6 @@ export function buildNowQueue({
       .map((e) => ({ id: e.targetId, described: describe(e.targetId) }))
       .filter((c): c is { id: number; described: NonNullable<ReturnType<typeof describe>> } => !!c.described)
 
-    // The prayer habit is already on the timeline as five timed slots.
-    if (hiddenHabitId !== null && contents.some((c) => c.id === hiddenHabitId)) continue
     const allDone = contents.length > 0 && contents.every((c) => c.described.done)
     // One finished thing leaves the queue, as ticking a task always has. A
     // batch does not — see `completed` on NowItem.
@@ -220,37 +197,11 @@ export function buildNowQueue({
     })
   }
 
-  for (const habit of habits) {
-    const p = habit.properties as Record<string, unknown>
-    const frequency = typeof p.frequency === 'string' ? p.frequency : 'daily'
-    const daysOfWeek = Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null
-    if (!isDueOn(frequency, daysOfWeek, dow)) continue
-    if (habit.id === hiddenHabitId) continue
-    if (scheduledTargets.has(habit.id)) continue
-
-    const logged = habitLogs.some((l) => {
-      const lp = l.properties as Record<string, unknown>
-      return lp.habitNodeId === habit.id && lp.date === date && lp.completed === true
-    })
-    if (logged) continue
-
-    items.push({
-      id: habit.id,
-      kind: 'habit',
-      label: typeof p.name === 'string' ? p.name : `Habit #${habit.id}`,
-      startTime: null,
-      endTime: null,
-      minutes: typeof p.durationMinutes === 'number' ? p.durationMinutes : null,
-      targetId: habit.id,
-      targetType: 'Habit',
-      note: null,
-    })
-  }
-
   for (const task of tasks) {
     const p = task.properties as Record<string, unknown>
     const status = typeof p.status === 'string' ? p.status : 'todo'
     const dueDate = typeof p.dueDate === 'string' ? p.dueDate : null
+    if (prayerKeyOf(p)) continue
     if (status === 'done' || !dueDate || dueDate > date) continue
     if (scheduledTargets.has(task.id)) continue
 
@@ -326,65 +277,6 @@ export function buildNowQueue({
   return items
 }
 
-/** A habit due today with no slot of its own, for the column beside Now. */
-export interface TodayHabit {
-  id: number
-  name: string
-  done: boolean
-  minutes: number | null
-}
-
-/**
- * Every habit due today that is not already on the clock, finished or not.
- *
- * The queue drops a habit once it is logged, which is right for "what next"
- * and wrong for a checklist: ticking the third of five off should leave
- * three ticks showing, not two items and no sign of progress. Habits that
- * sit in a block today are left out — they are on the timeline, at a time.
- */
-export function buildTodayHabits({
-  date,
-  habits,
-  habitLogs,
-  timeBlocks,
-  scheduledEdges,
-  hiddenHabitId = null,
-}: {
-  date: string
-  habits: Node[]
-  habitLogs: Node[]
-  timeBlocks: Node[]
-  scheduledEdges: Edge[]
-  /** The prayer habit, while its five are on the timeline instead. */
-  hiddenHabitId?: number | null
-}): TodayHabit[] {
-  const dow = new Date(date + 'T00:00:00').getDay()
-  const blocksToday = new Set(timeBlocks.filter((b) => blockOccursOn(b, date)).map((b) => b.id))
-  const onTheClock = new Set(scheduledEdges.filter((e) => blocksToday.has(e.sourceId)).map((e) => e.targetId))
-
-  return habits
-    .filter((habit) => {
-      const p = habit.properties as Record<string, unknown>
-      const frequency = typeof p.frequency === 'string' ? p.frequency : 'daily'
-      const daysOfWeek = Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null
-      return isDueOn(frequency, daysOfWeek, dow) && habit.id !== hiddenHabitId && !onTheClock.has(habit.id)
-    })
-    .map((habit) => {
-      const p = habit.properties as Record<string, unknown>
-      return {
-        id: habit.id,
-        name: typeof p.name === 'string' ? p.name : `Habit #${habit.id}`,
-        done: habitLogs.some((l) => {
-          const lp = l.properties as Record<string, unknown>
-          return lp.habitNodeId === habit.id && lp.date === date && lp.completed === true
-        }),
-        minutes: typeof p.durationMinutes === 'number' ? p.durationMinutes : null,
-      }
-    })
-    // Open ones first, so what is left is what is read.
-    .sort((a, b) => Number(a.done) - Number(b.done))
-}
-
 /** A task due in the next few days. */
 export interface UpcomingTask {
   id: number
@@ -410,7 +302,7 @@ export function buildUpcomingTasks({ date, until, tasks }: {
     .flatMap((task) => {
       const p = task.properties as Record<string, unknown>
       const dueDate = typeof p.dueDate === 'string' ? p.dueDate : null
-      if (p.status === 'done' || !dueDate || dueDate <= date || dueDate > until) return []
+      if (prayerKeyOf(p) || p.status === 'done' || !dueDate || dueDate <= date || dueDate > until) return []
       return [{
         id: task.id,
         name: typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : `Task #${task.id}`,

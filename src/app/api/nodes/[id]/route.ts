@@ -1,5 +1,6 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { getNodeById, deleteNode, getEdges } from '@/lib/graph/queries'
+import { prayerKeyOf } from '@/lib/prayers'
 
 export async function DELETE(
   _request: Request,
@@ -13,6 +14,11 @@ export async function DELETE(
 
   const existing = await getNodeById(user.id, nodeId)
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
+  // The five prayers come and go with the switch in Settings; deleting one
+  // here would only have it made again on the next load.
+  if (existing.type === 'Task' && prayerKeyOf(existing.properties as Record<string, unknown>)) {
+    return Response.json({ error: 'Prayers are turned off in Settings, not deleted.' }, { status: 400 })
+  }
 
   // The deleted node and its edges come back in the response so the caller
   // can offer an undo. Deleting cascades the edges away, so if they are not

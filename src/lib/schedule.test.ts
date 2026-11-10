@@ -41,7 +41,7 @@ test('one thing that does not fit no longer ends the plan', () => {
   // and used to `break` the loop, dropping the short items behind it.
   const busy = [at('08:00', '12:00'), at('13:00', '20:00')]
   const r = planSchedule({
-    tasks: [t(1, 180, { dueDate: '2026-09-20' }), t(2, 20), t(3, 15, { kind: 'habit', dueDate: null })],
+    tasks: [t(1, 180, { dueDate: '2026-09-20' }), t(2, 20), t(3, 15, { dueDate: null })],
     busy, workingHours: DAY,
   })
   assert.deepEqual(r.placements.map((p) => p.taskId).sort(), [2, 3])
@@ -85,13 +85,6 @@ test('splitting is all or nothing', () => {
   assert.equal(r.unplaced[0].taskId, 1)
 })
 
-test('habits are never split', () => {
-  const busy = [at('08:40', '09:00'), at('09:40', '20:00')]
-  const r = planSchedule({ tasks: [t(1, 60, { kind: 'habit', dueDate: null })], busy, workingHours: DAY })
-  assert.equal(r.placements.length, 0)
-  assert.equal(r.unplaced.length, 1)
-})
-
 test('a part of the day is a hard edge, and a full one is named', () => {
   const evening = { window: at('18:00', '20:00'), windowName: 'Evening' }
   const busy = [at('18:00', '20:00')]
@@ -120,7 +113,7 @@ test('busy time across midnight blocks the rest of the evening', () => {
 test('unreadable input does not become free time or a crash', () => {
   const busy = [{ start: NaN, end: 600 }, at('08:00', '09:00')]
   const r = planSchedule({
-    tasks: [t(1, NaN), t(2, 0, { kind: 'habit', dueDate: null }), t(3, -20)],
+    tasks: [t(1, NaN), t(2, 0, { dueDate: null }), t(3, -20)],
     busy,
     workingHours: { start: 'nonsense', end: '' },
   })
@@ -131,7 +124,7 @@ test('unreadable input does not become free time or a crash', () => {
 })
 
 test('a usual time is kept, and moved only when taken', () => {
-  const usual = { kind: 'habit' as const, dueDate: null, preferredStart: toMinutes('18:30') }
+  const usual = { dueDate: null, preferredStart: toMinutes('18:30') }
   const free = planSchedule({ tasks: [t(1, 20, usual)], busy: [], workingHours: DAY })
   assert.equal(free.placements[0].startTime, '18:30')
   assert.match(free.placements[0].reason, /your usual time/)
@@ -175,7 +168,6 @@ test('never double-books, whatever the day looks like', () => {
       return { start, end: start + pick(10, 180) }
     })
     const tasks = Array.from({ length: pick(1, 10) }, (_, i) => t(i + 1, pick(5, 200), {
-      kind: rand() < 0.3 ? 'habit' : 'task',
       priority: ['high', 'medium', 'low'][pick(0, 2)],
       preferredStart: rand() < 0.2 ? pick(8 * 60, 19 * 60) : null,
       optional: rand() < 0.15,

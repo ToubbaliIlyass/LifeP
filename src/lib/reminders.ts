@@ -1,10 +1,10 @@
 /**
  * When things remind you.
  *
- * A to-do, a habit or an event can carry any of three reminders, plus a
+ * A to-do or an event can carry any of three reminders, plus a
  * snooze:
  *
- *   reminder      HH:MM on its own day — each day, for a habit or a weekly class
+ *   reminder      HH:MM on its own day — each day, for a repeating to-do or a weekly class
  *   remindBefore  minutes before its time — "10 minutes before the dentist"
  *   remindAt      a moment on any day — "remind me on Friday at 9"
  *   snoozedUntil  a moment it was put off to, from a reminder that went off
@@ -29,7 +29,7 @@ export interface Reminder {
   at: string
   /** The line under the title: when it is, and what this reminder is for. */
   body: string
-  /** For a to-do: 'Task' or 'Habit' — which route ticks it off. */
+  /** For a to-do: 'Task'. */
   itemType?: string
 }
 
@@ -48,7 +48,7 @@ export function lead(minutes: number): string {
 }
 
 function forTodo(t: Todo): Reminder[] {
-  if (t.done || t.type === 'Prayer') return []
+  if (t.done || t.prayerKey) return []
   const out: Reminder[] = []
   const add = (at: string, body: string) => out.push({ key: `todo:${t.id}:${at}`, id: t.id, kind: 'todo', title: t.title || 'To-do', at, body, itemType: t.type })
   const timed = t.when && t.time ? `${t.when}T${t.time}` : null

@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Square, Tag } from 'lucide-react'
+import { Check, Search, Square, Tag } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
 import type { Todo } from '@/lib/todos'
 import { STANDARD_VIEWS, inInbox, isSomeday, isToday, isUpcoming, progress } from '@/lib/todo-views'
 import { useTodos } from './TodosProvider'
-import { ProgressRing, TodoCheck, VIEW_META } from './parts'
+import { ProgressRing, VIEW_META } from './parts'
 
 type Hit =
   | { kind: 'view'; key: string; label: string; icon: React.ReactNode; go: string }
@@ -98,13 +98,13 @@ export function QuickFind({ initial, onClose, onNavigate }: {
 
   const row = (hit: Hit, i: number) => {
     const on = i === at
-    const cls = `flex items-center gap-2.5 w-full text-left px-3 py-1.5 rounded-md ${on ? 'bg-primary/[0.12]' : ''}`
+    const cls = `flex items-center gap-2.5 w-full text-left px-3 py-1.5 max-md:min-h-11 rounded-md ${on ? 'bg-primary/[0.12]' : ''}`
     if (hit.kind === 'todo') {
       return (
         <button key={hit.key} className={cls} onMouseEnter={() => setAt(i)} onClick={() => choose(hit)}>
-          <span className="pointer-events-none"><TodoCheck done={hit.todo.done} onClick={() => {}} /></span>
+          <span aria-hidden className={`pointer-events-none grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] border-[1.5px] ${hit.todo.done ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50'}`}>{hit.todo.done && <Check className="h-[11px] w-[11px]" strokeWidth={3.2} />}</span>
           <span className={`flex-1 min-w-0 truncate ${hit.todo.done ? 'text-muted-foreground line-through' : ''}`}>{hit.todo.title}</span>
-          <span className="shrink-0 text-[12px] text-muted-foreground">{hit.where}</span>
+          <span className="shrink-0 text-[length:calc(12px*var(--ts))] text-muted-foreground">{hit.where}</span>
         </button>
       )
     }
@@ -112,7 +112,7 @@ export function QuickFind({ initial, onClose, onNavigate }: {
       <button key={hit.key} className={cls} onMouseEnter={() => setAt(i)} onClick={() => choose(hit)}>
         {hit.kind === 'tag' ? <Tag className="w-4 h-4 text-muted-foreground" /> : hit.icon}
         <span className="flex-1 min-w-0 truncate">{hit.label}</span>
-        {hit.kind === 'tag' && <span className="text-[12px] text-muted-foreground">Everything tagged</span>}
+        {hit.kind === 'tag' && <span className="text-[length:calc(12px*var(--ts))] text-muted-foreground">Everything tagged</span>}
       </button>
     )
   }
@@ -134,11 +134,11 @@ export function QuickFind({ initial, onClose, onNavigate }: {
             }}
             placeholder="Quick Find — a list, a to-do, or #tag"
             aria-label="Quick Find"
-            className="flex-1 min-w-0 bg-transparent outline-none text-[15px]"
+            className="flex-1 min-w-0 bg-transparent outline-none text-[length:calc(15px*var(--ts))]"
           />
         </label>
         {q.trim() && (
-          <div className="max-h-[min(420px,60vh)] overflow-y-auto p-1.5 text-[14px]">
+          <div className="max-h-[min(420px,60vh)] overflow-y-auto p-1.5 text-[length:calc(14px*var(--ts))]">
             {hits.length === 0 ? (
               <p className="flex items-center gap-2 px-3 py-1 text-muted-foreground">
                 <Tuck state="not-found" size={68} decorative />Nothing called that. Wrong tunnel?

@@ -19,8 +19,8 @@ const userId = 1
  * bug that hid Expense and HealthMetric when they were first added.
  */
 const builtinTypes = [
-  'Goal', 'Milestone', 'Habit', 'Task', 'Event', 'Note', 'Project', 'Concept',
-  'HabitLog', 'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
+  'Goal', 'Milestone', 'Task', 'Event', 'Note', 'Project', 'Concept',
+  'Course', 'Assignment', 'Exam', 'JournalEntry', 'TimeBlock',
   'HealthMetric', 'ContentSeries', 'ContentPiece', 'Settings',
 ]
 
@@ -73,15 +73,15 @@ async function seedSampleGraph() {
   // `name` throughout — the app reads `name` and only falls back to `title`,
   // and seeding the wrong key is what once made a goal render as "Goal #1".
   const goal = await node('Goal', { name: 'Get fit', description: 'Build a consistent workout routine.', status: 'active' })
-  const habit1 = await node('Habit', { name: 'Morning run', frequency: 'daily', durationMinutes: 30 })
-  const habit2 = await node('Habit', { name: 'Drink 2L water', frequency: 'daily' })
+  const run = await node('Task', { name: 'Morning run', status: 'todo', dueDate: new Date().toISOString().slice(0, 10), recurrence: { frequency: 'daily' }, estimatedMinutes: 30 })
+  const water = await node('Task', { name: 'Drink 2L water', status: 'todo', dueDate: new Date().toISOString().slice(0, 10), recurrence: { frequency: 'daily' } })
   const task = await node('Task', { name: 'Buy running shoes', status: 'todo', priority: 'medium' })
 
-  await edge(habit1, goal, 'supports')
-  await edge(habit2, goal, 'supports')
-  await edge(task, habit1, 'enables')
+  await edge(run, goal, 'supports')
+  await edge(water, goal, 'supports')
+  await edge(task, run, 'enables')
 
-  console.log(`Sample graph: Goal(${goal}), Habit(${habit1}), Habit(${habit2}), Task(${task}) + 3 edges`)
+  console.log(`Sample graph: Goal(${goal}), repeating Task(${run}), repeating Task(${water}), Task(${task}) + 3 edges`)
 }
 
 async function main() {

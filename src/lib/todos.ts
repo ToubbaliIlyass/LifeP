@@ -1,16 +1,16 @@
 import type { Node, Edge } from '@/lib/db/schema'
-import { addDays, eventOccursOn, isDueOn } from '@/lib/date'
+import { addDays, eventOccursOn } from '@/lib/date'
 import { blockOccursOn, firmnessOf } from '@/lib/sessions'
 import { statusOn, type EventStatus } from '@/lib/event-status'
 import { displayName } from '@/lib/graph/naming'
 import { toMinutes } from '@/lib/schedule'
-import type { PrayerSlot } from '@/lib/now'
+import { doneDatesOf, prayerKeyOf, type PrayerTime } from '@/lib/prayers'
 
 /**
  * Everything is something to be done.
  *
- * The graph holds Tasks, Habits, Projects, Goals, Events and the day's five
- * prayers, each with its own fields and its own idea of "done". The screen
+ * The graph holds Tasks, Projects, Goals and Events, each with its own fields
+ * and its own idea of "done". The screen
  * holds one thing: a list of to-dos, sorted into Inbox, Today, Upcoming,
  * Anytime and Someday, some of them inside a project. This file is the one
  * place that translates between the two, so no list has to know what kind of
@@ -18,9 +18,8 @@ import type { PrayerSlot } from '@/lib/now'
  *
  *   Task     a to-do. `dueDate` is the day it is *for* (the planner has always
  *            read it that way), `deadline` is the day it must be done by.
- *   Habit    a to-do that comes back: on Today each day it is due, ticked off
- *            into a HabitLog.
- *   Prayer   one of the five, at its time, when prayers are switched on.
+ *            The five prayers are Tasks too (src/lib/prayers.ts): repeating
+ *            daily, with a time that is worked out for each day.
  *   Project  a list of to-dos that can be finished. Goal: an area holding
  *            projects and to-dos, which never is.
  *   Event    not a to-do: it happens whether or not anything is ticked, so it
@@ -34,12 +33,12 @@ export interface ChecklistItem {
 }
 
 export interface Todo {
-  /** The node's id. Prayers have no node of their own and are -1 … -5. */
+  /** The node's id. */
   id: number
-  type: 'Task' | 'Habit' | 'Prayer'
+  type: 'Task'
   title: string
   notes: string
-  /** The day it is for, YYYY-MM-DD. A habit's is today on the days it is due. */
+  /** The day it is for, YYYY-MM-DD. A prayer's is always today. */
   when: string | null
   evening: boolean
   someday: boolean
@@ -74,8 +73,7 @@ export interface Todo {
   snoozedUntil?: string | null
   /** Marked as mattering more — or less — than the rest. */
   priority: 'high' | 'low' | null
-  /** Days in a row, for habits. */
-  streak: number | null
+  /** Set on the five prayers only: which one. They repeat daily, at a time worked out each day. */
   prayerKey?: string
   /** On a draft only: becomes an Event (something you show up to) when saved, not a to-do. */
   asEvent?: boolean
@@ -103,6 +101,8 @@ export interface TodoList {
   /** The area a project belongs to. */
   areaId: number | null
   deadline: string | null
+  /** Kept off Today: what is in it shows when the list is opened, and stays out of the day. An area hides its projects too. */
+  hideFromToday: boolean
   done: boolean
   doneAt: string | null
   order: number
@@ -145,8 +145,6 @@ export interface TodosPayload {
 const LOGBOOK_LIMIT = 300
 /** How far ahead Upcoming lists each day by name. */
 export const UPCOMING_DAYS = 7
-
-const PRAYER_ORDER = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
 const props = (n: Node) => n.properties as Record<string, unknown>
@@ -216,18 +214,14 @@ export function buildTodos({
   nodes,
   edges,
   prayers,
-  prayerHabitId = null,
 }: {
   /** The user's today — see src/lib/clock.ts. */
   date: string
   nodes: Node[]
   edges: Edge[]
-  /** Today's five, when the feature is on and a location is known. */
-  prayers?: PrayerSlot[]
-  /** The habit those five tick off, hidden while they are shown instead. */
-  prayerHabitId?: number | null
+  /** Today's five times, when the feature is on and a location is known. Without them the five are not shown. */
+  prayers?: PrayerTime[]
 }): TodosPayload {
-  const dow = new Date(date + 'T00:00:00').getDay()
 
   const kindById = new Map<number, 'area' | 'project'>()
   for (const n of nodes) {
@@ -256,6 +250,7 @@ export function buildTodos({
         headings: kind === 'project' ? headingsOf(p.headings) : [],
         areaId,
         deadline: str(kind === 'area' ? p.targetDate : p.dueDate),
+        hideFromToday: p.hideFromToday === true,
         done,
         doneAt: done ? str(p.completedAt) ?? n.updatedAt : null,
         order: typeof p.order === 'number' ? p.order : n.id,
@@ -280,13 +275,44 @@ export function buildTodos({
     return { time, planned: !!best && firmnessOf(props(best)) === 'tentative' }
   }
 
-  const logs = nodes.filter((n) => n.type === 'HabitLog').map(props)
-  const showingPrayers = !!prayers?.length
+  const prayerTime = new Map((prayers ?? []).map((t) => [t.key, t.time]))
   const todos: Todo[] = []
 
   for (const n of nodes) {
     const p = props(n)
     if (n.type === 'Task') {
+      const prayer = prayerKeyOf(p)
+      if (prayer) {
+        // Shown only while prayers are on and the day's time is known.
+        const time = prayerTime.get(prayer)
+        if (!time) continue
+        todos.push({
+          id: n.id,
+          type: 'Task',
+          title: str(p.name) ?? '',
+          notes: str(p.notes) ?? '',
+          when: date,
+          evening: false,
+          someday: false,
+          deadline: null,
+          time,
+          timePlanned: false,
+          minutes: null,
+          tags: tagsOf(p.tags),
+          checklist: [],
+          listId: containerOf(n.id, edges, kindById),
+          headingId: null,
+          done: doneDatesOf(p).includes(date),
+          doneAt: null,
+          order: typeof p.order === 'number' ? p.order : n.id,
+          repeats: 'daily',
+          repeatDays: null,
+          ...reminderFields(p),
+          priority: null,
+          prayerKey: prayer,
+        })
+        continue
+      }
       const done = p.status === 'done'
       const recurrence = p.recurrence as { frequency?: unknown } | undefined
       const clock = done || p.someday === true ? { time: null, planned: false } : clockOn(n.id, str(p.dueDate))
@@ -313,78 +339,12 @@ export function buildTodos({
         repeatDays: daysFor(recurrence?.frequency, (recurrence as { daysOfWeek?: unknown } | undefined)?.daysOfWeek),
         ...reminderFields(p),
         priority: p.priority === 'high' || p.priority === 'low' ? p.priority : null,
-        streak: null,
-      })
-    } else if (n.type === 'Habit') {
-      // The prayer habit is on the day as five timed to-dos instead.
-      if (showingPrayers && n.id === prayerHabitId) continue
-      const frequency = str(p.frequency) ?? 'daily'
-      const daysOfWeek = Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null
-      const kept = new Set(logs.filter((l) => l.habitNodeId === n.id && l.completed === true).map((l) => String(l.date)))
-      const done = kept.has(date)
-      // Counted back from today when it is done, from yesterday when it is
-      // not yet — a streak is not broken by a morning.
-      let streak = 0
-      for (let d = done ? date : addDays(date, -1); kept.has(d) && streak < 366; d = addDays(d, -1)) streak++
-      todos.push({
-        id: n.id,
-        type: 'Habit',
-        title: str(p.name) ?? str(p.title) ?? '',
-        notes: str(p.notes) ?? '',
-        when: isDueOn(frequency, daysOfWeek, dow) ? date : null,
-        evening: p.evening === true,
-        someday: false,
-        deadline: null,
-        time: done ? null : clockOn(n.id, date).time,
-        timePlanned: !done && clockOn(n.id, date).planned,
-        minutes: typeof p.durationMinutes === 'number' ? p.durationMinutes : null,
-        tags: tagsOf(p.tags),
-        checklist: [],
-        listId: containerOf(n.id, edges, kindById),
-        headingId: null,
-        done,
-        doneAt: null,
-        order: typeof p.order === 'number' ? p.order : n.id,
-        repeats: frequency,
-        repeatDays: daysFor(frequency, daysOfWeek),
-        ...reminderFields(p),
-        priority: null,
-        streak,
       })
     }
   }
 
-  for (const prayer of prayers ?? []) {
-    todos.push({
-      id: -(PRAYER_ORDER.indexOf(prayer.key) + 1),
-      type: 'Prayer',
-      title: prayer.label,
-      notes: '',
-      when: date,
-      evening: false,
-      someday: false,
-      deadline: null,
-      time: prayer.time,
-      timePlanned: false,
-      minutes: null,
-      tags: [],
-      checklist: [],
-      listId: null,
-      headingId: null,
-      done: prayer.done,
-      doneAt: null,
-      order: 0,
-      repeats: 'daily',
-      repeatDays: null,
-      reminder: null,
-      priority: null,
-      streak: null,
-      prayerKey: prayer.key,
-    })
-  }
-
   // The Logbook's tail is cut; everything still open is always sent.
-  const finished = todos.filter((t) => t.type === 'Task' && t.done).sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''))
+  const finished = todos.filter((t) => !t.prayerKey && t.done).sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''))
   const dropped = new Set(finished.slice(LOGBOOK_LIMIT).map((t) => t.id))
 
   // Events: each day of the coming week by its occurrences, then one-offs
