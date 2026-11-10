@@ -7,7 +7,7 @@ import { buildRhythm } from '@/lib/rhythm'
 
 /**
  * When a to-do really gets done, for its rhythm chart (src/lib/rhythm.ts).
- * A habit, or a task — a repeating one's history is every time round.
+ * A repeating one's history is every time round.
  *
  * `tz` is the browser's zone, so "today" is the user's.
  */
@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (isNaN(id)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
   const node = await getNodeById(user.id, id)
-  if (!node || (node.type !== 'Task' && node.type !== 'Habit')) return Response.json({ error: 'Not found' }, { status: 404 })
+  if (!node || node.type !== 'Task') return Response.json({ error: 'Not found' }, { status: 404 })
 
   const series = seriesOf(node)
   const clock = await clockFor(user.id, new URL(request.url).searchParams.get('tz'))

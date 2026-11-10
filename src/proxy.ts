@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { devTestLogin } from '@/lib/auth/devTestUser'
 
 /**
  * Refreshes the Supabase session on every request and keeps unauthenticated
@@ -26,6 +27,16 @@ const isProtected = (pathname: string) =>
   !OPEN_API.includes(pathname) && PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
 export async function proxy(request: NextRequest) {
+  // Local test user: no Supabase, straight to the app (see devTestUser.ts).
+  if (devTestLogin()) {
+    if (request.nextUrl.pathname === '/login') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/app'
+      return NextResponse.redirect(url)
+    }
+    return NextResponse.next({ request })
+  }
+
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(

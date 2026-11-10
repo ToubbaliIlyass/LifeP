@@ -6,7 +6,7 @@ import type { DayEvent, Todo } from './todos'
 const todo = (over: Partial<Todo>): Todo => ({
   id: 1, type: 'Task', title: 'Call mom', notes: '', when: '2026-10-18', evening: false, someday: false, deadline: null,
   time: null, timePlanned: false, minutes: null, tags: [], checklist: [], listId: null, headingId: null, done: false,
-  doneAt: null, order: 0, repeats: null, repeatDays: null, reminder: null, priority: null, streak: null, ...over,
+  doneAt: null, order: 0, repeats: null, repeatDays: null, reminder: null, priority: null, ...over,
 })
 const event = (over: Partial<DayEvent>): DayEvent => ({
   id: 9, date: '2026-10-18', title: 'Dentist', time: '15:00', endTime: '16:00', location: 'Agdal', minutes: 60,
@@ -43,7 +43,7 @@ test('a moment on any day, and a snooze', () => {
 })
 
 test('done to-dos and prayers never remind', () => {
-  assert.equal(remindersIn({ todos: [todo({ reminder: '17:00', done: true }), todo({ id: -1, type: 'Prayer', reminder: '13:00' })], events: [] }).length, 0)
+  assert.equal(remindersIn({ todos: [todo({ reminder: '17:00', done: true }), todo({ id: 2, prayerKey: 'dhuhr', reminder: '13:00' })], events: [] }).length, 0)
 })
 
 test('events: before they start, and at a time on their day', () => {

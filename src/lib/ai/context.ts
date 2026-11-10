@@ -5,7 +5,7 @@ import { readSettings } from '@/lib/settings'
 const ANCHOR_TYPES = new Set(['Goal', 'Project', 'Course'])
 // Memory and availability get their own context sections; tokens and raw
 // signals never reach the model at all.
-const EXCLUDE_TYPES = new Set(['HabitLog', 'JournalEntry', 'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'Settings', 'AiUsage'])
+const EXCLUDE_TYPES = new Set(['JournalEntry', 'Memory', 'AvailabilityRule', 'ActivitySignal', 'ApiToken', 'Settings', 'AiUsage'])
 const STOP_WORDS = new Set([
   'the', 'and', 'for', 'that', 'this', 'with', 'have', 'from', 'what',
   'want', 'need', 'add', 'create', 'make', 'new', 'can', 'you', 'help',
@@ -39,7 +39,6 @@ export async function buildContextSnapshot(userId: number, userMessage: string):
   const matched = allNodes.filter((node) => {
     if (EXCLUDE_TYPES.has(node.type)) return false
     if (ANCHOR_TYPES.has(node.type)) return true
-    if (node.type === 'Habit') return true
     if (node.type === 'Task') {
       const props = node.properties as Record<string, unknown>
       return props.status !== 'done'

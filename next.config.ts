@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
   // for testing on a phone, where the dev build's multi-megabyte unminified
   // bundle is too slow to be representative (or even usable).
   distDir: process.env.NEXT_DIST_DIR || '.next',
+  // The dev-only "N" badge sat on top of New List and on the world's full-screen button,
+  // so a click there hit the badge. Build errors still show in the overlay.
+  devIndicators: false,
   experimental: {
     // The site and the app each have their own root layout, so a missing
     // page has none to share — see src/app/global-not-found.tsx.

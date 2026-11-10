@@ -20,7 +20,7 @@ const at = (h: number) => new Date(2026, 9, 13, h, 0)
 const todo = (over: Partial<Todo> = {}): Todo => ({
   id: 900, type: 'Task', title: 'x', notes: '', when: TODAY, evening: false, someday: false, deadline: null, time: null,
   timePlanned: false, minutes: null, tags: [], checklist: [], listId: null, headingId: null, done: false, doneAt: null,
-  order: 0, repeats: null, repeatDays: null, reminder: null, priority: null, streak: null, ...over,
+  order: 0, repeats: null, repeatDays: null, reminder: null, priority: null, ...over,
 })
 const todays = (ns: Node[]) => view(ns).events.filter((e) => e.date === TODAY)
 const active = (ns: Node[]) => todays(ns).filter((e) => !e.status)
@@ -37,15 +37,11 @@ test('an empty day: every to-do and event settled', () => {
   const nodes = [node(dentist()), node(class_({ time: '10:00' }))]
   const settle = (n: Node, s: 'attended' | 'cancelled') => node(resolveOccurrence(n.properties as Record<string, unknown>, TODAY, s))
   const half = view([settle(nodes[0], 'attended'), nodes[1]]).events
-  const f1 = dayFacts({ now: at(14), todos: [todo({ done: true, doneAt: at(9).toISOString() })], lists: [], events: half, daysAway: 0 })
+  const f1 = dayFacts({ now: at(14), todos: [todo({ done: true, doneAt: at(9).toISOString() })], lists: [], events: half })
   assert.equal(f1.openEvents, 1)
-  assert.notEqual(pickMood({ now: at(14), todos: [todo({ done: true, doneAt: at(9).toISOString() })], lists: [], events: half, daysAway: 0 })?.state, 'all-done')
   const all = view([settle(nodes[0], 'attended'), settle(nodes[1], 'cancelled')]).events
-  const input = { now: at(14), todos: [todo({ done: true, doneAt: at(9).toISOString() })], lists: [], events: all, daysAway: 0 }
+  const input = { now: at(14), todos: [todo({ done: true, doneAt: at(9).toISOString() })], lists: [], events: all }
   assert.equal(dayFacts(input).openEvents, 0)
-  assert.equal(pickMood(input)?.state, 'all-done')
-  // Events alone, even all cancelled, clear the day.
-  assert.equal(pickMood({ ...input, todos: [] })?.state, 'all-done')
   // And the moment of settling the last one reads as all-done too.
   const before = dayFacts({ ...input, events: half })
   assert.equal(momentFor(todo(), before, dayFacts(input))?.state, 'all-done')
@@ -72,14 +68,14 @@ test('a repeating event is resolved for that day only', () => {
 test('not attending never reaches streaks or growth', () => {
   const nodes = (s: 'cancelled' | 'missed') => [node(resolveOccurrence(dentist() as Record<string, unknown>, TODAY, s))]
   const input = (s: 'cancelled' | 'missed' | 'attended') => ({
-    now: at(14), lists: [], daysAway: 0, events: view([node(resolveOccurrence(dentist() as Record<string, unknown>, TODAY, s))]).events,
-    todos: [todo({ type: 'Habit', streak: 2, done: true, doneAt: at(8).toISOString() })],
+    now: at(14), lists: [], events: view([node(resolveOccurrence(dentist() as Record<string, unknown>, TODAY, s))]).events,
+    todos: [todo({ done: true, doneAt: at(8).toISOString() })],
   })
   const base = dayFacts({ ...input('cancelled'), events: [] })
   for (const s of ['cancelled', 'missed', 'attended'] as const) {
     const f = dayFacts(input(s))
     assert.equal(f.finished, base.finished, `${s}: finished to-dos (growth level) unchanged`)
-    assert.equal(f.streak, base.streak, `${s}: streak unchanged`)
+    assert.equal(f.activeDays, base.activeDays, `${s}: rhythm unchanged`)
     assert.equal(f.doneToday, base.doneToday, `${s}: not counted as a ticked to-do`)
     assert.equal(f.level, base.level)
     assert.equal(f.overdue, 0)
@@ -88,7 +84,7 @@ test('not attending never reaches streaks or growth', () => {
 })
 
 test('no guilt in the words: nothing says missed or failed', () => {
-  const input = { now: at(14), lists: [], daysAway: 0, todos: [], events: view([node(resolveOccurrence(dentist() as Record<string, unknown>, TODAY, 'missed'))]).events }
+  const input = { now: at(14), lists: [], todos: [todo({ when: '2026-10-01' })], events: view([node(resolveOccurrence(dentist() as Record<string, unknown>, TODAY, 'missed'))]).events }
   assert.doesNotMatch(pickMood(input)!.line, /miss|fail|skip|behind/i)
 })
 

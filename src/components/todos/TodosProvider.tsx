@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { EventStatus } from '@/lib/event-status'
 import type { DayEvent, Todo, TodoList, TodosPayload } from '@/lib/todos'
 import { useUndo } from '@/components/undo/UndoProvider'
+import { ToastCard } from '@/components/ui/ToastCard'
 import { useDataChanged } from '@/lib/dataSignal'
 import { useLiveSync } from '@/lib/useLiveSync'
 import { todayStr } from '@/lib/date'
@@ -17,6 +18,7 @@ import { Tuck } from '@/components/ui/Tuck'
 import { SAVE_FAILED, SAY, TICKED } from '@/lib/tuck/events'
 import { dueReminders, remindersIn, SNOOZES, snoozeUntil, type Reminder } from '@/lib/reminders'
 import { momentNow, pushIsOn, systemNotification } from '@/lib/push'
+import { BTN_PRIMARY, BTN_GHOST } from '@/components/ui/buttons'
 
 /** The to-do being typed, before it has a row of its own. */
 export const DRAFT_ID = -999
@@ -87,7 +89,7 @@ const json = (method: string, body: unknown): RequestInit => ({
 const blank = (defaults: Partial<Todo>): Todo => ({
   id: DRAFT_ID, type: 'Task', title: '', notes: '', when: null, evening: false, someday: false,
   deadline: null, time: null, timePlanned: false, minutes: null, tags: [], checklist: [], listId: null, headingId: null, done: false, doneAt: null,
-  order: 0, repeats: null, repeatDays: null, reminder: null, priority: null, streak: null, ...defaults,
+  order: 0, repeats: null, repeatDays: null, reminder: null, priority: null, ...defaults,
 })
 
 /**
@@ -259,13 +261,11 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
         todos: d.todos.map((t) => (t.id === todo.id ? { ...t, done: on, doneAt: on ? new Date().toISOString() : null } : t)),
       } : d))
     const send = (on: boolean) =>
-      todo.type === 'Prayer' ? fetch('/api/prayers', json('POST', { prayer: todo.prayerKey, done: on }))
-        // The zone goes along: when it was ticked is learned from (src/lib/availability.ts).
-        : todo.type === 'Habit' ? fetch(`/api/habits/${todo.id}`, json('PATCH', { completed: on, tz: clockZone() }))
-        : fetch(`/api/todos/${todo.id}`, json('PATCH', { done: on, tz: clockZone() }))
+      // The zone goes along: when it was ticked is learned from (src/lib/availability.ts).
+      fetch(`/api/todos/${todo.id}`, json('PATCH', { done: on, tz: clockZone() }))
 
     // Tuck has a word for a to-do ticked off, and needs the lists as they were before it.
-    if (done && todo.type !== 'Prayer') window.dispatchEvent(new CustomEvent(TICKED, { detail: { id: todo.id } }))
+    if (done && !todo.prayerKey) window.dispatchEvent(new CustomEvent(TICKED, { detail: { id: todo.id } }))
     set(done)
     run(async () => {
       const res = await send(done)
@@ -289,7 +289,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     // Everything for today settled by this one? Tuck has a word; worked out from the lists as they are now.
     if (status && event.date === (data?.date ?? todayStr()) && data) {
       const events = data.events.map((e) => (e.id === event.id && e.date === event.date ? { ...e, status } : e))
-      const f = dayFacts({ now: wallNow(), todos: todosRef.current, lists: data.lists, events, daysAway: 0 })
+      const f = dayFacts({ now: wallNow(), todos: todosRef.current, lists: data.lists, events })
       if (f.open.length === 0 && f.openEvents === 0) window.dispatchEvent(new CustomEvent(SAY, { detail: { state: 'all-done', line: 'All clear. The garden is tidy.' } }))
     }
     const send = (s: EventStatus | null) => fetch(`/api/events/${event.id}/resolve`, json('POST', { date: event.date, status: s }))
@@ -357,7 +357,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
 
   const remove = useCallback((todo: Todo) => {
     if (todo.id === DRAFT_ID) { setDraft(null); return }
-    if (todo.type === 'Prayer') return
+    if (todo.prayerKey) return
     const pending = queue.current.get(todo.id)
     if (pending) { clearTimeout(pending.timer); queue.current.delete(todo.id) }
     setData((d) => (d ? { ...d, todos: d.todos.filter((t) => t.id !== todo.id) } : d))
@@ -431,7 +431,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     const res = await run(() => fetch('/api/todos', json('POST', { kind, title: '', areaId, order })))
     const { id } = ((await res?.json().catch(() => ({}))) ?? {}) as { id?: number }
     if (!id) return null
-    const list: TodoList = { id, kind, title: '', notes: '', headings: [], areaId: kind === 'project' ? areaId : null, deadline: null, done: false, doneAt: null, order }
+    const list: TodoList = { id, kind, title: '', notes: '', headings: [], areaId: kind === 'project' ? areaId : null, deadline: null, hideFromToday: false, done: false, doneAt: null, order }
     setData((d) => (d ? { ...d, lists: [...d.lists, list] } : d))
     return id
   }, [run])
@@ -468,21 +468,13 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     <TodosContext.Provider value={value}>
       {children}
       {note && (
-        <div role="status" aria-live="polite" className="acture-toast fixed z-[65] left-1/2 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-24 w-[min(440px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_2px_4px_rgb(0_0_0/0.06),0_16px_40px_rgb(0_0_0/0.18)]">
-          <div className="flex items-center gap-3 pl-2 pr-2.5 py-2.5">
-            {/* Tuck has put it away, and holds the way back. */}
-            <Tuck state={note.undo ? 'confirmed' : 'looking'} size={72} decorative className="shrink-0 -my-3" />
-            <span className="flex-1 min-w-0 text-[14px] leading-snug [overflow-wrap:anywhere]">{note.text}</span>
-            {note.undo && (
-              <button onClick={note.undo} className="shrink-0 rounded-full bg-primary text-primary-foreground px-3.5 py-1.5 text-[13px] font-semibold hover:opacity-90 active:scale-[0.97] transition">Undo</button>
-            )}
-            <button onClick={() => setNote(null)} aria-label="Dismiss" className="shrink-0 grid place-items-center w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          {/* The time left to change your mind. */}
-          <div key={note.id} className="acture-toast-timer h-[3px] bg-primary/60" aria-hidden />
-        </div>
+        <ToastCard
+          tuck={note.undo ? 'confirmed' : 'looking'}
+          text={note.text}
+          action={note.undo ? { label: 'Undo', onClick: note.undo } : undefined}
+          onDismiss={() => setNote(null)}
+          timerKey={note.id}
+        />
       )}
       {ringing.length > 0 && (
         <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))]" role="status" aria-live="polite">
@@ -495,8 +487,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
                   {/* Tuck rings the bell: a reminder is a nudge, never an alarm. */}
                   <Tuck state="nudge" size={60} decorative className="-ml-2 -mt-2" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium truncate">{r.title}</p>
-                    <p className="text-[12.5px] text-muted-foreground tabular-nums">{r.body}</p>
+                    <p className="text-[length:calc(14px*var(--ts))] font-medium truncate">{r.title}</p>
+                    <p className="text-[length:calc(12.5px*var(--ts))] text-muted-foreground tabular-nums">{r.body}</p>
                   </div>
                   <button onClick={away} aria-label="Put away" className="shrink-0 grid place-items-center w-6 h-6 -mr-1 rounded-md text-muted-foreground hover:text-foreground">
                     <X className="w-3.5 h-3.5" />
@@ -504,13 +496,13 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[52px]">
                   {todo && !todo.done && (
-                    <button onClick={() => { toggle(todo); away() }} className="rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-[12.5px] font-semibold hover:opacity-90">Done</button>
+                    <button onClick={() => { toggle(todo); away() }} className={`${BTN_PRIMARY} `}>Done</button>
                   )}
                   {todo && skipPreview(todo, data?.date ?? todayStr()).ok && (
-                    <button onClick={() => { skip(todo); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[12.5px] font-medium hover:bg-foreground/[0.05]">Skip today</button>
+                    <button onClick={() => { skip(todo); away() }} className={`${BTN_GHOST} `}>Skip today</button>
                   )}
                   {SNOOZES.map((s) => (
-                    <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[12.5px] font-medium hover:bg-foreground/[0.05]">
+                    <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[length:calc(12.5px*var(--ts))] font-medium hover:bg-foreground/[0.05]">
                       {s.minutes === null ? s.label : `Snooze ${s.label}`}
                     </button>
                   ))}

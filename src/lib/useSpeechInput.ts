@@ -318,7 +318,7 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
     } catch (e) {
       const name = e instanceof Error ? e.name : ''
       setError(
-        name === 'NotAllowedError' ? 'Microphone permission denied.'
+        name === 'NotAllowedError' ? 'I can’t use the microphone. Allow it in your browser, or type instead.'
           : name === 'NotFoundError' ? 'No microphone found.'
           : 'Could not start recording.',
       )
@@ -398,9 +398,9 @@ export function useSpeechInput(onFinalText?: (text: string) => void): SpeechInpu
 
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
           stoppedByUser.current = true // no point restarting into a refusal
-          setError('Microphone permission denied.')
+          setError('I can’t use the microphone. Allow it in your browser, or type instead.')
         } else {
-          setError('Could not hear you.')
+          setError('I couldn’t hear you. Try again, or type instead.')
         }
         setListening(false)
       }

@@ -111,13 +111,13 @@ export const FAQ = [
   { q: 'Where does my stuff go?', a: 'Your lists live in Acture’s own database. What you say or attach is sent to an AI model to be read, and that is all it is used for.' },
   { q: 'Will it buzz my phone?', a: 'If you want it to. Turn notifications on in Settings and reminders reach that device even with Acture closed. On an iPhone, add Acture to the Home Screen first. Without it, reminders show while Acture is open.' },
   { q: 'Is there an app?', a: 'Yes, and it is the same Acture. Install it from Chrome, on a computer or an Android phone: its own icon and window, straight to your lists. No store, and it keeps itself up to date.' },
-  { q: 'Is it a game now?', a: 'Only if you want it to be. Your World is off until you switch it on in Settings. Then you name who you’re becoming, every to-do you finish counts as a vote for them, and you choose how to see it: a night sky, a path or a small city. No points to lose, nobody to beat, and a missed day takes nothing away.' },
+  { q: 'Is it a game now?', a: 'No. Tuck is the only reward: a small mole who notices what you finish. You can name who you’re becoming, and every to-do you finish counts as a vote for them. No points to lose, nobody to beat, and a missed day takes nothing away.' },
   { q: 'Who can use it?', a: 'Right now it is a private instance: you sign in with a Google account that has been let in. It is free while it is being built.' },
 ]
 
 export const CHAPTERS = [
   null,
-  { k: '01 · Capture', l: 'Say it', h: 'Say it.', p: 'Tap Quick Capture and talk, the way you’d tell a friend. It turns your voice into to-dos.' },
+  { k: '01 · Capture', l: 'Say it', h: 'Say it.', p: 'Tap Tell Tuck and talk, the way you’d tell a friend. It turns your voice into to-dos.' },
   { k: '02 · Capture', l: 'Show it', h: 'Or show it.', p: 'A photo of the whiteboard, a timetable, a screenshot of a message. It pulls out what needs doing.' },
   { k: '03 · Plan', l: 'It finds the time', h: 'It finds the time.', p: 'Plan my day gives everything left a time, around your classes, shifts and prayers. A time you set yourself never moves.' },
   { k: '04 · Learn', l: 'It learns', h: 'It learns your real day.', p: 'Planned the gym for 7:00, went at seven in the evening, every time? It noticed. Tomorrow’s plan follows you.' },

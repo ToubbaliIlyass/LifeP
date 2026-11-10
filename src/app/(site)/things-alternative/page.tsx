@@ -39,7 +39,7 @@ export default function ThingsAlternativePage() {
       <section className="mt-14">
         <h2 className="text-[clamp(24px,3vw,30px)] font-bold leading-tight tracking-[-0.03em]">Side by side</h2>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse text-left text-[15px] leading-snug">
+          <table className="w-full min-w-[560px] border-collapse text-left text-[length:calc(15px*var(--ts))] leading-snug">
             <caption className="sr-only">Acture and Things compared</caption>
             <thead>
               <tr className="border-b border-[#dcdad5] text-[#6b6a66]">

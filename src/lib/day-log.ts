@@ -1,6 +1,7 @@
 import { createEdge, createNode, deleteNode, getEdges, getNodeById, getNodes, updateNode } from '@/lib/graph/queries'
 import { eventOccursOn, todayStr } from '@/lib/date'
-import { toMinutes, fromMinutes, DEFAULT_HABIT_MINUTES, DEFAULT_TASK_MINUTES } from '@/lib/schedule'
+import { toMinutes, fromMinutes, DEFAULT_TASK_MINUTES } from '@/lib/schedule'
+import { doneDatesOf, prayerKeyOf, withPrayerDone } from '@/lib/prayers'
 import { recordSignal, seriesOf } from '@/lib/availability'
 import { setTaskStatus } from '@/lib/tasks'
 import { buildSessions, blockOccursOn, batchLabel } from '@/lib/sessions'
@@ -18,7 +19,7 @@ import type { Node } from '@/lib/db/schema'
  * system beside it.
  *
  * Silent by design, like memory. The one visible effect is completing the
- * matched task or habit, because that changes what the user sees.
+ * matched task, because that changes what the user sees.
  */
 
 const normalise = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
@@ -26,7 +27,7 @@ const normalise = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' '
 export interface LogInput {
   /** What was done, in the user's words. */
   what: string
-  /** The task or habit it was, when the assistant already knows. Preferred over name matching. */
+  /** The task it was, when the assistant already knows. Preferred over name matching. */
   nodeId?: number
   /** YYYY-MM-DD; today when omitted. */
   date?: string
@@ -50,25 +51,22 @@ export interface LogResult {
 }
 
 /**
- * The task or habit a report is about, or null when it is about neither.
+ * The task a report is about, or null when it is about none.
  *
  * By id first — the assistant sees the graph with ids and should pass one.
  * By name only as a fallback, and only when exactly one thing fits: logging
- * against the wrong habit would poison its usual time, which is worse than
+ * against the wrong task would poison its usual time, which is worse than
  * logging against nothing.
  */
 export async function matchItem(userId: number, what: string, nodeId?: number): Promise<Node | null> {
   if (typeof nodeId === 'number') {
     const node = await getNodeById(userId, nodeId)
-    return node && (node.type === 'Task' || node.type === 'Habit') ? node : null
+    return node && node.type === 'Task' ? node : null
   }
 
   const target = normalise(what)
   if (!target) return null
-  const candidates = [
-    ...(await getNodes(userId, { type: 'Task' })),
-    ...(await getNodes(userId, { type: 'Habit' })),
-  ].filter((n) => (n.properties as Record<string, unknown>).archived !== true)
+  const candidates = (await getNodes(userId, { type: 'Task' })).filter((n) => (n.properties as Record<string, unknown>).archived !== true)
 
   const named = candidates.map((n) => {
     const name = normalise(displayName(n.type, n.properties as Record<string, unknown>))
@@ -154,7 +152,6 @@ async function plannedMinute(userId: number, itemId: number, date: string): Prom
     blocks: edges.map((e) => byId.get(e.sourceId)).filter((b): b is Node => !!b),
     edges,
     byId: new Map(),
-    habitLogs: [],
     date,
   })
   return sessions.length ? toMinutes(sessions[0].startTime) : null
@@ -186,7 +183,6 @@ async function reflectOnCalendar(
   const stated =
     typeof p.durationMinutes === 'number' && p.durationMinutes > 0 ? p.durationMinutes
       : typeof p.estimatedMinutes === 'number' && p.estimatedMinutes > 0 ? p.estimatedMinutes
-      : item.type === 'Habit' ? DEFAULT_HABIT_MINUTES
       : DEFAULT_TASK_MINUTES
   const finish = Math.min(24 * 60 - 1, end ?? start + stated)
 
@@ -232,25 +228,16 @@ export async function logActivity(userId: number, input: LogInput): Promise<LogR
   let markedDone = false
 
   if (item && completed) {
-    if (item.type === 'Task') {
-      const p = item.properties as Record<string, unknown>
-      if (p.status !== 'done') {
-        await setTaskStatus(userId, item.id, 'done')
+    const p = item.properties as Record<string, unknown>
+    if (prayerKeyOf(p)) {
+      // A prayer is done on a day, not for good: tick that day.
+      if (!doneDatesOf(p).includes(date)) {
+        await updateNode(userId, item.id, { ...p, doneDates: withPrayerDone(p, date, true) })
         markedDone = true
       }
-    } else if (item.type === 'Habit') {
-      const logs = await getNodes(userId, { type: 'HabitLog' })
-      const existing = logs.find((l) => {
-        const lp = l.properties as Record<string, unknown>
-        return lp.habitNodeId === item.id && lp.date === date
-      })
-      if (!existing) {
-        await createNode(userId, 'HabitLog', { habitNodeId: item.id, date, completed: true })
-        markedDone = true
-      } else if ((existing.properties as Record<string, unknown>).completed !== true) {
-        await updateNode(userId, existing.id, { ...(existing.properties as Record<string, unknown>), completed: true })
-        markedDone = true
-      }
+    } else if (p.status !== 'done') {
+      await setTaskStatus(userId, item.id, 'done')
+      markedDone = true
     }
   }
 
@@ -269,7 +256,7 @@ export async function logActivity(userId: number, input: LogInput): Promise<LogR
     kind: 'reported',
     itemType: item?.type ?? 'Activity',
     // 0 is "matched nothing": still evidence of when the day has room, and
-    // collected by name so a repeated activity can be offered as a habit.
+    // collected by name so a repeated activity can be offered as a repeating to-do.
     itemId: item ? seriesOf(item) : 0,
     name,
     date,
@@ -321,7 +308,6 @@ export async function readDayLog(userId: number, date: string): Promise<DayLog> 
     blocks: nodes.filter((n) => n.type === 'TimeBlock'),
     edges,
     byId,
-    habitLogs: nodes.filter((n) => n.type === 'HabitLog'),
     date,
   })) {
     planned.push({

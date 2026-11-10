@@ -1,4 +1,5 @@
 import { createClient } from '@libsql/client'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { drizzle } from 'drizzle-orm/libsql'
 import * as schema from './schema'
 
@@ -32,3 +33,26 @@ export const db = drizzle(client, { schema })
  * belongs in `npm run db:seed`, which is idempotent and already maintains
  * the same list.
  */
+
+/*
+ * Transactions.
+ *
+ * Every query function in the app reaches the database through getDb(), not
+ * through `db` directly. Outside a transaction that IS `db`; inside
+ * inTransaction() it is the open transaction, so a whole batch of writes made
+ * by ordinary query functions commits together or not at all, with nothing
+ * visible to anyone else until it does. The transaction is carried by
+ * AsyncLocalStorage, so no function has to be handed it.
+ */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+const scope = new AsyncLocalStorage<Tx>()
+
+export function getDb(): typeof db {
+  return (scope.getStore() ?? db) as unknown as typeof db
+}
+
+/** Runs `fn` as one all-or-nothing unit. If it throws, every write inside is undone by the database. Nests: an inner call joins the outer one. */
+export async function inTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  if (scope.getStore()) return fn()
+  return db.transaction((tx) => scope.run(tx, fn))
+}

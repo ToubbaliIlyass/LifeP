@@ -14,6 +14,7 @@
  * "one at a time". Nothing here counts what was missed.
  */
 
+import { activeDaysOf } from '@/lib/week-reflection'
 import { localDateStr } from '@/lib/date'
 import { daysBetween, isToday } from '@/lib/todo-views'
 import type { DayEvent, Todo, TodoList } from '@/lib/todos'
@@ -26,8 +27,6 @@ export interface MoodInput {
   todos: Todo[]
   lists: TodoList[]
   events: DayEvent[]
-  /** Whole days since Acture was last opened; 0 when it was today. */
-  daysAway: number
 }
 
 export interface Mood {
@@ -36,18 +35,11 @@ export interface Mood {
   /** Part of what the dismissal is remembered under, so a different mood is not hidden by it. */
   key: string
   /** What the one button does, when there is one. */
-  action?: { label: string; kind: 'triage' | 'break-down'; todoId?: number }
+  action?: { label: string; kind: 'break-down'; todoId: number }
 }
 
-/** At least this many things overdue is a heavy day, not a busy one. */
-export const HEAVY_DAY = 5
 /** A to-do this many days past its day has sat long enough to offer help with. */
 export const STUCK_DAYS = 7
-/** How soon a timed to-do counts as coming up, in minutes. */
-export const SOON_MINUTES = 30
-
-const minutesOf = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
-
 /** The numbers the pick is made from, also shown in the proof. */
 export interface DayFacts {
   today: string
@@ -58,81 +50,41 @@ export interface DayFacts {
   /** Today's events already settled, whichever way. */
   settledEvents: number
   overdue: number
-  streak: number
+  /** Of the last seven days, how many had something finished: a rhythm, not a chain that breaks. */
+  activeDays: number
   finished: number
   level: TuckLevel
 }
 
 export function dayFacts(i: MoodInput): DayFacts {
   const today = localDateStr(i.now)
-  const live = i.todos.filter((t) => t.type !== 'Prayer' && !inDoneList(t, i.lists))
-  const open = live.filter((t) => !t.done && isToday(t, today))
+  const live = i.todos.filter((t) => !t.prayerKey && !inDoneList(t, i.lists))
+  const open = live.filter((t) => !t.done && isToday(t, today, i.lists))
   const doneToday = live.filter((t) => t.done && t.doneAt && localDateStr(new Date(t.doneAt)) === today).length
   const todays = i.events.filter((e) => e.date === localDateStr(i.now))
   const openEvents = todays.filter((e) => !e.status).length
   const settledEvents = todays.length - openEvents
   const overdue = open.filter((t) => (t.when && t.when < today) || (t.deadline && t.deadline < today)).length
-  const streak = i.todos.reduce((m, t) => (t.type === 'Habit' ? Math.max(m, t.streak ?? 0) : m), 0)
-  const finished = i.todos.filter((t) => t.done && t.type !== 'Prayer').length
-  return { today, open, doneToday, openEvents, settledEvents, overdue, streak, finished, level: levelFor(finished) }
+  const activeDays = activeDaysOf(live, today)
+  const finished = i.todos.filter((t) => t.done && !t.prayerKey).length
+  return { today, open, doneToday, openEvents, settledEvents, overdue, activeDays, finished, level: levelFor(finished) }
 }
 
+/**
+ * The one thing worth a card on Today besides the day's own: a to-do that has
+ * sat for a week, offered help rather than blame. Everything else Tuck used
+ * to say here (greetings, "all clear", a nudge for what is about to start)
+ * repeated the Now card, the empty state or the week card, and is gone; see
+ * src/lib/today-card.ts for what is shown and in what order.
+ */
 export function pickMood(i: MoodInput): Mood | null {
   const f = dayFacts(i)
-  const hour = i.now.getHours()
-  const minutes = hour * 60 + i.now.getMinutes()
-
-  // Back after days away: no overdue lecture, just a place to start.
-  if (i.daysAway >= 3) return { state: 'welcome-back', key: 'welcome-back', line: 'Welcome back. Nothing is on fire, let’s start small.' }
-
-  if (f.overdue >= HEAVY_DAY) {
-    return { state: 'overwhelmed-support', key: 'overwhelmed', line: 'Big day. Let’s shelter these first and take it one at a time.', action: { label: 'Help me sort it', kind: 'triage' } }
-  }
-
-  // Something with a time that is about to start.
-  const soon = f.open
-    .filter((t) => t.time && minutesOf(t.time) - minutes >= 0 && minutesOf(t.time) - minutes <= SOON_MINUTES)
-    .sort((a, b) => minutesOf(a.time!) - minutesOf(b.time!))[0]
-  if (soon) return { state: 'nudge', key: `nudge:${soon.id}`, line: `Psst, “${soon.title || 'a to-do'}” is coming up at ${soon.time}.` }
-
-  // Sat for a week: offered help, not blame.
   const stuck = f.open
     .map((t) => ({ t, since: t.when ?? t.deadline }))
-    .filter((x): x is { t: Todo; since: string } => !!x.since && daysBetween(x.since, f.today) >= STUCK_DAYS && x.t.type === 'Task')
+    .filter((x): x is { t: Todo; since: string } => !!x.since && daysBetween(x.since, f.today) >= STUCK_DAYS)
     .sort((a, b) => a.since.localeCompare(b.since))[0]
-  if (stuck) {
-    return { state: 'stuck-helper', key: `stuck:${stuck.t.id}`, line: `Stuck on “${stuck.t.title || 'this one'}”? Take my trowel, we’ll dig together.`, action: { label: 'Break it down', kind: 'break-down', todoId: stuck.t.id } }
-  }
-
-  // Nothing left to do or to show up to. A settled event counts, even a cancelled one: the day is clear.
-  if ((f.doneToday > 0 || f.settledEvents > 0) && f.open.length === 0 && f.openEvents === 0) return { state: 'all-done', key: 'all-done', line: 'All clear. The garden is tidy.' }
-
-  if (f.streak >= 3) return { state: 'streak', key: `streak:${f.streak}`, line: `${f.streak} days in a row. Watered.` }
-
-  // An event is on right now.
-  const on = i.events.find((e) => e.date === f.today && !e.status && e.time && minutesOf(e.time) <= minutes && minutes < minutesOf(e.time) + e.minutes)
-  if (on) return { state: 'focus', key: `focus:${on.id}`, line: `${on.title} is on. I’ll keep quiet.` }
-
-  // The small hours, then the late evening.
-  if (hour < 5) {
-    return f.open.length === 0 && f.openEvents === 0
-      ? { state: 'deep-sleep', key: 'deep-sleep', line: 'Nothing due. Sleeping.' }
-      : { state: 'night-sleepy', key: 'night-sleepy', line: 'Getting sleepy. Want me to save the rest for tomorrow?' }
-  }
-  if (hour >= 22) return { state: 'night-sleepy', key: 'night-sleepy', line: 'Getting sleepy. Want me to save the rest for tomorrow?' }
-
-  // The first look at the day. (From 20:00 the evening check-in speaks instead.)
-  // With nothing on the list the empty state has its own Tuck: one is enough.
-  if (f.open.length === 0 && f.doneToday === 0) return null
-  if (hour < 11) return { state: 'morning-wake', key: 'morning', line: 'Morning. Stretching first, then plans.' }
-  if (hour < 20 && f.doneToday === 0) return { state: 'greeting', key: 'greeting', line: 'Hello. Shall we see what today looks like?' }
-  return null
-}
-
-/** Whole days between the last time the app was opened and today. */
-export function daysSince(last: string | null, today: string): number {
-  if (!last || last > today) return 0
-  return Math.max(0, daysBetween(last, today))
+  if (!stuck) return null
+  return { state: 'stuck-helper', key: `stuck:${stuck.t.id}`, line: `Stuck on “${stuck.t.title || 'this one'}”? Take my trowel, we’ll dig together.`, action: { label: 'Break it down', kind: 'break-down', todoId: stuck.t.id } }
 }
 
 /** What a toast says about a to-do that was just ticked, if it is worth saying. */
@@ -143,14 +95,21 @@ export function momentFor(done: Todo, before: DayFacts, after: DayFacts, finishe
       : { state: 'level-sprout', key: 'level', line: 'Growing steadily. Your sprout is up.' }
   }
   if (finishedList) return { state: 'milestone', key: 'milestone', line: `“${finishedList.title || 'That project'}” is finished. Look how much has grown.` }
-  if (done.type === 'Habit' && (done.streak ?? 0) >= 2) {
-    return { state: 'streak', key: 'streak', line: `${(done.streak ?? 0) + 1} days in a row. Watered.` }
-  }
   if (after.open.length === 0 && after.openEvents === 0 && (after.doneToday > 0 || after.settledEvents > 0)) {
     return after.doneToday >= 3
       ? { state: 'celebrating', key: 'celebrate', line: 'We did it! Everything for today is done.' }
       : { state: 'all-done', key: 'all-done', line: 'All clear. The garden is tidy.' }
   }
-  return { state: 'task-done', key: 'task-done', line: 'One down. Nice.' }
+  return { state: 'task-done', key: 'task-done', line: cheer(after.doneToday) }
+}
+
+/** What Tuck says as the day's ticks add up: the first, a run, a good day. Varied, so it never reads as a canned line. */
+const CHEERS = ['Nice one.', 'That’s one more.', 'Smooth.', 'Look at you go.', 'Another one off the list.', 'Steady. I like it.']
+export function cheer(doneToday: number): string {
+  if (doneToday <= 1) return 'First one done. That’s how a day starts.'
+  if (doneToday === 3) return 'Three today. You’re rolling.'
+  if (doneToday === 5) return 'Five! Today’s a good one.'
+  if (doneToday >= 8 && doneToday % 4 === 0) return `${doneToday} done today. Wow.`
+  return CHEERS[doneToday % CHEERS.length]
 }
 

@@ -1,5 +1,5 @@
 import { getNodes, getEdges, createNode, createEdge, deleteNode } from '@/lib/graph/queries'
-import { eventOccursOn, isDueOn, addDays } from '@/lib/date'
+import { eventOccursOn, addDays } from '@/lib/date'
 import { statusOn } from '@/lib/event-status'
 import { clockIn, type UserClock } from '@/lib/clock'
 import {
@@ -7,7 +7,6 @@ import {
   mergeIntervals,
   toMinutes,
   DEFAULT_TASK_MINUTES,
-  DEFAULT_HABIT_MINUTES,
   type BusyInterval,
   type Placement,
   type PlanResult,
@@ -19,7 +18,7 @@ import { blockOccursOn, firmnessOf, isDone } from '@/lib/sessions'
 import { loadAvailability, seriesOf } from '@/lib/availability'
 import { readSettings } from '@/lib/settings'
 import { workTypes } from '@/lib/modules'
-import { prayerTimesFor, PRAYER_MINUTES } from '@/lib/prayers'
+import { prayerKeyOf, prayerTimesFor, PRAYER_MINUTES } from '@/lib/prayers'
 
 /**
  * Reads a day out of the database and works out what could be scheduled into
@@ -40,12 +39,6 @@ export async function planDay(
   userId: number,
   date: string,
   workingHours: { start: string; end: string },
-  /**
-   * 'habits' plans only the habits, leaving tasks where they are. Used when
-   * re-laying out habits on their own, so accepting a fresh habit layout
-   * cannot quietly move work the user had already placed.
-   */
-  include: 'all' | 'habits' = 'all',
   options: {
     /** The user's own date and time — see src/lib/clock.ts. */
     clock?: UserClock
@@ -66,7 +59,7 @@ export async function planDay(
 ): Promise<PlanResult> {
   const clock = options.clock ?? clockIn()
   const ignored = options.ignoreBlockIds ?? new Set<number>()
-  const tasks = include === 'habits' ? [] : await getNodes(userId, { type: 'Task' })
+  const tasks = (await getNodes(userId, { type: 'Task' })).filter((n) => !prayerKeyOf(n.properties as Record<string, unknown>))
   const settings = await readSettings(userId)
   const dow = new Date(date + 'T00:00:00').getDay()
   // What has been learned and told about when this person can do things.
@@ -146,35 +139,12 @@ export async function planDay(
       optional: dueDate === null || dueDate > date,
       // A one-off task has no history of its own to learn from, so only a
       // stated preference ("I study in the mornings") can pin it. A repeating
-      // one does — every time round is one series — and follows it like a habit.
+      // one does — every time round is one series — and follows its usual time.
       // Work pulled forward from a later day has no claim on a usual slot
       // ahead of what is due today.
       preferredStart: dueDate === null || dueDate > date ? null
         : repeating || availability.rules.some((r) => r.kind === 'prefer') ? availability.usualStart(series, name, dow) : null,
     }))
-
-  /*
-   * Habits belong in the plan, not stamped onto the calendar behind the user's
-   * back. They used to be written straight in at a hardcoded 08:00 the moment
-   * a day was opened — outside the working day, all on the same slot, and
-   * never approved by anyone. Now they go through exactly the same suggestion
-   * the tasks do, so a time is proposed and the user says yes.
-   *
-   * "Already scheduled" is per-day for a habit (it recurs) but any-day for a
-   * task (it does not).
-   */
-  const scheduledOnThisDate = new Set(
-    scheduledForEdges
-      .filter((e) => {
-        const block = blockById.get(e.sourceId)
-        // Recurrence-aware: a habit sitting in a daily morning routine is
-        // scheduled every day that routine runs, not only on the one date
-        // the block itself carries. Comparing dates re-planned it on top of
-        // its own routine every morning.
-        return !!block && blockOccursOn(block, date)
-      })
-      .map((e) => e.targetId),
-  )
 
   /*
    * Work owned by the enabled modules — an assignment due Thursday, a piece
@@ -188,7 +158,7 @@ export async function planDay(
    */
   const moduleTypes = workTypes(settings)
   const fixedModuleTimes: BusyInterval[] = []
-  if (include !== 'habits' && moduleTypes.size > 0) {
+  if (moduleTypes.size > 0) {
     for (const node of await getNodes(userId)) {
       if (!moduleTypes.has(node.type)) continue
       const p = node.properties as Record<string, unknown>
@@ -229,70 +199,6 @@ export async function planDay(
         preferredStart: null,
       })
     }
-  }
-
-  const habitLogs = await getNodes(userId, { type: 'HabitLog' })
-
-  for (const habit of await getNodes(userId, { type: 'Habit' })) {
-    const p = habit.properties as Record<string, unknown>
-    const frequency = typeof p.frequency === 'string' ? p.frequency : 'daily'
-    const daysOfWeek = Array.isArray(p.daysOfWeek) ? (p.daysOfWeek as number[]) : null
-    if (!isDueOn(frequency, daysOfWeek, dow)) continue
-    if (scheduledOnThisDate.has(habit.id)) continue
-
-    /*
-     * Some habits belong to the day rather than to a time in it — praying
-     * five times, drinking water, standing up now and then. Giving those a
-     * block is a category error: it invents a commitment that was never
-     * made, and eats space real appointments need. They stay in the Now
-     * queue as untimed, where they can be ticked off whenever they happen.
-     */
-    if (p.anytime === true) continue
-
-    const done = habitLogs.some((l) => {
-      const lp = l.properties as Record<string, unknown>
-      return lp.habitNodeId === habit.id && lp.date === date && lp.completed === true
-    })
-    if (done) continue
-
-    // A habit recorded as taking no time still needs a slot with a height.
-    const stated = typeof p.durationMinutes === 'number' ? p.durationMinutes : 0
-    const minutes = stated > 0 ? stated : DEFAULT_HABIT_MINUTES
-
-    // The time it was last given, if it has one — see preferredStart.
-    const previous = scheduledForEdges
-      .filter((e) => e.targetId === habit.id)
-      .map((e) => blockById.get(e.sourceId))
-      .map((b) => (b ? (b.properties as Record<string, unknown>) : null))
-      .filter((bp): bp is Record<string, unknown> => !!bp && typeof bp.date === 'string' && (bp.date as string) < date)
-      .sort((a, b) => (b.date as string).localeCompare(a.date as string))[0]
-
-    const name = typeof p.name === 'string' ? p.name : `Habit #${habit.id}`
-    /*
-     * When it actually gets done wins; where it was last *put* is only the
-     * fallback.
-     *
-     * The other way round could not learn anything. Each day copied the
-     * previous day's slot forward, so the first time a habit was placed — by
-     * a planner that knew nothing yet — became the time it was planned at
-     * forever, no matter how many times it really happened five hours later.
-     * `usualStart` only answers once there is enough recent evidence to
-     * cluster (see availability.ts), so the copy still carries a habit that
-     * has never been observed.
-     */
-    const learned = availability.usualStart(habit.id, name, dow)
-    const preferredStart =
-      learned ?? (previous && typeof previous.startTime === 'string' ? toMinutes(previous.startTime) : null)
-
-    candidates.push({
-      id: habit.id,
-      name,
-      dueDate: null,
-      priority: 'medium',
-      minutes,
-      kind: 'habit',
-      preferredStart,
-    })
   }
 
   if (candidates.length === 0) return { placements: [], unplaced: [] }
@@ -346,7 +252,7 @@ export async function planDay(
 
   /*
    * Spread rather than packed. Everything placed back to back from the start
-   * of the day is how eight habits ended up in one unreadable stack; sharing
+   * of the day is how eight routines ended up in one unreadable stack; sharing
    * the day's spare minutes between them gives each one room and makes the
    * plan look like a day someone would actually live. Capped so a nearly
    * empty day does not fling two items twelve hours apart.
@@ -427,7 +333,6 @@ export async function replanDay(
 
   const allNodes = await getNodes(userId)
   const byId = new Map(allNodes.map((n) => [n.id, n]))
-  const habitLogs = allNodes.filter((n) => n.type === 'HabitLog')
   const blockById = new Map(allNodes.filter((n) => n.type === 'TimeBlock').map((b) => [b.id, b]))
   const scheduledEdges = await getEdges(userId, { type: 'scheduled-for' })
 
@@ -450,13 +355,13 @@ export async function replanDay(
     // Something already ticked off is a record of the day, not a plan for it.
     const done = targets.every((id) => {
       const node = byId.get(id)
-      return node ? isDone(node, habitLogs, date) : false
+      return node ? isDone(node, date) : false
     })
     if (targets.length > 0 && done) continue
     replaced.add(blockId)
   }
 
-  const { placements, unplaced } = await planDay(userId, date, hours, 'all', { clock, ignoreBlockIds: replaced, notBefore })
+  const { placements, unplaced } = await planDay(userId, date, hours, { clock, ignoreBlockIds: replaced, notBefore })
 
   // The edge goes with the block, so the item returns to the unplanned rail.
   for (const id of replaced) await deleteNode(userId, id)

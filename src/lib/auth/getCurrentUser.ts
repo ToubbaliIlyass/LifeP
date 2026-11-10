@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { DEV_TEST_AUTH_ID, DEV_TEST_EMAIL, devTestLogin } from './devTestUser'
 
 export interface CurrentUser {
   id: number
@@ -40,6 +41,14 @@ export function isEmailAllowed(email: string | null | undefined): boolean {
  * database.
  */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
+  // The local test user (see devTestUser.ts): a row of its own, never an existing one.
+  if (devTestLogin()) {
+    const row =
+      (await db.select().from(users).where(eq(users.authId, DEV_TEST_AUTH_ID)).get()) ??
+      (await db.insert(users).values({ name: 'Test', authId: DEV_TEST_AUTH_ID, email: DEV_TEST_EMAIL }).returning().get())
+    return { id: row.id, name: row.name, email: row.email }
+  }
+
   const supabase = await createSupabaseServerClient()
 
   // getUser() revalidates the token with Supabase rather than trusting the

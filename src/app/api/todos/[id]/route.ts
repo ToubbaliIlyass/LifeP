@@ -3,6 +3,7 @@ import { nowFor } from '@/lib/reminders-server'
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createEdge, deleteEdge, getEdges, getNodeById, getNodes, updateNode } from '@/lib/graph/queries'
 import { todayStr } from '@/lib/date'
+import { doneDatesOf, prayerKeyOf, withPrayerDone } from '@/lib/prayers'
 import { blockStartFor, forgetDone, recordDone, seriesOf } from '@/lib/availability'
 import { clockFor } from '@/lib/clock-server'
 import { setTaskStatus } from '@/lib/tasks'
@@ -73,12 +74,16 @@ export async function PATCH(
   if (isNaN(id)) return Response.json({ error: 'Invalid id' }, { status: 400 })
 
   const node = await getNodeById(user.id, id)
-  if (!node || !['Task', 'Habit', 'Project', 'Goal'].includes(node.type)) {
+  if (!node || !['Task', 'Project', 'Goal'].includes(node.type)) {
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
   const props = { ...(node.properties as Record<string, unknown>) }
+  // One of the five: ticked, noted and tagged like any to-do, but its day, its
+  // time and its repeating are the app's to work out, not something to edit.
+  const prayer = node.type === 'Task' ? prayerKeyOf(props) : null
+  if (prayer) for (const k of ['title', 'when', 'evening', 'someday', 'deadline', 'repeats', 'repeatDays', 'time', 'minutes', 'checklist']) delete body[k]
   const dayBefore = typeof props.dueDate === 'string' ? props.dueDate : null
   const isList = node.type === 'Project' || node.type === 'Goal'
 
@@ -87,8 +92,8 @@ export async function PATCH(
   if (typeof body.order === 'number') props.order = body.order
   if (Array.isArray(body.tags)) put(props, 'tags', body.tags.length ? body.tags : null)
 
-  // A to-do or a habit: when it reminds you. See src/lib/reminders.ts.
-  if (node.type === 'Task' || node.type === 'Habit') applyReminderChanges(props, body, await nowFor(user.id, body))
+  // A to-do: when it reminds you. See src/lib/reminders.ts.
+  if (node.type === 'Task') applyReminderChanges(props, body, await nowFor(user.id, body))
 
   if (isList) {
     // A project's headings, whole: the screen sends the list as it now stands.
@@ -102,6 +107,8 @@ export async function PATCH(
     }
     const deadline = day(body.deadline)
     if (deadline !== undefined) put(props, node.type === 'Goal' ? 'targetDate' : 'dueDate', deadline)
+    // Kept off Today: the list's own to-dos still show when it is opened.
+    if (typeof body.hideFromToday === 'boolean') put(props, 'hideFromToday', body.hideFromToday)
     if (typeof body.done === 'boolean') {
       props.status = body.done ? 'completed' : 'active'
       put(props, 'completedAt', body.done ? new Date().toISOString() : null)
@@ -137,13 +144,6 @@ export async function PATCH(
     if ('repeats' in body) {
       put(props, 'recurrence', recurrenceFor(body.repeats, typeof props.dueDate === 'string' ? props.dueDate : todayStr(), body.repeatDays))
     }
-  } else if (node.type === 'Habit' && 'repeats' in body) {
-    // A habit keeps the same answer in its own two fields, and always repeats.
-    const rule = recurrenceFor(body.repeats, todayStr(), body.repeatDays)
-    if (rule) {
-      props.frequency = rule.frequency
-      put(props, 'daysOfWeek', rule.daysOfWeek ?? null)
-    }
   }
 
   await updateNode(user.id, id, props)
@@ -169,21 +169,31 @@ export async function PATCH(
 
   // Done goes last and through the one place that knows what it entails: the
   // timestamp, and a repeating to-do handing off to its next occurrence.
+  // A prayer is the exception: it never finishes, it is prayed on a day.
   let spawned: { id: number } | null = null
   if (node.type === 'Task' && typeof body.done === 'boolean') {
-    const change = await setTaskStatus(user.id, id, body.done ? 'done' : 'todo')
-    spawned = change?.spawned ?? null
+    const clock = await clockFor(user.id, body.tz)
+    let wasDone: boolean
+    if (prayer) {
+      wasDone = doneDatesOf(props).includes(clock.date)
+      props.doneDates = withPrayerDone(props, clock.date, body.done)
+      await updateNode(user.id, id, props)
+    } else {
+      const change = await setTaskStatus(user.id, id, body.done ? 'done' : 'todo')
+      spawned = change?.spawned ?? null
+      wasDone = change?.previous === 'done'
+      if (!change) wasDone = body.done
+    }
     // When it actually got done is what the planner learns from, and what
     // the to-do's rhythm shows — see recordDone.
-    if (change && body.done !== (change.previous === 'done')) {
-      const clock = await clockFor(user.id, body.tz)
+    if (body.done !== wasDone) {
       const tick = { itemType: 'Task', itemId: seriesOf(node), sourceId: id, date: clock.date }
       if (body.done) {
         await recordDone(user.id, {
           ...tick,
           name: typeof props.name === 'string' ? props.name : `Task #${id}`,
           minute: clock.minutes,
-          plannedMinute: await blockStartFor(user.id, id, typeof props.dueDate === 'string' ? props.dueDate : clock.date),
+          plannedMinute: prayer ? null : await blockStartFor(user.id, id, typeof props.dueDate === 'string' ? props.dueDate : clock.date),
         })
       } else {
         await forgetDone(user.id, tick)

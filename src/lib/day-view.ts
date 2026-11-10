@@ -1,11 +1,13 @@
 import { getNodes, getEdges } from '@/lib/graph/queries'
-import { buildNowQueue, buildTodayHabits } from '@/lib/now'
+import { buildNowQueue, type PrayerSlot } from '@/lib/now'
 import { readSettings } from '@/lib/settings'
 import { workTypes } from '@/lib/modules'
+import { zoneFor } from '@/lib/clock'
+import { doneDatesOf, prayerKeyOf, prayerTimesFor } from '@/lib/prayers'
 
 /**
- * One day, as the assistant reads it back: what is on the clock, what still
- * needs a time, and the habits due.
+ * One day, as the assistant reads it back: what is on the clock and what
+ * still needs a time.
  *
  * Built from the same queue the Today page draws, so "what do I have today?"
  * answered in the chat is the day on screen, not a second opinion of it.
@@ -16,15 +18,25 @@ export async function dayView(userId: number, date: string) {
   const of = (type: string) => nodes.filter((n) => n.type === type)
   const dated = workTypes(settings)
 
+  // The five are to-dos of their own, with the day's time worked out.
+  const prayed = new Set(
+    of('Task').flatMap((n) => {
+      const p = n.properties as Record<string, unknown>
+      const key = prayerKeyOf(p)
+      return key && doneDatesOf(p).includes(date) ? [key] : []
+    }),
+  )
+  const prayers: PrayerSlot[] = prayerTimesFor(settings, date, zoneFor(null, settings.timeZone, settings.timeZoneOverride))
+    .map((t) => ({ ...t, done: prayed.has(t.key) }))
+
   const queue = buildNowQueue({
     date,
     tasks: of('Task'),
-    habits: of('Habit'),
-    habitLogs: of('HabitLog'),
     events: of('Event'),
     timeBlocks: of('TimeBlock'),
     scheduledEdges,
     dueItems: nodes.filter((n) => dated.has(n.type)),
+    prayers,
   })
 
   return {
@@ -39,14 +51,7 @@ export async function dayView(userId: number, date: string) {
         ...(i.completed ? { done: true } : {}),
       })),
     stillNeedsATime: queue
-      .filter((i) => !i.startTime && i.kind !== 'habit')
+      .filter((i) => !i.startTime)
       .map((i) => ({ what: i.label, kind: i.targetType?.toLowerCase() ?? i.kind, ...(i.note === 'overdue' ? { overdue: true } : {}) })),
-    habits: buildTodayHabits({
-      date,
-      habits: of('Habit'),
-      habitLogs: of('HabitLog'),
-      timeBlocks: of('TimeBlock'),
-      scheduledEdges,
-    }).map((h) => ({ name: h.name, done: h.done })),
   }
 }

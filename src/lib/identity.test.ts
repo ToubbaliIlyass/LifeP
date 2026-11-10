@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Edge, Node } from '@/lib/db/schema'
-import { collectVotes, nextHue, tally, type Identity, type Vote } from './identity'
+import { collectEvidence, collectVotes, identityForTodo, nextHue, tally, type Identity, type Vote } from './identity'
 import { cityLayout, pathLayout, skyLayout, skyMilestone, spiral, STRIDE } from './world-layout'
 
 const TODAY = '2026-10-22'
@@ -13,17 +13,13 @@ const edge = (sourceId: number, targetId: number): Edge =>
 const identity = (id: number, patch: Partial<Identity> = {}): Identity =>
   ({ id, name: `#${id}`, hue: 0, listIds: [], itemIds: [], tags: [], order: id, ...patch })
 
-test('finished tasks and kept habit days are votes; open ones are not', () => {
-  const habit = node('Habit', { name: 'Run' })
+test('finished tasks are votes; open ones are not', () => {
   const nodes = [
     node('Task', { status: 'done', completedAt: '2026-10-20T09:00:00.000Z' }),
     node('Task', { status: 'todo' }),
-    habit,
-    node('HabitLog', { habitNodeId: habit.id, date: '2026-10-21', completed: true }),
-    node('HabitLog', { habitNodeId: habit.id, date: '2026-10-19', completed: false }),
   ]
   const votes = collectVotes({ nodes, edges: [], identities: [], today: TODAY, zone: 'UTC' })
-  assert.deepEqual(votes, [[2, -1], [1, -1]])
+  assert.deepEqual(votes, [[2, -1]])
 })
 
 test('the day a task was finished is the user’s day, not UTC’s', () => {
@@ -32,9 +28,12 @@ test('the day a task was finished is the user’s day, not UTC’s', () => {
   assert.deepEqual(collectVotes({ nodes, edges: [], identities: [], today: TODAY, zone: 'UTC' }), [[1, -1]])
 })
 
-test('each of the five prayers is its own vote', () => {
-  const nodes = [node('HabitLog', { habitNodeId: 999, date: TODAY, prayers: ['fajr', 'dhuhr', 'asr'] })]
-  assert.equal(collectVotes({ nodes, edges: [], identities: [], today: TODAY, zone: null }).length, 3)
+test('each prayer prayed on a day is its own vote, and is never "next up"', () => {
+  const nodes = ['fajr', 'dhuhr', 'asr'].map((prayer) =>
+    node('Task', { name: prayer, prayer, status: 'todo', recurrence: { frequency: 'daily' }, doneDates: [TODAY, '2026-10-21'] }))
+  assert.equal(collectVotes({ nodes, edges: [], identities: [], today: TODAY, zone: null }).length, 6)
+  const ev = collectEvidence({ nodes, edges: [], identities: [identity(1, { itemIds: [nodes[0].id] })], today: TODAY, zone: null })
+  assert.equal(ev.next[0], null)
 })
 
 test('the most specific link decides: the item, its project, the project’s area, then tags', () => {
@@ -110,15 +109,57 @@ test('city: buildings rise floor by floor, and a crowded district takes the next
   assert.deepEqual(spiral(3), [[1, 0], [1, 1], [0, 1]])
 })
 
-test('a new identity finds the lists, habits and tags that sound like it', async () => {
+test('a new identity finds the lists, to-dos and tags that sound like it', async () => {
   const { suggestSources } = await import('./identity')
   const sources = {
     lists: [{ id: 1, title: 'Running plan' }, { id: 2, title: 'Taxes' }, { id: 3, title: 'Writing' }],
-    habits: [{ id: 10, title: 'Morning run' }, { id: 11, title: 'Read 10 pages' }],
+    items: [{ id: 10, title: 'Morning run' }, { id: 11, title: 'Read 10 pages' }],
     tags: ['run', 'work', 'reading'],
   }
   assert.deepEqual(suggestSources('a runner', sources), { listIds: [1], itemIds: [10], tags: ['run'] })
   assert.deepEqual(suggestSources('someone who writes', sources), { listIds: [3], itemIds: [], tags: [] })
   assert.deepEqual(suggestSources('a reader', sources), { listIds: [], itemIds: [11], tags: ['reading'] })
   assert.deepEqual(suggestSources('calm', sources), { listIds: [], itemIds: [], tags: [] })
+})
+
+test('each identity keeps the receipts behind its number, newest first, five at most', () => {
+  const project = node('Project', { name: 'Marathon' })
+  const done = (name: string, day: string) => node('Task', { name, status: 'done', completedAt: `${day}T08:00:00Z` })
+  const tasks = [done('a', '2026-10-15'), done('b', '2026-10-16'), done('c', '2026-10-17'), done('d', '2026-10-18'), done('e', '2026-10-19'), done('f', '2026-10-20'), done('g', '2026-10-21')]
+  const edges = tasks.map((t) => edge(t.id, project.id))
+  const ids = [identity(10, { listIds: [project.id] })]
+  const ev = collectEvidence({ nodes: [project, ...tasks], edges, identities: ids, today: TODAY, zone: 'UTC' })
+  assert.equal(ev.votes.length, 7)
+  assert.deepEqual(ev.receipts[0].map((r) => r.title), ['g', 'f', 'e', 'd', 'c'])
+  assert.equal(ev.receipts[0][0].date, '2026-10-21')
+  const counted = tally(ids, ev.votes, ev)
+  assert.equal(counted.identities[0].votes, 7)
+  assert.equal(counted.identities[0].recent.length, 5)
+})
+
+test('the next thing up for an identity is its soonest open to-do, dated before undated', () => {
+  const project = node('Project', { name: 'Marathon' })
+  const later = node('Task', { name: 'later', status: 'todo', dueDate: '2026-10-30' })
+  const sooner = node('Task', { name: 'sooner', status: 'todo', dueDate: '2026-10-23' })
+  const undated = node('Task', { name: 'undated', status: 'todo' })
+  const parked = node('Task', { name: 'parked', status: 'todo', someday: true, dueDate: '2026-10-01' })
+  const edges = [later, sooner, undated, parked].map((t) => edge(t.id, project.id))
+  const ev = collectEvidence({ nodes: [project, later, sooner, undated, parked], edges, identities: [identity(10, { listIds: [project.id] })], today: TODAY, zone: 'UTC' })
+  assert.equal(ev.next[0]?.title, 'sooner')
+})
+
+test('with nothing linked there is nothing to show, not an error', () => {
+  const ev = collectEvidence({ nodes: [node('Task', { name: 'x', status: 'done', completedAt: '2026-10-21T08:00:00Z' })], edges: [], identities: [identity(10)], today: TODAY, zone: 'UTC' })
+  assert.deepEqual(ev.receipts, [[]])
+  assert.deepEqual(ev.next, [null])
+})
+
+test('on screen, a to-do votes for the same identity the server would pick', () => {
+  const ids = [identity(10, { listIds: [7] }), identity(11, { tags: ['writing'] }), identity(12, { itemIds: [99] })]
+  const lists = [{ id: 7, areaId: null }, { id: 8, areaId: 7 }]
+  assert.equal(identityForTodo({ id: 99, listId: 7, tags: [] }, lists, ids)?.id, 12, 'the item itself first')
+  assert.equal(identityForTodo({ id: 1, listId: 7, tags: [] }, lists, ids)?.id, 10, 'then its list')
+  assert.equal(identityForTodo({ id: 2, listId: 8, tags: [] }, lists, ids)?.id, 10, 'then its list’s area')
+  assert.equal(identityForTodo({ id: 3, listId: null, tags: ['Writing'] }, lists, ids)?.id, 11, 'then its tags, ignoring case')
+  assert.equal(identityForTodo({ id: 4, listId: null, tags: [] }, lists, ids), null)
 })

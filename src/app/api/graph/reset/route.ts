@@ -12,7 +12,7 @@ import { and, eq, notInArray } from 'drizzle-orm'
  * palette, your location, your working hours and the access token you pasted
  * into another chatbot is a surprise, not a fresh start.
  *
- * Everything else goes — tasks, habits, their logs, notes, time blocks,
+ * Everything else goes — tasks, notes, time blocks,
  * whatever the assistant had remembered. Pass `{ everything: true }` to take
  * the settings too.
  *

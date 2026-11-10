@@ -13,10 +13,10 @@ import { TodosProvider } from '@/components/todos/TodosProvider'
 import { Sidebar } from '@/components/todos/Sidebar'
 import { TodoView } from '@/components/todos/TodoView'
 import { QuickFind } from '@/components/todos/QuickFind'
-import { CheckIn } from '@/components/todos/CheckIn'
-import { TodayTuck } from '@/components/tuck/TodayTuck'
+import { TodayCards } from '@/components/todos/TodayCards'
 import { TuckStatus } from '@/components/tuck/TuckStatus'
-import { WorldView } from '@/components/world/WorldView'
+import { IdentityPage } from '@/components/world/IdentityPage'
+import { UndoOfferToast } from '@/components/undo/UndoOfferToast'
 import { todayStr } from '@/lib/date'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { safeGet, safeSet } from '@/lib/storage'
@@ -137,7 +137,7 @@ export default function Home() {
 
   /** Capture, from anywhere: a list with the assistant under it, listening. */
   const capture = useCallback(() => {
-    setView((v) => (v === 'proposals' || v === 'settings' || v === 'world' ? 'today' : v))
+    setView((v) => (v === 'proposals' || v === 'settings' ? 'today' : v))
     startListening()
   }, [])
 
@@ -206,23 +206,28 @@ export default function Home() {
   }, [capture, toggleSlim])
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const input = e.target
+    const file = input.files?.[0]
     if (!file) return
-    const text = await file.text()
     try {
-      const json = JSON.parse(text)
+      const json = JSON.parse(await file.text())
       const res = await fetch('/api/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(json),
       })
-      const data = await res.json() as { ok: boolean; importedNodes: number; importedEdges: number }
-      if (data.ok) {
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; importedNodes?: number; importedEdges?: number }
+      if (res.ok && data.ok) {
         notifyDataChanged()
         alert(`Imported ${data.importedNodes} nodes and ${data.importedEdges} edges.`)
+      } else {
+        // Said, not swallowed: a file that is refused must not look like a button that did nothing.
+        alert(`Import failed: ${data.error ?? `the server said ${res.status}`}.`)
       }
-    } catch { alert('Import failed — invalid file format.') }
-    e.target.value = ''
+    } catch {
+      alert('Import failed: that is not a valid Acture export file.')
+    }
+    input.value = ''
   }
 
 
@@ -247,20 +252,19 @@ export default function Home() {
         onQuickFind={() => setFinding('')}
         onCapture={(how) => {
           setMobileNavOpen(false)
-          setView((v) => (v === 'proposals' || v === 'settings' || v === 'world' ? 'today' : v))
+          setView((v) => (v === 'proposals' || v === 'settings' ? 'today' : v))
           if (how === 'type') startTyping()
           else startListening()
         }}
         onAttach={(files) => {
           setMobileNavOpen(false)
-          setView((v) => (v === 'proposals' || v === 'settings' || v === 'world' ? 'today' : v))
+          setView((v) => (v === 'proposals' || v === 'settings' ? 'today' : v))
           attachFiles(files)
         }}
         view={view}
         onSelect={select}
         pendingCount={pendingCount}
         open={mobileNavOpen}
-        world={settings?.world?.enabled ? settings.world.kind : null}
       />
 
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -272,8 +276,8 @@ export default function Home() {
         {view === 'proposals' ? (
           <ProposalQueue onCountChange={setPendingCount} onOpenMenu={() => setMobileNavOpen(true)} />
         ) : view === 'world' ? (
-          // Your World: who the to-dos are making you, as a world that grows.
-          <WorldView settings={settings} onSettingsChanged={setSettings} onOpenMenu={() => setMobileNavOpen(true)} />
+          // Identity: who the to-dos are making you, as evidence — and, if wanted, as a world.
+          <IdentityPage onOpenMenu={() => setMobileNavOpen(true)} dock={<TodayAssistant dock onNavigate={select} />} />
         ) : view === 'settings' ? (
           // Drawn as one more list, with its own title in the list's column.
           <SettingsPanel
@@ -303,7 +307,7 @@ export default function Home() {
               onOpenMenu={() => setMobileNavOpen(true)}
               onQuickFind={(initial) => setFinding(initial)}
               dock={<TodayAssistant dock onNavigate={select} />}
-              banner={<>{view === 'today' && <TodayTuck />}<CheckIn date={todayStr()} /></>}
+              banner={view === 'today' ? <TodayCards date={todayStr()} /> : null}
             />
           </>
         )}
@@ -311,6 +315,7 @@ export default function Home() {
 
       {/* Tuck's word on what is happening behind the screen: ticks, new proposals, saving, offline. */}
       <TuckStatus onNavigate={select} />
+      <UndoOfferToast />
 
       {finding !== null && <QuickFind initial={finding} onClose={() => setFinding(null)} onNavigate={select} />}
 

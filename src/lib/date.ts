@@ -32,7 +32,7 @@ export function addDays(dateStr: string, days: number): string {
 
 /**
  * Shared recurrence rule for anything with a `frequency`/`daysOfWeek` pair
- * (Habits today, recurring Tasks as of Phase 2) — is a given day-of-week
+ * (recurring Tasks) — is a given day-of-week
  * (0=Sun..6=Sat) one this thing is due on.
  */
 export function isDueOn(frequency: string, daysOfWeek: number[] | null, dow: number): boolean {
@@ -48,7 +48,7 @@ export function isDueOn(frequency: string, daysOfWeek: number[] | null, dow: num
 export interface EventRecurrence {
   /** The first (or only) day it happens. */
   date: string | null
-  /** 'once' | 'daily' | 'weekdays' | 'weekly' — same vocabulary as Habits. */
+  /** 'once' | 'daily' | 'weekdays' | 'weekly' — same vocabulary as a Task's recurrence. */
   frequency?: string | null
   /** For 'weekly'/'weekdays': which days, 0=Sun..6=Sat. */
   daysOfWeek?: number[] | null
@@ -62,7 +62,7 @@ export interface EventRecurrence {
  * Events used to be a single fixed day, which meant a weekly class or a
  * standing meeting had to be re-entered every time — the one kind of entry
  * most worth automating. They now use the same frequency/daysOfWeek pair as
- * Habits, so "every Tuesday and Thursday" means the same thing in both
+ * a repeating Task, so "every Tuesday and Thursday" means the same thing in both
  * places, and `isDueOn` stays the single definition of that rule.
  *
  * Occurrences are computed on read rather than written out as rows: nothing

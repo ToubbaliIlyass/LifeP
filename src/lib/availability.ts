@@ -24,7 +24,7 @@ import { daysLabel } from '@/lib/days'
 /**
  * 'batched' records that several things were put in one block together —
  * which is the only way a grouping can ever be noticed. Everything else is
- * about one item at a time, so the app could learn that three habits each
+ * about one item at a time, so the app could learn that three to-dos each
  * happen around 08:00 and still never work out that they are one routine.
  */
 export type SignalKind = 'done' | 'moved' | 'skipped' | 'batched' | 'reported'
@@ -55,16 +55,16 @@ export interface ActivitySignal {
    * keeps turning out to be wrong.
    */
   plannedMinute?: number | null
-  /** On a 'done' signal: the node that was ticked — one occurrence of a repeating task, or the habit. */
+  /** On a 'done' signal: the node that was ticked — one occurrence of a repeating task. */
   sourceId?: number
 }
 
-/** Unmatched activity reported this often is worth offering as a habit. */
+/** Unmatched activity reported this often is worth offering as a repeating to-do. */
 const MIN_ACTIVITY_SIGHTINGS = 3
 /** Plan and reality this far apart, repeatedly, is worth mentioning. */
 const DIVERGENCE_MINUTES = 60
 
-export interface SuggestedHabit {
+export interface SuggestedRoutine {
   name: string
   times: number
   usualStart: number | null
@@ -101,7 +101,7 @@ export interface AvailabilityRule {
   note?: string
 }
 
-/** How far back learned behaviour counts. Old habits should be allowed to fade. */
+/** How far back learned behaviour counts. Old routines should be allowed to fade. */
 const WINDOW_DAYS = 60
 /** An item needs this many sightings before its "usual time" is trusted. */
 const MIN_ITEM_SIGNALS = 2
@@ -109,7 +109,7 @@ const MIN_ITEM_SIGNALS = 2
  * How fast old evidence stops counting. A sighting a fortnight ago carries
  * half the weight of one today, one from a month ago a quarter.
  *
- * Without this a plain median averages across a change of habit instead of
+ * Without this a plain median averages across a change of routine instead of
  * following it: this graph moved Workout from ~21:00 to ~09:30, and the
  * median of the whole history was 13:00 — a time never once chosen.
  */
@@ -156,8 +156,8 @@ export async function recordSignal(userId: number, signal: ActivitySignal): Prom
  * A repeating task is a new node each time round (src/lib/tasks.ts), so
  * keyed by its own id every occurrence started with no past at all, and
  * "when does this usually get done" could never be answered for one. Each
- * occurrence carries the first one's id as `seriesId`; a habit, or a task
- * that never repeated, is its own series.
+ * occurrence carries the first one's id as `seriesId`; a task
+ * that never repeated is its own series.
  */
 export function seriesOf(node: { id: number; properties: unknown }): number {
   const p = (node.properties ?? {}) as Record<string, unknown>
@@ -188,14 +188,15 @@ export async function recordDone(
 /** Takes a tick back: an accidental one must not become someone's usual time. */
 export async function forgetDone(
   userId: number,
-  { itemType, itemId, sourceId, date }: { itemType: string; itemId: number; sourceId: number; date: string },
+  { itemId, sourceId, date, perDay = false }: { itemType?: string; itemId: number; sourceId: number; date: string; /** True for a to-do ticked day by day, like a prayer: only that day's tick is taken back. */ perDay?: boolean },
 ): Promise<void> {
   try {
     for (const n of await getNodes(userId, { type: 'ActivitySignal' })) {
       const s = n.properties as Partial<ActivitySignal>
       if (s.kind !== 'done' || s.itemId !== itemId || s.sourceId !== sourceId) continue
-      // A task occurrence is ticked once, whatever the day; a habit once a day.
-      if (itemType !== 'Habit' || s.date === date) await deleteNode(userId, n.id)
+      // A task occurrence is ticked once, whatever the day; a prayer, which
+      // is done day by day, once a day.
+      if (!perDay || s.date === date) await deleteNode(userId, n.id)
     }
   } catch {
     // A side effect, like recordSignal.
@@ -206,7 +207,7 @@ function nameOf(p: Record<string, unknown>, fallback: string): string {
   return typeof p.name === 'string' ? p.name : typeof p.title === 'string' ? p.title : fallback
 }
 
-/** The Task/Habit a time block is for, if it is for anything. */
+/** The Task a time block is for, if it is for anything. */
 export async function blockSource(userId: number, blockId: number) {
   const edge = (await getEdges(userId, { sourceId: blockId, type: 'scheduled-for' }))[0]
   if (!edge) return null
@@ -301,7 +302,7 @@ export interface AvailabilityProfile {
    */
   groupings(): Grouping[]
   /** Things reported repeatedly that are not tracked as anything yet. */
-  suggestedHabits(): SuggestedHabit[]
+  suggestedRoutines(): SuggestedRoutine[]
   /** Items that keep happening at a different time from when they are planned. */
   divergences(): Divergence[]
   rules: AvailabilityRule[]
@@ -519,7 +520,7 @@ export function buildProfile(signals: ActivitySignal[], rules: AvailabilityRule[
         .sort((a, b) => b.ids.length - a.ids.length || b.times - a.times)
     },
 
-    suggestedHabits() {
+    suggestedRoutines() {
       // Only reports that matched nothing reach here, so anything already
       // tracked is excluded by construction — provided matching worked. A
       // report of a tracked thing under a different name would show up as a
@@ -576,9 +577,9 @@ export function buildProfile(signals: ActivitySignal[], rules: AvailabilityRule[
       for (const d of this.divergences()) {
         lines.push(`- learned: "${d.name}" is planned around ${fromMinutes(d.plannedAround)} but actually happens around ${fromMinutes(d.actuallyAround)} (${d.times} times) -- plan it where it really happens`)
       }
-      for (const h of this.suggestedHabits()) {
+      for (const h of this.suggestedRoutines()) {
         const when = h.usualStart !== null ? ` around ${fromMinutes(h.usualStart)}` : ''
-        lines.push(`- learned: the user keeps doing "${h.name}"${when} (${h.times} times) but does not track it -- offer to make it a habit if it comes up`)
+        lines.push(`- learned: the user keeps doing "${h.name}"${when} (${h.times} times) but does not track it -- offer to make it a repeating to-do if it comes up`)
       }
       if (lines.length === 0) return ''
       return [

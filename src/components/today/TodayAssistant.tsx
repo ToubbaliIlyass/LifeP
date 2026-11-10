@@ -1,17 +1,23 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, Keyboard, ArrowUp, Square, X, RotateCcw, ChevronRight } from 'lucide-react'
+import { Mic, Keyboard, ArrowUp, X, RotateCcw, ChevronRight } from 'lucide-react'
 import type { UIMessage } from 'ai'
 import { useAssistant } from '@/components/chat/AssistantProvider'
 import { ToolActivity, isToolPart, type ToolPart } from '@/components/chat/ToolActivity'
 import { AttachButton, AttachmentStrip, FilePreview, useAttachments } from '@/components/chat/attachments'
 import { Tuck, TuckAvatar } from '@/components/ui/Tuck'
+import { ListenOverlay } from '@/components/ui/ListenOverlay'
+import { TellTuckScreen } from './TellTuckScreen'
+import { ProposalCard } from '@/components/proposals/ProposalCard'
+import { isSmallAddition } from '@/lib/proposal-undo'
+import type { Proposal } from '@/lib/db/schema'
 import { afterPose, workingPose } from '@/lib/tuck/chat'
 import { TUCK_LINES, type TuckState } from '@/lib/tuck/states'
 import { useSpeechInput } from '@/lib/useSpeechInput'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { clockZone } from '@/lib/wallclock'
+import { BTN_PRIMARY } from '@/components/ui/buttons'
 
 const LISTEN_EVENT = 'acture:listen'
 /** Set when the assistant was asked for before its bar was on screen. */
@@ -77,7 +83,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
   onNavigate?: (tab: string) => void
   /**
    * Docked at the foot of a list rather than heading a page: an island that
-   * is there only while in use, opened from Quick Capture in the sidebar.
+   * is there only while in use, opened from Tell Tuck in the sidebar.
    */
   dock?: boolean
 }) {
@@ -111,6 +117,8 @@ export function TodayAssistant({ onNavigate, dock = false }: {
   const handedOver = useRef(false)
   const speech = useSpeechInput((text) => { heard.current = text })
   const [typing, setTyping] = useState(false)
+  /** Tell Tuck as one full-screen conversation: listening, working, the answer and its changes, all in the same place. */
+  const [immersive, setImmersive] = useState(false)
   /** The question being asked, when it is not "what needs to happen" — the evening check-in. */
   const [prompt, setPrompt] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -187,6 +195,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
 
   function listen() {
     if (busy) return
+    if (dock && speech.supported) setImmersive(true)
     heard.current = ''
     discard.current = false
     handedOver.current = false
@@ -199,6 +208,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
     discard.current = true
     setArming(false)
     speech.cancel()
+    if (dock && messages.length === 0) setImmersive(false)
     // Cancelled before the mic came on, with nothing else here: nothing to keep open.
     if (dock && !live && messages.length === 0 && attachments.items.length === 0) close()
   }
@@ -296,55 +306,18 @@ export function TodayAssistant({ onNavigate, dock = false }: {
         // shadow, nothing floating — a line across the foot of the page.
         className={dock ? '' : 'rounded-2xl border border-border/70 bg-card shadow-[0_2px_12px_oklch(0_0_0/0.04)]'}
       >
-        {listeningView ? (
-          // ── Listening ──────────────────────────────────────
-          <div className={dock ? 'px-2 py-3' : 'px-5 py-5'}>
-            <div className="flex items-center gap-4">
-              {/* Tuck, listening: with the waves, and the bars beside it for the voice itself. While
-                  the browser is asking for the mic, Tuck asks too — "only when you tap". */}
-              <Tuck
-                state={speech.transcribing ? 'thinking' : arming && !live ? 'permission-mic' : 'listening'}
-                size={116}
-                decorative
-                className="-my-3 -ml-2"
-              />
-              <div className="flex-1 min-w-0">
-                {!speech.transcribing && (
-                  <div className="flex items-center gap-[3px] h-7 mb-1" aria-hidden>
-                    {[10, 22, 16, 28, 12, 24, 18, 26, 14, 20, 11, 23].map((h, i) => (
-                      <span
-                        key={i}
-                        className="acture-voice-bar block w-[3px] rounded-full bg-primary/80"
-                        style={{ height: h, animationDelay: `${(i % 5) * 0.12}s` }}
-                      />
-                    ))}
-                  </div>
-                )}
-                <p className="text-[15px] text-foreground/85 leading-relaxed">
-                  {speech.transcribing
-                    ? 'Writing that down…'
-                    : speech.transcript || prompt || (arming && !live ? TUCK_LINES['permission-mic'] : (speech.mode === 'record' ? 'Recording — tap Done when you have said it all.' : 'Listening… say everything that needs to happen.'))}
-                </p>
-              </div>
-            </div>
-            <div className={`flex items-center gap-2 ${dock ? 'mt-3' : 'mt-4'}`}>
-              <button
-                onClick={() => speech.stop()}
-                disabled={speech.transcribing}
-                className="flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
-              >
-                <Square className="w-3.5 h-3.5" fill="currentColor" /> Done
-              </button>
-              <button
-                onClick={cancel}
-                disabled={speech.transcribing}
-                className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
-              >
-                <X className="w-3.5 h-3.5" /> Cancel
-              </button>
-            </div>
-          </div>
-        ) : keyboard || dock ? (
+        {/* Listening takes the whole screen (ListenOverlay); the island underneath stays as it was. */}
+        {listeningView && !immersive && (
+          <ListenOverlay
+            state={speech.transcribing ? 'thinking' : arming && !live ? 'permission-mic' : 'listening'}
+            line={prompt || (arming && !live ? TUCK_LINES['permission-mic'] : speech.mode === 'record' ? 'Recording. Tap Done when you have said it all.' : 'Say everything that needs to happen.')}
+            words={speech.transcript}
+            busy={speech.transcribing}
+            onDone={() => speech.stop()}
+            onCancel={cancel}
+          />
+        )}
+        {keyboard || dock ? (
           // ── Typing: when speaking is not an option, and always in the
           //    island, where the mic is one of its buttons ─────────
           <>
@@ -373,7 +346,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
                 prompt ?? (hasFiles ? 'Say what it is about, or just send' : dock && latest.length > 0 ? 'Reply…' : 'What needs to happen today?')
               }
               aria-label="What needs to happen today"
-              className={`${dock && multi ? 'w-full pr-1.5' : 'flex-1 self-center'} min-w-0 bg-transparent text-[14.5px] leading-6 text-foreground placeholder:text-muted-foreground/55 outline-none resize-none py-1.5 max-h-[140px] overflow-y-auto [scrollbar-width:none]`}
+              className={`${dock && multi ? 'w-full pr-1.5' : 'flex-1 self-center'} min-w-0 bg-transparent text-[length:calc(14.5px*var(--ts))] leading-6 text-foreground placeholder:text-muted-foreground/55 outline-none resize-none py-1.5 max-h-[140px] overflow-y-auto [scrollbar-width:none]`}
             />
             <div className={`flex items-center shrink-0 ${dock ? 'gap-1' : 'gap-2'} ${dock && multi ? 'self-end' : ''}`}>
             <AttachButton onFiles={attachments.add} disabled={busy} className="w-9 h-9 rounded-full" />
@@ -414,11 +387,11 @@ export function TodayAssistant({ onNavigate, dock = false }: {
                 <Mic className={dock ? 'w-4 h-4' : 'w-5 h-5'} />
               </span>
               <span className="min-w-0">
-                <span className={`block truncate ${dock ? 'text-[13.5px] text-muted-foreground group-hover:text-foreground' : 'text-[16px] text-foreground'}`}>
+                <span className={`block truncate ${dock ? 'text-[length:calc(13.5px*var(--ts))] text-muted-foreground group-hover:text-foreground' : 'text-[length:calc(16px*var(--ts))] text-foreground'}`}>
                   {busy ? 'Working on it…' : open && latest.length > 0 ? 'Say or type a reply' : dock ? 'Say or type what needs to happen' : 'Tap and say what needs to happen'}
                 </span>
                 {!dock && (
-                  <span className="block text-[12px] text-muted-foreground/75 mt-0.5">
+                  <span className="block text-[length:calc(12px*var(--ts))] text-muted-foreground/75 mt-0.5">
                     It adds it, plans your day, and answers here.
                   </span>
                 )}
@@ -444,7 +417,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
               <button
                 onClick={() => { send(text); setText('') }}
                 disabled={busy}
-                className="text-[12.5px] font-semibold px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                className={BTN_PRIMARY}
               >
                 Add what&apos;s in {attachments.items.length === 1 ? 'it' : 'them'} to my day
               </button>
@@ -452,13 +425,13 @@ export function TodayAssistant({ onNavigate, dock = false }: {
           </div>
         )}
         {speech.error && !active && (
-          <p className={`${dock ? 'px-2' : 'px-5'} pb-3 -mt-1 text-[12px] text-destructive/80`}>{speech.error}</p>
+          <p className={`${dock ? 'px-2' : 'px-5'} pb-3 -mt-1 text-[length:calc(14px*var(--ts))] text-destructive`}>{speech.error}</p>
         )}
       </div>
   )
 
   const failure = error && !busy && (
-    <div className="flex items-center gap-2 rounded-lg bg-destructive/[0.07] pl-1.5 pr-3 py-1.5 text-[12.5px]">
+    <div className="flex items-center gap-2 rounded-lg bg-destructive/[0.07] pl-1.5 pr-3 py-1.5 text-[length:calc(12.5px*var(--ts))]">
       {/* Oops, not a sad face: the sprout droops and the shoulders go up. */}
       <Tuck state="error" size={96} decorative />
       <div className="min-w-0">
@@ -469,7 +442,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
           <button
             onClick={saveAsTask}
             disabled={rescue === 'saving'}
-            className="mt-1.5 text-[12px] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground disabled:opacity-50"
+            className="mt-1.5 text-[length:calc(12px*var(--ts))] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground disabled:opacity-50"
           >
             {rescue === 'saving' ? 'Adding…' : 'Add what I said to today as a task'}
           </button>
@@ -479,8 +452,41 @@ export function TodayAssistant({ onNavigate, dock = false }: {
   )
 
   // Docked, it is an island at the foot of the list that is only there while
-  // it is in use — started from Quick Capture in the sidebar — and swells into
+  // it is in use — started from Tell Tuck in the sidebar — and swells into
   // whatever is happening: listening, typing, the answer.
+  if (dock && immersive) {
+    const said = textOf([...messages].reverse().find((m) => m.role === 'user'))
+    // Sent but not yet answered counts as working too: the moment between pressing Done and the first word back.
+    const awaiting = latest.length > 0 && !reply && !error
+    const phase = listeningView ? 'listening' : busy || awaiting ? 'working' : latest.length > 0 ? 'reply' : 'listening'
+    const hasProposal = !!reply?.parts.some((p) => isToolPart(p) && typeof (p as ToolPart).output === 'object' && (p as { output?: { proposalId?: number } }).output?.proposalId)
+    const tuck: TuckState =
+      phase === 'listening' ? (speech.transcribing ? 'thinking' : arming && !live ? 'permission-mic' : 'listening')
+      : phase === 'working' ? (pose && pose !== 'error' ? pose : 'thinking')
+      : error ? 'error' : afterglow ?? (hasProposal ? 'proposing' : 'confirmed')
+    const closeScreen = () => { setImmersive(false); setOpen(false); setTyping(false); setPrompt(null); setRescue('idle') }
+    return (
+      <TellTuckScreen
+        phase={phase}
+        tuck={tuck}
+        line={phase === 'working' ? (pose && pose !== 'error' ? TUCK_LINES[pose] : 'Let me think about that…') : prompt || (arming && !live ? TUCK_LINES['permission-mic'] : 'Say everything that needs to happen.')}
+        words={speech.transcript}
+        said={said}
+        busy={busy}
+        transcribing={speech.transcribing}
+        onStop={() => speech.stop()}
+        onCancel={() => { cancel(); if (messages.length > 0) return; closeScreen() }}
+        onMore={listen}
+        onClose={closeScreen}
+        onType={(t) => send(t)}
+        error={speech.error}
+      >
+        {reply && <ReplyCards message={reply} onNavigate={onNavigate} live={busy} />}
+        {failure}
+      </TellTuckScreen>
+    )
+  }
+
   if (dock) {
     if (!open) return null
     const mode: 'compose' | 'talk' = latest.length > 0 ? 'talk' : 'compose'
@@ -494,8 +500,8 @@ export function TodayAssistant({ onNavigate, dock = false }: {
                 <div className="flex items-center gap-3 pl-2 pt-2 pr-3">
                   <Tuck state="idle" size={120} decorative />
                   <div className="min-w-0">
-                    <p className="text-[14px] font-semibold leading-tight">Hi, I’m Tuck</p>
-                    <p className="mt-0.5 text-[13px] text-muted-foreground">{TUCK_LINES.idle}</p>
+                    <p className="text-[length:calc(14px*var(--ts))] font-semibold leading-tight">Hi, I’m Tuck</p>
+                    <p className="mt-0.5 text-[length:calc(13px*var(--ts))] text-muted-foreground">{TUCK_LINES.idle}</p>
                   </div>
                 </div>
               )}
@@ -508,17 +514,17 @@ export function TodayAssistant({ onNavigate, dock = false }: {
               <div className="shrink-0 flex items-center gap-1 pl-4 pr-2 pt-2">
                 <TuckAvatar size={40} decorative />
                 <span className="flex-1 ml-1.5 min-w-0 leading-tight">
-                  <span className="block text-[14px] font-semibold">Tuck</span>
-                  <span className="block truncate text-[12px] text-muted-foreground">{busy ? 'Working on it…' : 'Your gardener'}</span>
+                  <span className="block text-[length:calc(14px*var(--ts))] font-semibold">Tuck</span>
+                  <span className="block truncate text-[length:calc(12px*var(--ts))] text-muted-foreground">{busy ? 'Working on it…' : 'Your gardener'}</span>
                 </span>
                 {busy ? (
-                  <button onClick={stop} className="text-[12px] px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60">
+                  <button onClick={stop} className="text-[length:calc(12px*var(--ts))] px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60">
                     Stop
                   </button>
                 ) : (
                   <button
                     onClick={() => { setMessages([]); setRescue('idle'); close() }}
-                    className="flex items-center gap-1 text-[12px] px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    className="flex items-center gap-1 text-[length:calc(12px*var(--ts))] px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60"
                   >
                     <RotateCcw className="w-3 h-3" /> Clear
                   </button>
@@ -558,7 +564,7 @@ export function TodayAssistant({ onNavigate, dock = false }: {
           {earlier.length > 0 && (
             <button
               onClick={() => setShowEarlier((v) => !v)}
-              className="flex items-center gap-1 mb-2 text-[11.5px] text-muted-foreground/65 hover:text-foreground"
+              className="flex items-center gap-1 mb-2 text-[length:calc(11.5px*var(--ts))] text-muted-foreground/65 hover:text-foreground"
             >
               <ChevronRight className={`w-3 h-3 transition-transform ${showEarlier ? 'rotate-90' : ''}`} />
               Earlier in this conversation
@@ -586,11 +592,11 @@ export function TodayAssistant({ onNavigate, dock = false }: {
 
           <div className="flex items-center gap-3 mt-2.5">
             {busy ? (
-              <button onClick={stop} className="text-[11.5px] text-muted-foreground/70 hover:text-foreground">Stop</button>
+              <button onClick={stop} className="text-[length:calc(11.5px*var(--ts))] text-muted-foreground/70 hover:text-foreground">Stop</button>
             ) : (
               <button
                 onClick={() => { setMessages([]); setRescue('idle') }}
-                className="flex items-center gap-1 text-[11.5px] text-muted-foreground/65 hover:text-foreground"
+                className="flex items-center gap-1 text-[length:calc(11.5px*var(--ts))] text-muted-foreground/65 hover:text-foreground"
               >
                 <RotateCcw className="w-3 h-3" /> Clear
               </button>
@@ -744,6 +750,67 @@ function Island({ mode, canClose, onClose, shellRef: shell, children }: {
   )
 }
 
+/** Reads that are only the assistant looking: not worth a card in the answer. */
+const QUIET_TOOLS = new Set(['readGraph', 'searchNodes', 'getNodeDetail', 'getDay', 'readOrganisation', 'remember', 'rememberAvailability', 'logActivity', 'forget'])
+const toolOf = (part: { type: string }) => String(part.type).replace(/^tool-/, '')
+
+/** A proposal, fetched by id and shown as the same card as in To review, so a plan can be looked over, trimmed and added without leaving the conversation. */
+function InlineProposal({ id }: { id: number }) {
+  const [proposal, setProposal] = useState<Proposal | null | undefined>(undefined)
+  const [outcome, setOutcome] = useState<'added' | 'no' | null>(null)
+  useEffect(() => {
+    let live = true
+    fetch('/api/proposals')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { proposals: Proposal[] } | null) => { if (live) setProposal(d?.proposals.find((p) => p.id === id) ?? null) })
+      .catch(() => { if (live) setProposal(null) })
+    return () => { live = false }
+  }, [id])
+  if (outcome) return <p className="text-center text-[length:calc(15px*var(--ts))] text-muted-foreground">{outcome === 'added' ? 'Added. Undo is at the bottom of the screen if you change your mind.' : 'Left out.'}</p>
+  if (!proposal) return null
+  return <ProposalCard variant="screen" autoApply={isSmallAddition(proposal.operations as never)} proposal={proposal} onResolved={(ok) => { setOutcome(ok ? 'added' : 'no'); notifyDataChanged() }} />
+}
+
+/**
+ * The answer, in the full-screen conversation: the sentence or two Tuck says
+ * large, then the changes under it. A plan, a rearrangement or a set of areas
+ * is the review card itself, there to untick and approve; what was simply done
+ * (an identity added, a day planned) is a one-line row.
+ */
+function ReplyCards({ message, onNavigate, live }: { message: UIMessage; onNavigate?: (tab: string) => void; live: boolean }) {
+  return (
+    <>
+      {message.parts.map((part, i) => {
+        if (part.type === 'text') {
+          // Said in plain words: the screen does not draw markdown, so its marks are taken out.
+          const plain = part.text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1').replace(/`([^`]+)`/g, '$1')
+          return plain ? <p key={i} className="whitespace-pre-wrap text-center text-[clamp(18px,3dvh,24px)] font-semibold leading-snug tracking-tight">{plain}</p> : null
+        }
+        if (!isToolPart(part)) return null
+        const tp = part as ToolPart
+        if (QUIET_TOOLS.has(toolOf(tp))) return null
+        // Plumbing, not changes: the calendar slot and the links between things are part of "added the call", not their own news.
+        const input = (tp.input ?? {}) as { type?: string }
+        if (toolOf(tp) === 'createEdge' || (toolOf(tp) === 'createNode' && (input.type === 'TimeBlock'))) return null
+        const out = tp.output as { proposed?: boolean; proposalId?: number; revise?: boolean } | undefined
+        // A plan sent back to be improved is the assistant working, not something to show.
+        if (out?.revise) return null
+        if (out && out.proposed && typeof out.proposalId === 'number') return <InlineProposal key={i} id={out.proposalId} />
+        if (live && tp.state !== 'output-available' && tp.state !== 'output-error') return null
+        return (
+          <ToolActivity
+            key={i}
+            part={tp}
+            onReviewProposals={onNavigate ? () => onNavigate('proposals') : undefined}
+            onOpenDay={onNavigate ? () => onNavigate('today') : undefined}
+            onOpenIdentity={onNavigate ? () => onNavigate('world') : undefined}
+          />
+        )
+      })}
+    </>
+  )
+}
+
 /** The conversation inside the island, newest at the bottom and kept in view. */
 function Thread({ messages, pose, busy, failure, onNavigate }: {
   messages: UIMessage[]
@@ -770,7 +837,7 @@ function Thread({ messages, pose, busy, failure, onNavigate }: {
         // Only the live moment: the pose of an earlier turn is not kept.
         <div className="flex items-center gap-2 -my-2" role="status" data-chat-pose={pose}>
           <Tuck state={pose} size={132} decorative className="-ml-2" />
-          <span className="text-[13px] text-muted-foreground">{TUCK_LINES[pose]}</span>
+          <span className="text-[length:calc(13px*var(--ts))] text-muted-foreground">{TUCK_LINES[pose]}</span>
         </div>
       )}
       {failure}
@@ -802,7 +869,7 @@ function Message({ message, onNavigate, chat = false, live = false }: {
             </div>
           )}
           {textOf(message) && (
-            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-muted px-3.5 py-2 text-[14px] leading-relaxed text-foreground whitespace-pre-wrap">
+            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-muted px-3.5 py-2 text-[length:calc(14px*var(--ts))] leading-relaxed text-foreground whitespace-pre-wrap">
               {textOf(message)}
             </p>
           )}
@@ -817,7 +884,7 @@ function Message({ message, onNavigate, chat = false, live = false }: {
           </div>
         )}
         {textOf(message) && (
-          <p className="text-[12.5px] text-muted-foreground/80 italic">&ldquo;{textOf(message)}&rdquo;</p>
+          <p className="text-[length:calc(12.5px*var(--ts))] text-muted-foreground/80 italic">&ldquo;{textOf(message)}&rdquo;</p>
         )}
       </div>
     )
@@ -826,16 +893,16 @@ function Message({ message, onNavigate, chat = false, live = false }: {
     const said = message.parts.filter((p) => p.type === 'text' && p.text)
     // Only actions, and finished: say so rather than show nothing.
     if (said.length === 0) {
-      return live || !message.parts.some(isToolPart) ? null : <p className="text-[14.5px] text-foreground/90">Done.</p>
+      return live || !message.parts.some(isToolPart) ? null : <p className="text-[length:calc(14.5px*var(--ts))] text-foreground/90">Done.</p>
     }
     return (
-      <div className="space-y-1.5 text-[14.5px] leading-relaxed text-foreground/90">
+      <div className="space-y-1.5 text-[length:calc(14.5px*var(--ts))] leading-relaxed text-foreground/90">
         {said.map((p, i) => <p key={i} className="whitespace-pre-wrap">{p.type === 'text' ? p.text : null}</p>)}
       </div>
     )
   }
   return (
-    <div className="space-y-1.5 text-[14px] leading-relaxed text-foreground/90">
+    <div className="space-y-1.5 text-[length:calc(14px*var(--ts))] leading-relaxed text-foreground/90">
       {message.parts.map((part, i) => {
         if (part.type === 'text') return part.text ? <p key={i} className="whitespace-pre-wrap">{part.text}</p> : null
         if (part.type === 'file') return <FilePreview key={i} part={part} size="sm" />
@@ -846,6 +913,7 @@ function Message({ message, onNavigate, chat = false, live = false }: {
               part={part as ToolPart}
               onReviewProposals={onNavigate ? () => onNavigate('proposals') : undefined}
               onOpenDay={onNavigate ? () => onNavigate('today') : undefined}
+              onOpenIdentity={onNavigate ? () => onNavigate('world') : undefined}
             />
           )
         }

@@ -27,8 +27,8 @@ export default async function TuckLab({ searchParams }: { searchParams: Promise<
       <ul className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${px * 2 + 48}px, 1fr))` }}>
         {states.map((s) => (
           <li key={s} data-state-card={s} className="rounded-xl border border-border/70 p-3">
-            <p className="text-[13px] font-semibold">{s}</p>
-            <p className="mb-2 text-[12px] text-muted-foreground">{TUCK_LINES[s]}</p>
+            <p className="text-[length:calc(13px*var(--ts))] font-semibold">{s}</p>
+            <p className="mb-2 text-[length:calc(12px*var(--ts))] text-muted-foreground">{TUCK_LINES[s]}</p>
             <div className="flex gap-3">
               <div className="rounded-lg bg-[#fefffe] p-2"><Tuck state={s} size={px} tone="light" level={stage} /></div>
               <div className="rounded-lg bg-[#141415] p-2"><Tuck state={s} size={px} tone="dark" level={stage} /></div>

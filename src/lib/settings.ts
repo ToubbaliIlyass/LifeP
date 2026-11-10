@@ -1,6 +1,5 @@
 import { getNodes, createNode, updateNode } from '@/lib/graph/queries'
 import type { Madhab } from '@/lib/prayer-times'
-import type { WorldKind } from '@/lib/identity'
 
 /**
  * User settings, stored as a single Settings node rather than a new table.
@@ -107,11 +106,6 @@ export interface Settings {
     method: string
     /** Which shadow length defines Asr. An hour's difference. */
     madhab: Madhab
-    /**
-     * The Habit the five tick off, so a streak and its goal link keep
-     * working. Resolved once by name and remembered.
-     */
-    habitNodeId: number | null
   }
   /**
    * IANA zone, captured with the location. Prayer times are local solar
@@ -134,12 +128,12 @@ export interface Settings {
    */
   simple: boolean
   /**
-   * Your World: who the to-dos are making you, drawn as a world that grows with
-   * every one finished — a night sky, a path or a small city (see
-   * src/lib/identity.ts). Off by default: it is there for the people it
+   * Identity: who the to-dos are making you (see src/lib/identity.ts). Off by default: it is there for the people it
    * helps, and a to-do list should never feel like a game nobody asked for.
    */
-  world: { enabled: boolean; kind: WorldKind }
+  world: { enabled: boolean }
+  /** Who Tuck is talking to: what to call them, a line about them, and how Tuck should sound. */
+  profile: { name: string; about: string; tone: 'gentle' | 'direct' | 'playful' }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -157,11 +151,12 @@ export const DEFAULT_SETTINGS: Settings = {
   autoLink: 'auto',
   graphSweep: { enabled: true, intervalDays: 7, lastRun: null },
   resurfaceDays: 21,
-  prayer: { enabled: false, method: 'morocco', madhab: 'standard', habitNodeId: null },
+  prayer: { enabled: false, method: 'morocco', madhab: 'standard' },
   timeZone: null,
   timeZoneOverride: null,
   simple: true,
-  world: { enabled: false, kind: 'sky' },
+  world: { enabled: true },
+  profile: { name: '', about: '', tone: 'gentle' },
 }
 
 async function settingsNode(userId: number) {

@@ -9,7 +9,7 @@ import { skipOccurrence, type SkipResult } from '@/lib/skip'
  * and apart from the screen so the rules can be read, and tested, in one go.
  *
  *   Inbox     no day, no place — said, and not yet decided
- *   Today     for today or earlier, or due by today; habits due today; prayers
+ *   Today     for today or earlier, or due by today; the five prayers, each day
  *   Upcoming  for a later day, or with a deadline still ahead and no day yet
  *   Anytime   has a place and could be done now
  *   Someday   parked on purpose
@@ -23,16 +23,33 @@ export type StandardView = (typeof STANDARD_VIEWS)[number]
 
 const isTask = (t: Todo) => t.type === 'Task'
 
-export function isToday(t: Todo, today: string): boolean {
-  if (t.type === 'Prayer') return true
-  if (t.type === 'Habit') return t.when === today
+/** One of the five. They repeat daily and belong to Today alone: never Anytime, Upcoming or the Logbook. */
+export const isPrayer = (t: Todo) => !!t.prayerKey
+
+/**
+ * A to-do in a list that is kept off Today, or in a project whose area is.
+ * Hiding is about the day, not the to-do: it still has its day, shows in
+ * Upcoming, Anytime and in its list, and a deadline arriving does not
+ * pull it back (that is what hiding means).
+ */
+export function hiddenFromToday(t: Todo, lists: TodoList[]): boolean {
+  if (t.listId === null) return false
+  const list = lists.find((l) => l.id === t.listId)
+  if (!list) return false
+  if (list.hideFromToday) return true
+  return list.areaId !== null && !!lists.find((l) => l.id === list.areaId)?.hideFromToday
+}
+
+export function isToday(t: Todo, today: string, lists: TodoList[] = []): boolean {
+  if (hiddenFromToday(t, lists)) return false
+  if (isPrayer(t)) return t.when === today
   return !t.someday && ((!!t.when && t.when <= today) || (!!t.deadline && t.deadline <= today))
 }
 
 export const inInbox = (t: Todo) => isTask(t) && !t.listId && !t.when && !t.someday
 
 export function isUpcoming(t: Todo, today: string): boolean {
-  if (!isTask(t) || t.someday) return false
+  if (!isTask(t) || t.someday || isPrayer(t)) return false
   return (!!t.when && t.when > today) || (!t.when && !!t.deadline && t.deadline > today)
 }
 
@@ -40,7 +57,7 @@ export function isUpcoming(t: Todo, today: string): boolean {
 export const upcomingDay = (t: Todo) => t.when ?? t.deadline
 
 export function isAnytime(t: Todo, today: string): boolean {
-  return isTask(t) && !t.someday && !inInbox(t) && !(t.when && t.when > today)
+  return isTask(t) && !isPrayer(t) && !t.someday && !inInbox(t) && !(t.when && t.when > today)
 }
 
 export const isSomeday = (t: Todo) => isTask(t) && t.someday
@@ -66,9 +83,11 @@ export function counts(todos: Todo[], lists: TodoList[], today: string) {
   let day = 0
   let due = 0
   for (const t of todos) {
-    if (t.done || inDoneList(t, lists)) continue
+    // A draft that is still being typed is not a thing yet; the daily prayers are not counted either, so the
+    // number here is the same "left" the Now card shows.
+    if (t.done || t.id < -900 || isPrayer(t) || inDoneList(t, lists)) continue
     if (inInbox(t)) inbox++
-    if (isToday(t, today)) {
+    if (isToday(t, today, lists)) {
       day++
       if (t.deadline && t.deadline <= today) due++
     }
@@ -108,7 +127,7 @@ export function relDate(day: string, today: string): string {
 
 export function deadlineLabel(deadline: string, today: string): { text: string; tone: 'over' | 'soon' | 'calm' } {
   const n = daysBetween(today, deadline)
-  if (n < 0) return { text: `${-n} day${n === -1 ? '' : 's'} overdue`, tone: 'over' }
+  if (n < 0) return { text: 'Past due', tone: 'over' }
   if (n === 0) return { text: 'Due today', tone: 'over' }
   if (n === 1) return { text: 'Due tomorrow', tone: 'soon' }
   return { text: `${n} days left`, tone: n <= 2 ? 'soon' : 'calm' }
@@ -121,7 +140,7 @@ export function repeatLabel(repeats: string | null): string {
 }
 
 /** Only a repeating to-do that is open and on a day can have one time round skipped. */
-export const canSkip = (t: Todo) => t.type === 'Task' && !!t.repeats && !t.done && !t.someday && !!t.when && t.id > 0
+export const canSkip = (t: Todo) => !isPrayer(t) && !!t.repeats && !t.done && !t.someday && !!t.when && t.id > 0
 
 /** Where skipping would take it, by the same rule the server applies (src/lib/skip.ts). */
 export function skipPreview(t: Todo, today: string): SkipResult {

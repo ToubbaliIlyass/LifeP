@@ -8,7 +8,7 @@ export default function VoiceTodoPage() {
     <ContentPage
       seo={PAGES.voice}
       h1="A voice to-do list that just listens."
-      lede="Tap Quick Capture and talk, the way you’d tell a friend. Acture turns what you said into to-dos, each one a line you can see straight away."
+      lede="Tap Tell Tuck and talk, the way you’d tell a friend. Acture turns what you said into to-dos, each one a line you can see straight away."
       sections={[
         {
           h: 'Say everything at once',

@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@/lib/db/schema'
 import { addDays } from '@/lib/date'
 import { clockIn } from '@/lib/clock'
+import { doneDatesOf, prayerKeyOf } from '@/lib/prayers'
 
 /**
  * Who the to-dos are making you.
@@ -9,10 +10,10 @@ import { clockIn } from '@/lib/clock'
  * of evidence about the person who did it — we decide who we are partly by
  * watching what we do. So the user can name who they are becoming ("a
  * runner", "a good friend", "someone who ships"), say which of their lists,
- * habits and tags count toward each, and every tick from then on is a vote.
+ * to-dos and tags count toward each, and every tick from then on is a vote.
  *
  * Votes are read back from what is already in the graph — finished tasks and
- * kept habit days — rather than written anywhere new: nothing to keep in
+ * prayed days — rather than written anywhere new: nothing to keep in
  * step, nothing lost if a link is changed later, and the whole history
  * counts from the first day an identity is named. A vote never expires and
  * a missed day takes nothing away; that is deliberate (see WorldView).
@@ -20,9 +21,6 @@ import { clockIn } from '@/lib/clock'
  * An Identity is a node like any other, so it is exported, synced and
  * deleted with the rest of the graph.
  */
-
-export const WORLD_KINDS = ['sky', 'path', 'city'] as const
-export type WorldKind = (typeof WORLD_KINDS)[number]
 
 /** One colour per identity, chosen to read on the worlds' dark grounds. The brand's amber first. */
 export const IDENTITY_COLORS = ['#F5A524', '#7dd3fc', '#fb7185', '#6ee7b7', '#c4b5fd', '#ff8552', '#bef264', '#5eead4'] as const
@@ -40,7 +38,7 @@ export interface Identity {
   hue: number
   /** Areas and projects whose to-dos vote for it. A project counts for its area's identity too. */
   listIds: number[]
-  /** Habits and repeating to-dos (by their first occurrence) that vote for it. */
+  /** To-dos, and repeating ones (by their first occurrence), that vote for it. */
   itemIds: number[]
   /** To-dos carrying any of these tags vote for it. */
   tags: string[]
@@ -50,9 +48,22 @@ export interface Identity {
 /** A vote, as the worlds draw it: how many days ago, and for whom (-1: the everyday). */
 export type Vote = [age: number, group: number]
 
+/** One finished thing that counted, as a receipt: what it was and the day it was done. */
+export interface Receipt { id: number; title: string; date: string }
+/** The next open to-do that would vote for an identity. */
+export interface NextUp { id: number; title: string; due: string | null }
+
+export type IdentityStats = Identity & {
+  votes: number
+  week: number
+  /** The latest few things that counted, newest first: the evidence behind the number. */
+  recent: Receipt[]
+  next: NextUp | null
+}
+
 export interface WorldPayload {
   today: string
-  identities: (Identity & { votes: number; week: number })[]
+  identities: IdentityStats[]
   everyday: { votes: number; week: number }
   /** Oldest first. */
   votes: Vote[]
@@ -85,18 +96,18 @@ export function nextHue(identities: Pick<Identity, 'hue'>[]): number {
  * Every vote in the graph, oldest first. Pure.
  *
  * A vote is a finished task (on the day it was finished, in the user's
- * zone) or a habit kept on a day; the five prayers count one each. Which
+ * zone); a prayer prayed on a day counts one each. Which
  * identity it is for is decided by the most specific link: the item itself,
  * then its project, then the project's area, then its tags — and among
  * identities claiming the same thing, the first in the user's order.
  */
-export function collectVotes({ nodes, edges, identities, today, zone }: {
+export function collectEvidence({ nodes, edges, identities, today, zone }: {
   nodes: Node[]
   edges: Edge[]
   identities: Identity[]
   today: string
   zone: string | null
-}): Vote[] {
+}): { votes: Vote[]; receipts: Receipt[][]; next: (NextUp | null)[] } {
   const ordered = [...identities].sort((a, b) => a.order - b.order || a.id - b.id)
   const groupOf = new Map(ordered.map((idt, i) => [idt.id, i]))
 
@@ -118,7 +129,6 @@ export function collectVotes({ nodes, edges, identities, today, zone }: {
   for (const [id, k] of kind) if (k === 'project') areaOfProject.set(id, linked(id, 'area'))
   const containerOf = (id: number) => linked(id, 'project') ?? linked(id, 'area')
 
-  const byId = new Map(nodes.map((n) => [n.id, n]))
   const pick = (test: (idt: Identity) => boolean) => {
     const hit = ordered.find(test)
     return hit ? groupOf.get(hit.id)! : null
@@ -152,29 +162,45 @@ export function collectVotes({ nodes, edges, identities, today, zone }: {
     return isNaN(when.getTime()) ? today : clockIn(zone, when).date
   }
   const ageOf = (date: string) => Math.max(0, daysBetween(date, today))
-  const votes: { date: string; group: number }[] = []
+  const votes: { date: string; group: number; id: number; title: string }[] = []
+  const open: { group: number; id: number; title: string; due: string | null }[] = []
 
   for (const n of nodes) {
     const p = (n.properties ?? {}) as Record<string, unknown>
-    if (n.type === 'Task' && p.status === 'done') {
+    if (n.type === 'Task' && prayerKeyOf(p)) {
+      // A prayer is done day by day (src/lib/prayers.ts): each day prayed is a vote.
+      const group = groupFor([n.id], strs(p.tags))
+      for (const date of doneDatesOf(p)) votes.push({ date, group, id: n.id, title: titleOf(p) })
+    } else if (n.type === 'Task' && p.status === 'done') {
       const at = typeof p.completedAt === 'string' ? p.completedAt : n.updatedAt
       const series = typeof p.seriesId === 'number' ? [n.id, p.seriesId] : [n.id]
-      votes.push({ date: dayOf(at), group: groupFor(series, strs(p.tags)) })
-    } else if (n.type === 'HabitLog' && typeof p.habitNodeId === 'number' && typeof p.date === 'string') {
-      const habit = byId.get(p.habitNodeId)
-      const hp = (habit?.properties ?? {}) as Record<string, unknown>
-      const group = groupFor([p.habitNodeId], strs(hp.tags))
-      // The prayer habit's day holds the five, each its own tick.
-      const times = Array.isArray(p.prayers) ? p.prayers.length : p.completed === true ? 1 : 0
-      for (let i = 0; i < times; i++) votes.push({ date: p.date, group })
+      votes.push({ date: dayOf(at), group: groupFor(series, strs(p.tags)), id: n.id, title: titleOf(p) })
+    } else if (n.type === 'Task' && !p.someday && p.status !== 'done') {
+      const series = typeof p.seriesId === 'number' ? [n.id, p.seriesId] : [n.id]
+      open.push({ group: groupFor(series, strs(p.tags)), id: n.id, title: titleOf(p), due: typeof p.dueDate === 'string' ? p.dueDate : null })
     }
   }
 
-  return votes
-    .filter((v) => v.date <= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((v) => [ageOf(v.date), v.group] as Vote)
+  const kept = votes.filter((v) => v.date <= today).sort((a, b) => a.date.localeCompare(b.date))
+  const receipts: Receipt[][] = ordered.map(() => [])
+  for (const v of [...kept].reverse()) {
+    if (v.group >= 0 && receipts[v.group].length < 5) receipts[v.group].push({ id: v.id, title: v.title, date: v.date })
+  }
+  // The soonest open to-do for each: dated first (earliest), then undated.
+  const next: (NextUp | null)[] = ordered.map(() => null)
+  for (const o of [...open].sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || a.id - b.id)) {
+    if (o.group >= 0 && !next[o.group]) next[o.group] = { id: o.id, title: o.title, due: o.due }
+  }
+  return { votes: kept.map((v) => [ageOf(v.date), v.group] as Vote), receipts, next }
 }
+
+/** Just the votes, oldest first (what the world is drawn from). */
+export function collectVotes(args: Parameters<typeof collectEvidence>[0]): Vote[] {
+  return collectEvidence(args).votes
+}
+
+const titleOf = (p: Record<string, unknown>) =>
+  (typeof p.name === 'string' && p.name.trim() ? p.name : typeof p.title === 'string' ? p.title : '').trim() || 'A to-do'
 
 function daysBetween(from: string, to: string): number {
   const a = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))
@@ -183,7 +209,11 @@ function daysBetween(from: string, to: string): number {
 }
 
 /** The counts the screen shows beside each identity: all time, and the last seven days. */
-export function tally(identities: Identity[], votes: Vote[]): Pick<WorldPayload, 'identities' | 'everyday'> {
+export function tally(
+  identities: Identity[],
+  votes: Vote[],
+  evidence?: { receipts: Receipt[][]; next: (NextUp | null)[] },
+): Pick<WorldPayload, 'identities' | 'everyday'> {
   const ordered = [...identities].sort((a, b) => a.order - b.order || a.id - b.id)
   const all = new Array(ordered.length + 1).fill(0)
   const week = new Array(ordered.length + 1).fill(0)
@@ -193,7 +223,7 @@ export function tally(identities: Identity[], votes: Vote[]): Pick<WorldPayload,
     if (age < 7) week[i]++
   }
   return {
-    identities: ordered.map((idt, i) => ({ ...idt, votes: all[i], week: week[i] })),
+    identities: ordered.map((idt, i) => ({ ...idt, votes: all[i], week: week[i], recent: evidence?.receipts[i] ?? [], next: evidence?.next[i] ?? null })),
     everyday: { votes: all[ordered.length], week: week[ordered.length] },
   }
 }
@@ -209,13 +239,13 @@ function stemsOf(name: string): string[] {
 }
 
 /**
- * Which lists, habits and tags look like they belong to a new identity, by
+ * Which lists, to-dos and tags look like they belong to a new identity, by
  * name: "a runner" finds "Running", "Run club" and #run. Only ever a
  * suggestion — the user confirms it before anything counts.
  */
 export function suggestSources(name: string, sources: {
   lists: { id: number; title: string }[]
-  habits: { id: number; title: string }[]
+  items: { id: number; title: string }[]
   tags: string[]
 }): { listIds: number[]; itemIds: number[]; tags: string[] } {
   const stems = stemsOf(name)
@@ -225,7 +255,34 @@ export function suggestSources(name: string, sources: {
   }
   return {
     listIds: sources.lists.filter((l) => hit(l.title)).map((l) => l.id),
-    itemIds: sources.habits.filter((h) => hit(h.title)).map((h) => h.id),
+    itemIds: sources.items.filter((h) => hit(h.title)).map((h) => h.id),
     tags: sources.tags.filter(hit),
   }
+}
+
+/**
+ * Which identity a to-do on the screen votes for, or null: the same most-specific-link
+ * rule as the server (the item, then its list, then the list's area, then its tags),
+ * from what the lists already hold, so a tick can say "+1 runner" at once.
+ */
+export function identityForTodo(
+  todo: { id: number; listId: number | null; tags: string[] },
+  lists: { id: number; areaId: number | null }[],
+  identities: Identity[],
+): Identity | null {
+  const ordered = [...identities].sort((a, b) => a.order - b.order || a.id - b.id)
+  const first = (test: (i: Identity) => boolean) => ordered.find(test) ?? null
+  const byItem = first((i) => i.itemIds.includes(todo.id))
+  if (byItem) return byItem
+  if (todo.listId !== null) {
+    const byList = first((i) => i.listIds.includes(todo.listId!))
+    if (byList) return byList
+    const area = lists.find((l) => l.id === todo.listId)?.areaId
+    if (area != null) {
+      const byArea = first((i) => i.listIds.includes(area))
+      if (byArea) return byArea
+    }
+  }
+  const lower = todo.tags.map((t) => t.toLowerCase())
+  return first((i) => i.tags.some((t) => lower.includes(t.toLowerCase())))
 }

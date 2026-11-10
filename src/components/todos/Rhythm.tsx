@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import type { Rhythm } from '@/lib/rhythm'
 import { clockZone } from '@/lib/wallclock'
+import { BTN_PRIMARY } from '@/components/ui/buttons'
 
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
@@ -19,14 +20,13 @@ const NEAR_MINUTES = 30
  * src/lib/rhythm.ts). Nothing to fill in: it is drawn from ticking things off
  * and from what is said in the evening check-in.
  */
-export function RhythmCard({ id, kind, done, time, onPlanAt }: {
+export function RhythmCard({ id, done, time, onPlanAt }: {
   id: number
-  kind: 'Task' | 'Habit'
   /** Re-read when it is ticked, so the dot appears. */
   done: boolean
   /** The time it has on its day, if any. */
   time: string | null
-  /** Moves it to its usual time — tasks only; a habit's plan follows by itself. */
+  /** Moves it to its usual time. */
   onPlanAt?: (time: string) => void
 }) {
   const [rhythm, setRhythm] = useState<Rhythm | null>(null)
@@ -48,7 +48,7 @@ export function RhythmCard({ id, kind, done, time, onPlanAt }: {
 
   if (rhythm.doneDays === 0) {
     return (
-      <p className="flex items-start gap-2 mt-3 text-[12.5px] leading-snug text-muted-foreground">
+      <p className="flex items-start gap-2 mt-3 text-[length:calc(12.5px*var(--ts))] leading-snug text-muted-foreground">
         <Clock className="w-3.5 h-3.5 mt-[1px] shrink-0" />
         Tick it off when you actually do it. After a few times, Acture learns when that is and plans it there.
       </p>
@@ -58,33 +58,29 @@ export function RhythmCard({ id, kind, done, time, onPlanAt }: {
   const { usual, planned } = rhythm
   const current = time ? toMin(time) : planned
   const apart = usual !== null && current !== null && Math.abs(usual - current) >= NEAR_MINUTES
-  const canPlan = kind === 'Task' && !!onPlanAt && usual !== null && (time === null || apart)
+  const canPlan = !!onPlanAt && usual !== null && (time === null || apart)
 
   return (
     <div className="mt-3 rounded-lg border border-border/70 px-3 pt-2.5 pb-2">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[13px] font-semibold">
+        <p className="text-[length:calc(13px*var(--ts))] font-semibold">
           {usual !== null ? <>Usually around <span className="tabular-nums">{hhmm(usual)}</span></> : 'Learning when you do this'}
         </p>
-        <span className="text-[12px] text-muted-foreground shrink-0">last two weeks</span>
+        <span className="text-[length:calc(12px*var(--ts))] text-muted-foreground shrink-0">last two weeks</span>
       </div>
-      <p className="text-[12px] text-muted-foreground tabular-nums">
+      <p className="text-[length:calc(12px*var(--ts))] text-muted-foreground tabular-nums">
         {planned !== null && <>planned {hhmm(planned)} · </>}done {rhythm.doneDays} of {rhythm.days.length} days
       </p>
       <RhythmChart rhythm={rhythm} />
-      {(canPlan || (kind === 'Habit' && apart)) && (
-        <div className="flex items-center gap-2 mt-1.5 text-[12.5px]">
-          {canPlan ? (
-            <button
-              type="button"
-              onClick={() => onPlanAt!(hhmm(usual!))}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-2.5 py-1 font-semibold hover:opacity-90"
-            >
-              <Clock className="w-3.5 h-3.5" /> Plan it at {hhmm(usual!)}
-            </button>
-          ) : (
-            <span className="text-muted-foreground">Your next plans put it there.</span>
-          )}
+      {canPlan && (
+        <div className="flex items-center gap-2 mt-1.5 text-[length:calc(12.5px*var(--ts))]">
+          <button
+            type="button"
+            onClick={() => onPlanAt!(hhmm(usual!))}
+            className={`${BTN_PRIMARY} `}
+          >
+            <Clock className="w-3.5 h-3.5" /> Plan it at {hhmm(usual!)}
+          </button>
         </div>
       )}
     </div>
@@ -114,7 +110,7 @@ export function RhythmChart({ rhythm }: { rhythm: Rhythm }) {
   ].filter(Boolean).join(', ')
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={said} className="block mt-1.5 overflow-visible text-[11px]">
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={said} className="block mt-1.5 overflow-visible text-[length:calc(11px*var(--ts))]">
       {grid.map((m) => (
         <g key={m}>
           <line x1={x0} x2={W} y1={ys(m)} y2={ys(m)} className="stroke-border" strokeWidth={1} />
@@ -146,7 +142,7 @@ export function RhythmChart({ rhythm }: { rhythm: Rhythm }) {
             strokeWidth={2}
             strokeLinecap="round"
           />
-          <text x={x1} y={ys(usual) - 8} textAnchor="end" className="fill-foreground font-bold tabular-nums text-[12.5px]">{hhmm(usual)}</text>
+          <text x={x1} y={ys(usual) - 8} textAnchor="end" className="fill-foreground font-bold tabular-nums text-[length:calc(12.5px*var(--ts))]">{hhmm(usual)}</text>
         </>
       )}
     </svg>

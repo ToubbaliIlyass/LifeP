@@ -96,7 +96,7 @@ export const proposals = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     summary: text('summary').notNull(),
     operations: text('operations', { mode: 'json' }).notNull().default('[]'),
-    status: text('status', { enum: ['pending', 'approved', 'rejected'] })
+    status: text('status', { enum: ['pending', 'executing', 'approved', 'rejected', 'undone'] })
       .notNull()
       .default('pending'),
     rejectionReason: text('rejection_reason'),

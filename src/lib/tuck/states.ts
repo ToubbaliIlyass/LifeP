@@ -53,7 +53,7 @@ export const TUCK_LINES: Record<TuckState, string> = {
   'task-done': 'One down. Nice.',
   'all-done': 'All clear. The garden is tidy.',
   'milestone': 'Look how much has grown.',
-  'streak': 'Days in a row. Watered.',
+  'streak': 'Most days this week. Watered.',
   'level-seed': 'Just getting started.',
   'level-sprout': 'Growing steadily.',
   'level-bloom': 'Look, it bloomed.',

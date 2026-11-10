@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, Archive, Bell, CalendarDays, Clock, Flag, MapPin, Moon, Plus, Repeat, SkipForward, Star, Trash2, X } from 'lucide-react'
+import { ArrowRight, Archive, Bell, CalendarDays, Check, Clock, Ellipsis, Flag, ListChecks, MapPin, Moon, Plus, Repeat, SkipForward, Star, Trash2, X } from 'lucide-react'
 import type { ChecklistItem, Todo, TodoList } from '@/lib/todos'
 import { relDate, repeatLabel, skipLabel } from '@/lib/todo-views'
 import { parseEntry, saysMore } from '@/lib/quick-entry'
 import { lead } from '@/lib/reminders'
 import { EVENING_TONE, SOMEDAY_TONE, TodoCheck } from './parts'
 import { RhythmCard } from './Rhythm'
+import { BTN_PRIMARY } from '@/components/ui/buttons'
 
 export type PopKind = 'when' | 'time' | 'deadline' | 'move' | 'repeat' | 'remind'
 
@@ -33,7 +34,7 @@ export function AutoTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaEle
   return <textarea ref={ref} rows={1} {...props} />
 }
 
-const PILL = 'inline-flex items-center gap-1.5 max-w-[220px] text-[12.5px] px-2 py-1 rounded-md border transition-colors'
+const PILL = 'inline-flex flex-auto items-center justify-center gap-1.5 whitespace-nowrap min-w-0 text-[length:calc(12.5px*var(--ts))] max-md:text-[length:calc(14.5px*var(--ts))] px-2 max-md:px-3 py-1 max-md:py-2 max-md:min-h-10 rounded-md max-md:rounded-lg border transition-colors'
 
 /**
  * A to-do, opened in place.
@@ -72,7 +73,22 @@ export function TodoEditor({
     el.scrollIntoView({ block: 'nearest' })
   })
 
+  // On a phone the keyboard rises after the field is focused and would cover the card: bring it into view
+  // now, and again when the visible area shrinks.
+  useEffect(() => {
+    const show = () => root.current?.scrollIntoView({ block: 'nearest' })
+    const t = setTimeout(show, 60)
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    vv?.addEventListener('resize', show)
+    return () => { clearTimeout(t); vv?.removeEventListener('resize', show) }
+  }, [])
+  /** On a phone only the first three buttons show; the rest are one tap away. */
+  const [more, setMore] = useState(false)
+  const hide = (on: boolean) => (!more && !on ? 'max-md:hidden' : '')
+
   const isDraft = todo.id < -900
+  /** A phone's empty new draft shows only the title and the buttons: room for the keyboard. Notes, checklist and tags appear once there are words. */
+  const lean = isDraft && !todo.title.trim() && !todo.notes.trim() && todo.checklist.length === 0 && todo.tags.length === 0
   /** The title as it was when this opened, so only words added since are read. */
   const [opened] = useState(todo.title)
   const deleting = useRef(false)
@@ -115,6 +131,13 @@ export function TodoEditor({
   useEffect(() => () => closing.current(), [])
   const list = lists.find((l) => l.id === todo.listId)
   const setChecklist = (checklist: ChecklistItem[]) => onPatch({ checklist })
+  const [newItem, setNewItem] = useState('')
+  function addNewItem() {
+    const text = newItem.trim()
+    if (!text) return
+    setNewItem('')
+    setChecklist([...todo.checklist, { id: newId(), text, done: false }])
+  }
 
   /**
    * A list pasted into the checklist becomes the checklist: "- eggs\n- milk",
@@ -153,48 +176,34 @@ export function TodoEditor({
     whenOn = true
   }
   const pill = (on: boolean, extra = '') =>
-    `${PILL} ${on ? `border-border/80 text-foreground ${extra}` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045]'}`
+    `${PILL} ${on ? `border-primary/40 bg-primary/[0.12] text-foreground ${extra}` : 'border-transparent bg-foreground/[0.05] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.085]'}`
 
   return (
     <li
       ref={root}
       data-editor
       data-todo-id={todo.id}
-      className="flex gap-2 items-start my-2.5 -mx-3 max-md:-mx-2 px-3 max-md:px-2 pt-3 pb-2.5 rounded-[10px] leading-[22px] bg-card border border-border/70 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.10)]"
+      className="flex gap-2 items-start my-2.5 scroll-mb-3 -mx-3 max-md:-mx-2 px-3 max-md:px-2 pt-3 pb-2.5 rounded-[10px] leading-[22px] bg-card border border-border/70 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.10)]"
     >
-      <TodoCheck done={todo.done} onClick={onToggle} />
+      {/* Nothing to tick until it exists. */}
+      {isDraft ? <span className="w-[22px] shrink-0" aria-hidden /> : <TodoCheck done={todo.done} label={todo.done ? `Mark “${todo.title}” as not done` : `Complete “${todo.title}”`} onClick={onToggle} />}
       <div className="flex-1 min-w-0">
-        {/* A new item can be either: something to do, or something to show up to. */}
-        {isDraft && (
-          <div className="float-right ml-2 -mt-0.5 inline-flex rounded-md bg-foreground/[0.06] p-0.5 text-[12px] font-medium">
-            {([['To-do', false], ['Event', true]] as const).map(([label, value]) => (
-              <button
-                key={label}
-                type="button"
-                aria-pressed={isEvent === value}
-                onClick={() => onPatch({ asEvent: value })}
-                className={`px-2 py-0.5 rounded ${isEvent === value ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-        <input
+        <AutoTextarea
           data-title
           value={todo.title}
           onChange={(e) => onPatch({ title: e.target.value })}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onClose() } }}
           placeholder={isEvent ? 'Dentist fri at 3pm for 1h @clinic' : isDraft ? 'Review ML do tomorrow due fri for 45m #school' : 'New to-do'}
           aria-label="Title"
-          className="block w-full bg-transparent outline-none text-[14px] font-medium leading-[22px] placeholder:text-muted-foreground/50 placeholder:font-normal"
+          // Long titles wrap onto the next line, so all of it can be read.
+          className="block w-full resize-none overflow-hidden [overflow-wrap:anywhere] bg-transparent outline-none text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(17px*var(--ts))] font-medium leading-[22px] max-md:leading-6 placeholder:text-muted-foreground/50 placeholder:font-normal"
         />
         {entry && saysMore(entry) && (
           // What the line says, piece by piece — it becomes exactly this on save.
-          <div className="flex flex-wrap items-center gap-1 mt-1 text-[12px]">
+          <div className="flex flex-wrap items-center gap-1 mt-1 text-[length:calc(12px*var(--ts))]">
             {entry.title && entry.title !== todo.title.trim() && <span className="font-medium text-foreground/80 mr-0.5">“{entry.title}”</span>}
             {entry.pieces.map((p) => (
-              <span key={p} className="rounded-[4px] bg-primary/[0.12] text-primary px-1.5 leading-[18px] font-medium">{p}</span>
+              <span key={p} className="rounded-[4px] bg-primary/[0.14] text-primary-ink px-1.5 leading-[18px] font-medium">{p}</span>
             ))}
             <button type="button" onClick={() => onPatch({ literal: true })} className="ml-1 text-muted-foreground hover:text-foreground underline underline-offset-2">
               keep the words
@@ -203,7 +212,7 @@ export function TodoEditor({
         )}
         {isDraft && !todo.title && (
           // The shorthand, while there is nothing typed to show it on.
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground/80">
+          <p className="mt-1 text-[length:calc(12px*var(--ts))] leading-relaxed text-muted-foreground/80 max-md:hidden">
             <b className="font-semibold">event:</b> or <b className="font-semibold">todo:</b> first, then any of
             {' '}<b className="font-semibold">do</b> fri · <b className="font-semibold">due</b> mon · <b className="font-semibold">at</b> 3pm · <b className="font-semibold">for</b> 45m · #tag · !! · <b className="font-semibold">every</b> day x5 · /project · @place
           </p>
@@ -216,7 +225,7 @@ export function TodoEditor({
               onChange={(e) => onPatch({ location: e.target.value })}
               placeholder="Where (optional)"
               aria-label="Where"
-              className="flex-1 min-w-0 bg-transparent outline-none text-[13.5px] text-foreground placeholder:text-muted-foreground/50"
+              className="flex-1 min-w-0 bg-transparent outline-none text-[length:calc(13.5px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] text-foreground placeholder:text-muted-foreground/50"
             />
           </label>
         )}
@@ -225,11 +234,11 @@ export function TodoEditor({
           onChange={(e) => onPatch({ notes: e.target.value })}
           placeholder="Notes"
           aria-label="Notes"
-          className="block w-full mt-0.5 bg-transparent outline-none resize-none overflow-hidden text-[13.5px] text-muted-foreground leading-normal min-h-[20px] placeholder:text-muted-foreground/50"
+          className={`block w-full mt-0.5 bg-transparent outline-none resize-none overflow-hidden text-[length:calc(13.5px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] text-muted-foreground leading-normal min-h-[20px] placeholder:text-muted-foreground/50 ${lean ? 'max-md:hidden' : ''}`}
         />}
 
         {isTask && (
-          <ul className="mt-2.5">
+          <ul className={`mt-2.5 ${lean ? 'max-md:hidden' : ''}`}>
             {todo.checklist.map((c, i) => (
               <li key={c.id} data-cid={c.id} className="group/cl flex items-center gap-2 py-[3px] border-b border-border/60">
                 <TodoCheck
@@ -256,13 +265,13 @@ export function TodoEditor({
                       setChecklist(todo.checklist.filter((x) => x.id !== c.id))
                     }
                   }}
-                  className={`flex-1 min-w-0 bg-transparent outline-none text-[13.5px] py-[2px] ${c.done ? 'text-muted-foreground line-through' : ''}`}
+                  className={`flex-1 min-w-0 bg-transparent outline-none text-[length:calc(13.5px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] py-[2px] max-md:py-1.5 ${c.done ? 'text-muted-foreground line-through' : ''}`}
                 />
                 <button
                   type="button"
                   aria-label="Remove item"
                   onClick={() => setChecklist(todo.checklist.filter((x) => x.id !== c.id))}
-                  className="grid place-items-center w-6 h-6 rounded-md text-muted-foreground opacity-0 group-hover/cl:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-foreground/[0.045]"
+                  className="grid place-items-center w-6 h-6 rounded-md text-muted-foreground opacity-0 group-hover/cl:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-foreground/[0.045] max-md:h-10 max-md:w-10 max-md:opacity-100"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -272,32 +281,45 @@ export function TodoEditor({
               <span className="w-[13px] grid place-items-center text-muted-foreground/50"><Plus className="w-3 h-3" /></span>
               <input
                 data-cl-new
-                placeholder="Add checklist item — or paste a list"
+                value={newItem}
+                enterKeyHint="done"
+                placeholder="Add checklist item"
                 aria-label="Add checklist item"
+                onChange={(e) => setNewItem(e.target.value)}
                 onPaste={(e) => pasteList(e, todo.checklist.length)}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return
                   e.preventDefault()
-                  const text = e.currentTarget.value.trim()
-                  if (!text) return
-                  e.currentTarget.value = ''
-                  setChecklist([...todo.checklist, { id: newId(), text, done: false }])
+                  addNewItem()
                 }}
-                className="flex-1 min-w-0 bg-transparent outline-none text-[13.5px] py-[2px] placeholder:text-muted-foreground/50"
+                // Phone keyboards do not always send Enter: leaving the field keeps what was typed.
+                onBlur={addNewItem}
+                className="flex-1 min-w-0 bg-transparent outline-none text-[length:calc(13.5px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] py-[2px] max-md:py-1.5 placeholder:text-muted-foreground/50"
               />
+              {newItem.trim() && (
+                <button
+                  type="button"
+                  // Before the field blurs, so the tap adds the item once.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={addNewItem}
+                  className="shrink-0 rounded-md bg-foreground/[0.07] px-2.5 py-1 text-[length:calc(12.5px*var(--ts))] font-semibold hover:bg-foreground/[0.12] max-md:h-10 max-md:px-3.5 max-md:text-[length:calc(14.5px*var(--ts))]"
+                >
+                  Add
+                </button>
+              )}
             </li>
           </ul>
         )}
 
-        {!isEvent && <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+        {!isEvent && <div className={`flex flex-wrap items-center gap-1.5 mt-2.5 ${lean ? 'max-md:hidden' : ''}`}>
           {todo.tags.map((tag) => (
-            <span key={tag} className="inline-flex items-center gap-0.5 text-[12.5px] bg-foreground/[0.05] text-muted-foreground rounded-md pl-2 pr-[3px] py-0.5">
+            <span key={tag} className="inline-flex items-center gap-0.5 text-[length:calc(12.5px*var(--ts))] max-md:text-[length:calc(14px*var(--ts))] bg-foreground/[0.05] text-muted-foreground rounded-md pl-2 pr-[3px] py-0.5 max-md:py-1">
               #{tag}
               <button
                 type="button"
                 aria-label={`Remove tag ${tag}`}
                 onClick={() => onPatch({ tags: todo.tags.filter((t) => t !== tag) })}
-                className="grid place-items-center w-[18px] h-[18px] rounded text-muted-foreground/60 hover:text-foreground"
+                className="grid place-items-center w-[18px] h-[18px] max-md:w-8 max-md:h-8 rounded text-muted-foreground/60 hover:text-foreground"
               >
                 <X className="w-[11px] h-[11px]" />
               </button>
@@ -316,15 +338,14 @@ export function TodoEditor({
               }
             }}
             onBlur={(e) => { if (e.currentTarget.value.trim()) { addTags(e.currentTarget.value); e.currentTarget.value = '' } }}
-            className="flex-1 min-w-[90px] bg-transparent outline-none text-[13px] py-0.5 placeholder:text-muted-foreground/50"
+            className="flex-1 min-w-[90px] bg-transparent outline-none text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] py-0.5 max-md:py-1.5 placeholder:text-muted-foreground/50"
           />
         </div>}
 
         {/* Something that comes back has a rhythm worth seeing; a one-off has one tick. */}
-        {!isDraft && (todo.type === 'Habit' || (isTask && !!todo.repeats)) && (
+        {!isDraft && isTask && !!todo.repeats && !todo.prayerKey && (
           <RhythmCard
             id={todo.id}
-            kind={todo.type === 'Habit' ? 'Habit' : 'Task'}
             done={todo.done}
             time={todo.time}
             onPlanAt={todo.someday || todo.done ? undefined : (time) => onPatch({ time })}
@@ -352,47 +373,91 @@ export function TodoEditor({
               )}
             </>
           ) : null}
-          {(isTask || todo.type === 'Habit') && !isDraft && (
+          {isTask && !isDraft && (
             // When it reminds you: at its time, before it, or any moment.
-            <button type="button" className={pill(!!reminderLabel(todo, today), 'text-amber-600 dark:text-amber-400')} onClick={(e) => onPop('remind', e.currentTarget)}>
+            <button type="button" className={`${pill(!!reminderLabel(todo, today), 'text-amber-600 dark:text-amber-400')} ${hide(!!reminderLabel(todo, today))}`} onClick={(e) => onPop('remind', e.currentTarget)}>
               <Bell className="w-[15px] h-[15px]" />
               <span className="truncate tabular-nums">{reminderLabel(todo, today) ?? 'Remind'}</span>
             </button>
           )}
           {isTask && (
             // Priority: marked, or not. "!!" in a new to-do's line sets it too.
-            <button type="button" className={pill(todo.priority === 'high', 'text-red-500')} aria-pressed={todo.priority === 'high'} onClick={() => onPatch({ priority: todo.priority === 'high' ? null : 'high' })}>
+            <button type="button" className={`${pill(todo.priority === 'high', 'text-red-500')} ${hide(todo.priority === 'high')}`} aria-pressed={todo.priority === 'high'} onClick={() => onPatch({ priority: todo.priority === 'high' ? null : 'high' })}>
               <span className="font-bold leading-none">!!</span>
               <span className="truncate">{todo.priority === 'high' ? 'High' : 'Priority'}</span>
             </button>
           )}
-          {/* Any to-do can come round again; nothing has to be a "habit" first. */}
-          <button type="button" className={pill(!!todo.repeats)} onClick={(e) => onPop('repeat', e.currentTarget)}>
+          {/* Any to-do can come round again. */}
+          <button type="button" className={`${pill(!!todo.repeats)} ${hide(!!todo.repeats)}`} onClick={(e) => onPop('repeat', e.currentTarget)}>
             <Repeat className={`w-[15px] h-[15px] ${todo.repeats ? 'text-emerald-600 dark:text-emerald-400' : ''}`} />
             <span className="truncate">{todo.repeats ? repeatLabel(todo.repeats) : 'Repeat'}</span>
           </button>
           {!isEvent && (
-            <button type="button" className={pill(false)} onClick={(e) => onPop('move', e.currentTarget)}>
+            <button type="button" className={`${pill(false)} ${hide(false)}`} onClick={(e) => onPop('move', e.currentTarget)}>
               <ArrowRight className="w-[15px] h-[15px]" />
               <span className="truncate">{list ? list.title || 'Untitled' : isTask ? 'Inbox' : 'No list'}</span>
             </button>
           )}
           {onSkip && !isDraft && (
-            <button type="button" className={pill(false)} onClick={() => { onSkip(); onClose() }}>
+            <button type="button" className={`${pill(false)} ${hide(false)}`} onClick={() => { onSkip(); onClose() }}>
               <SkipForward className="w-[15px] h-[15px]" />
               <span className="truncate">{skipLabel(todo, today)}</span>
             </button>
           )}
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={() => { deleting.current = true; onDelete() }}
-            aria-label="Delete to-do"
-            className="grid place-items-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045]"
-          >
-            <Trash2 className="w-[17px] h-[17px]" />
-          </button>
+          {!more && (
+            <button type="button" className={`${pill(false)} md:hidden`} onClick={() => setMore(true)}>
+              <Ellipsis className="w-[15px] h-[15px]" />
+              <span>More</span>
+            </button>
+          )}
+          {!isDraft && (
+            <>
+              <button
+                type="button"
+                onClick={() => { deleting.current = true; onDelete() }}
+                aria-label="Delete to-do"
+                className="grid shrink-0 place-items-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045] max-md:w-11 max-md:h-11"
+              >
+                <Trash2 className="w-[17px] h-[17px]" />
+              </button>
+            </>
+          )}
         </div>
+        {isDraft && (
+          // A new item is either something to do or something to show up to; it is only kept once confirmed
+          // (this button, Enter, or clicking away).
+          <div className="mt-2.5 flex items-center gap-2 max-md:flex-wrap">
+            <div role="group" aria-label="Kind" className="inline-flex h-9 shrink-0 rounded-lg max-md:h-11 max-md:w-full bg-foreground/[0.06] p-0.5 text-[length:calc(13px*var(--ts))] font-medium max-md:text-[length:calc(15px*var(--ts))]">
+              {([['To-do', false, ListChecks], ['Event', true, CalendarDays]] as const).map(([label, value, Icon]) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={isEvent === value}
+                  onClick={() => onPatch({ asEvent: value })}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 max-md:flex-1 max-md:px-3 ${isEvent === value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Icon className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" />{label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => { deleting.current = true; onDelete() }}
+              aria-label="Discard this one"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-foreground/[0.05] text-muted-foreground hover:bg-foreground/[0.085] hover:text-foreground max-md:h-11 max-md:w-11"
+            >
+              <X className="h-[18px] w-[18px]" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={!todo.title.trim() && !todo.notes.trim()}
+              className={`${BTN_PRIMARY} min-w-0 flex-1 max-md:min-w-0 max-md:flex-1`}
+            >
+              <Check className="h-4 w-4" strokeWidth={3} />{isEvent ? 'Add event' : 'Add to-do'}
+            </button>
+          </div>
+        )}
       </div>
     </li>
   )
