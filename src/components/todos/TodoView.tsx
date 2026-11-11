@@ -1,6 +1,7 @@
 'use client'
 
 import { BTN_PRIMARY } from '@/components/ui/buttons'
+import { ListSkeleton } from '@/components/todos/ListSkeleton'
 import { startListening } from '@/components/today/TodayAssistant'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
@@ -1489,7 +1490,7 @@ export function TodoView({
 
   return (
     <div ref={scroller} className="h-full overflow-y-auto flex flex-col">
-      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 max-md:pb-36 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] transition-opacity duration-150 ${ready || down ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 max-md:pb-36 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] `}>
         {phoneBar}
         {!ready && down ? (
           // The server is not answering: say so, kindly, with a way to try again.
@@ -1499,6 +1500,8 @@ export function TodoView({
             <p className="mt-1 text-[length:calc(13.5px*var(--ts))] text-muted-foreground">Your lists are safe. This is on our side.</p>
             <button onClick={reload} className={`${BTN_PRIMARY} mt-4`}>Try again</button>
           </div>
+        ) : !ready ? (
+          <ListSkeleton />
         ) : (
           <>
             {known ? body() : null}
