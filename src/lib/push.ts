@@ -59,29 +59,48 @@ function keyBytes(base64: string): Uint8Array<ArrayBuffer> {
 }
 
 /** Which device this is, for the list of where reminders go. */
-function deviceLabel(): string {
+async function deviceLabel(): Promise<string> {
   const ua = navigator.userAgent
   const os = isIOS() ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'This device'
-  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : ''
+  const browser = (await isBrave()) ? 'Brave' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : ''
   return [os, browser].filter(Boolean).join(' · ')
+}
+
+/** Why turning push on did not work, so Settings can say what to do about it. */
+export type PushResult = 'ok' | 'denied' | 'not-ready' | 'push-service' | 'server'
+
+/** Brave answers this; every other browser has no `brave` object. */
+export async function isBrave(): Promise<boolean> {
+  const brave = (navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }).brave
+  try { return !!(await brave?.isBrave?.()) } catch { return false }
 }
 
 /**
  * Turns push on here: asks permission if it has not been given, subscribes
  * with the server's key, and tells the server where to send. Must start from
- * a tap — browsers refuse otherwise. True when it worked.
+ * a tap: browsers refuse otherwise. Says why when it cannot.
+ *
+ * `push-service` is the browser refusing to reach its push service. Brave
+ * does this by default (it ships with Google's push messaging switched off),
+ * and so does any browser offline or behind a blocker.
  */
-export async function enablePush(): Promise<boolean> {
+export async function enablePush(): Promise<PushResult> {
   const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-  if (!key || !('serviceWorker' in navigator) || !('PushManager' in window)) return false
-  if (Notification.permission === 'default' && (await Notification.requestPermission()) !== 'granted') return false
-  if (Notification.permission !== 'granted') return false
+  if (!key || !('serviceWorker' in navigator) || !('PushManager' in window)) return 'not-ready'
+  if (Notification.permission === 'default' && (await Notification.requestPermission()) !== 'granted') return 'denied'
+  if (Notification.permission !== 'granted') return 'denied'
   const reg = await navigator.serviceWorker.getRegistration()
-  if (!reg) return false // registered in production only — see RegisterServiceWorker
-  const sub = (await reg.pushManager.getSubscription()) ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
-  const res = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), label: deviceLabel() }) })
-  if (res.ok) safeSet('local', PUSH_KEY, '1')
-  return res.ok
+  if (!reg) return 'not-ready' // registered in production only: see RegisterServiceWorker
+  let sub: PushSubscription
+  try {
+    sub = (await reg.pushManager.getSubscription()) ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
+  } catch {
+    return 'push-service'
+  }
+  const res = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), label: await deviceLabel() }) }).catch(() => null)
+  if (!res?.ok) return 'server'
+  safeSet('local', PUSH_KEY, '1')
+  return 'ok'
 }
 
 /** Turns push off here, on both sides. */
