@@ -80,6 +80,10 @@ const themeScript = `
       if (css) { var st = document.createElement('style'); st.id = 'acture-custom-theme'; st.textContent = css; document.head.appendChild(st); document.documentElement.setAttribute('data-theme', 'custom'); }
     } else if (p && p !== 'default') document.documentElement.setAttribute('data-theme', p);
   } catch(e){}
+  try {
+    var w = parseInt(localStorage.getItem('acture-sb') || '', 10);
+    if (w >= 220 && w <= 480) document.documentElement.style.setProperty('--sb', w + 'px');
+  } catch(e){}
 })()
 `
 

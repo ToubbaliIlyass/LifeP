@@ -12,6 +12,62 @@ import { AttachButton } from '@/components/chat/attachments'
 import { ASSISTANT_TRIGGER } from '@/components/today/TodayAssistant'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
 
+const SB_MIN = 220
+const SB_MAX = 480
+const SB_DEFAULT = 284
+
+/** Sets the sidebar's width for the whole page (the lists and the cards beside it read it) and remembers it on this device. */
+function setSidebarWidth(px: number, save: boolean) {
+  const w = Math.round(Math.min(SB_MAX, Math.max(SB_MIN, px)))
+  document.documentElement.style.setProperty('--sb', `${w}px`)
+  if (save) { try { localStorage.setItem('acture-sb', String(w)) } catch { /* not remembered */ } }
+  return w
+}
+
+/** The edge you drag to make the sidebar wider or narrower; double-click puts it back, arrow keys nudge it. */
+function ResizeHandle() {
+  const [dragging, setDragging] = useState(false)
+  const current = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sb'), 10) || SB_DEFAULT
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the sidebar"
+      aria-valuemin={SB_MIN}
+      aria-valuemax={SB_MAX}
+      tabIndex={0}
+      title="Drag to resize · double-click to reset"
+      onPointerDown={(e) => {
+        e.preventDefault()
+        const startX = e.clientX
+        const startW = current()
+        setDragging(true)
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+        const move = (ev: PointerEvent) => setSidebarWidth(startW + ev.clientX - startX, false)
+        const up = (ev: PointerEvent) => {
+          setSidebarWidth(startW + ev.clientX - startX, true)
+          setDragging(false)
+          document.body.style.cursor = ''
+          document.body.style.userSelect = ''
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', up)
+        }
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', up)
+      }}
+      onDoubleClick={() => setSidebarWidth(SB_DEFAULT, true)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); setSidebarWidth(current() - 16, true) }
+        if (e.key === 'ArrowRight') { e.preventDefault(); setSidebarWidth(current() + 16, true) }
+      }}
+      className="group absolute inset-y-0 -right-1.5 z-30 w-3 cursor-col-resize touch-none max-md:hidden focus-visible:outline-none"
+    >
+      <span className={`absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors group-hover:bg-primary/50 group-focus-visible:bg-primary/60 ${dragging ? 'bg-primary/60' : 'bg-transparent'}`} />
+    </div>
+  )
+}
+
 /** What dropping a to-do on a list means, in fields. */
 function dropChanges(todo: Todo, target: string, today: string): Partial<Todo> | 'complete' | null {
   if (target.startsWith('project:') || target.startsWith('area:')) {
@@ -239,13 +295,14 @@ export function Sidebar({
       <aside
         aria-label="Lists"
         className={`
-          flex flex-col min-h-0 w-[var(--sb)] shrink-0 bg-sidebar border-r border-border/60
+          relative flex flex-col min-h-0 w-[var(--sb)] shrink-0 bg-sidebar border-r border-border/60
           max-md:fixed max-md:inset-0 max-md:z-50 max-md:w-full max-md:border-r-0
           max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]
           max-md:transition-transform max-md:duration-200 motion-reduce:transition-none
           ${open ? '' : 'max-md:-translate-x-[102%]'} ${slim ? 'md:hidden' : ''}
         `}
       >
+        <ResizeHandle />
         <nav className="flex-1 min-h-0 overflow-y-auto px-2.5 pt-3 pb-3">
           {standard('inbox', c.inbox)}
           <div className="h-3" />

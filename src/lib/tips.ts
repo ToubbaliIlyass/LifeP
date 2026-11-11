@@ -59,6 +59,7 @@ export const TIPS: Tip[] = [
   { id: 'key-n', title: 'N starts a to-do', body: 'On a computer, press N for a new to-do and Shift+N for a new event. No mouse needed.', on: 'desktop' },
   { id: 'type-to-find', title: 'Just start typing', body: 'With nothing selected, typing searches everything. ⌘K or / does the same.', on: 'desktop' },
   { id: 'keys', title: 'Drive the list with keys', body: 'Arrows move, Space ticks, T sends it to today and E to this evening.', on: 'desktop' },
+  { id: 'sidebar-width', title: 'Make the sidebar fit you', body: 'Drag the sidebar’s edge to make it wider or narrower. Double-click the edge to put it back.', on: 'desktop' },
   { id: 'slim', title: 'Need more room?', body: 'Press ⌘/ to hide the sidebar. Settings can also let the lists run the full width.', on: 'desktop' },
   { id: 'deadline', title: 'A deadline isn’t the day you’ll do it', body: 'Give a to-do a day to do it and, separately, a deadline. The deadline stays in sight without crowding Today.', when: (c) => !real(c).some((t) => t.deadline) },
   { id: 'project', title: 'Group steps into a project', body: 'New List, then New project. Its to-dos can sit under headings, and the project shows what’s left.', when: (c) => c.lists.filter((l) => l.kind === 'project').length < 2 },
