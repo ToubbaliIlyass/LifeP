@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, Eye, EyeOff, Inbox as ProposalsIcon, Keyboard, Layers, Mic, Moon, Pencil, Plus, Search, SlidersHorizontal, Square, Sun, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Inbox as ProposalsIcon, Keyboard, Layers, Mic, Moon, Pencil, Plus, Search, SlidersHorizontal, Square, Sun, Trash2 } from 'lucide-react'
 import { useMode } from '@/lib/useMode'
 import { addDays } from '@/lib/date'
 import { byOrder, counts, progress, type StandardView } from '@/lib/todo-views'
@@ -12,7 +12,7 @@ import { AttachButton } from '@/components/chat/attachments'
 import { ASSISTANT_TRIGGER } from '@/components/today/TodayAssistant'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
 
-const SB_MIN = 220
+const SB_MIN = 260
 const SB_MAX = 480
 const SB_DEFAULT = 284
 
@@ -90,10 +90,10 @@ function dropChanges(todo: Todo, target: string, today: string): Partial<Todo> |
 const TOOL = 'grid place-items-center w-7 h-7 max-md:w-11 max-md:h-11 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
 const ROW = 'flex items-center gap-2 max-md:gap-3 w-full px-2 py-[3.5px] max-md:min-h-11 max-md:py-2 rounded-md text-[length:calc(13.5px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] leading-5 text-left select-none'
 
-const MENU_ITEM = 'flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-[7px] text-left text-[length:calc(14px*var(--ts))] hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] outline-none max-md:py-3 max-md:text-[length:calc(16px*var(--ts))]'
+export const MENU_ITEM = 'flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-[7px] text-left text-[length:calc(14px*var(--ts))] hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] outline-none max-md:py-3 max-md:text-[length:calc(16px*var(--ts))]'
 
 /** A menu at the pointer, kept on the screen, closed by a click elsewhere, Escape or scrolling. */
-function ContextMenu({ at, onClose, children }: { at: { x: number; y: number }; onClose: () => void; children: React.ReactNode }) {
+export function ContextMenu({ at, onClose, children }: { at: { x: number; y: number }; onClose: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   useLayoutEffect(() => {
@@ -250,6 +250,90 @@ export function Sidebar({
     },
   })
 
+  /** The list being dragged to a new place in the sidebar, and where it would land. */
+  const listDrag = useRef<TodoList | null>(null)
+  const [listHint, setListHint] = useState<{ id: number; before: boolean } | null>(null)
+
+  /** The lists a list can be moved among: its own area's projects, or the areas. */
+  const siblingsOf = (l: TodoList) =>
+    l.kind === 'area' ? areas
+      : projects.filter((p) => (areaIds.has(l.areaId ?? -1) ? p.areaId === l.areaId : !p.areaId || !areaIds.has(p.areaId)))
+
+  /**
+   * Puts `l` before or after `target`, between the two it lands between. A
+   * project dropped among another area's projects moves into that area.
+   */
+  const placeList = (l: TodoList, target: TodoList, before: boolean) => {
+    const rest = siblingsOf(target).filter((x) => x.id !== l.id)
+    const at = rest.findIndex((x) => x.id === target.id) + (before ? 0 : 1)
+    const prev = rest[at - 1]
+    const next = rest[at]
+    const order = prev && next ? (prev.order + next.order) / 2 : prev ? prev.order + 1 : next ? next.order - 1 : l.order
+    const changes: Partial<TodoList> = {}
+    if (order !== l.order) changes.order = order
+    if (l.kind === 'project') {
+      const area = areaIds.has(target.areaId ?? -1) ? target.areaId : null
+      if ((l.areaId ?? null) !== area) changes.areaId = area
+    }
+    if (Object.keys(changes).length) patchList(l.id, changes)
+  }
+
+  /** A project dropped on an area's own row: into that area, at the end. */
+  const moveIntoArea = (l: TodoList, area: TodoList) => {
+    if (l.areaId === area.id) return
+    const last = projects.filter((p) => p.areaId === area.id).reduce((m, p) => Math.max(m, p.order), 0)
+    patchList(l.id, { areaId: area.id, order: Math.max(last + 1, l.order) })
+  }
+  /** The area a project is hovering over, to be dropped into. */
+  const [intoArea, setIntoArea] = useState<number | null>(null)
+
+  /** One step up or down among its siblings: for a keyboard, a phone, or anyone who would rather not drag. */
+  const stepList = (l: TodoList, dir: -1 | 1) => {
+    const sib = siblingsOf(l)
+    const i = sib.findIndex((x) => x.id === l.id)
+    const other = sib[i + dir]
+    if (other) placeList(l, other, dir === -1)
+  }
+
+  /** Drag a project or an area to reorder it. To-dos dragged onto a list still land in it, as before. */
+  const listDnd = (l: TodoList, base: ReturnType<typeof dropProps>) => ({
+    draggable: renaming !== l.id,
+    onDragStart: (e: React.DragEvent) => {
+      listDrag.current = l
+      e.dataTransfer.setData('text/plain', `list:${l.id}`)
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    onDragEnd: () => { listDrag.current = null; setListHint(null); setIntoArea(null) },
+    onDragOver: (e: React.DragEvent) => {
+      const d = listDrag.current
+      if (!d) return base.onDragOver(e)
+      if (d.id === l.id) return
+      // A project over an area's row goes into the area; over another project, it goes beside it.
+      if (d.kind === 'project' && l.kind === 'area') { e.preventDefault(); if (intoArea !== l.id) setIntoArea(l.id); return }
+      if (d.kind !== l.kind) return
+      e.preventDefault()
+      const r = e.currentTarget.getBoundingClientRect()
+      const before = e.clientY < r.top + r.height / 2
+      if (listHint?.id !== l.id || listHint.before !== before) setListHint({ id: l.id, before })
+    },
+    onDragLeave: (e: React.DragEvent) => { if (!listDrag.current) base.onDragLeave(); else if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { setListHint((h) => (h?.id === l.id ? null : h)); setIntoArea((a) => (a === l.id ? null : a)) } },
+    onDrop: (e: React.DragEvent) => {
+      const d = listDrag.current
+      if (!d) return base.onDrop(e)
+      e.preventDefault()
+      const before = listHint?.before ?? true
+      listDrag.current = null
+      setListHint(null)
+      setIntoArea(null)
+      if (d.id === l.id) return
+      if (d.kind === 'project' && l.kind === 'area') moveIntoArea(d, l)
+      else if (d.kind === l.kind) placeList(d, l, before)
+    },
+  })
+  const hintClass = (l: TodoList) =>
+    intoArea === l.id ? 'bg-primary/10 ring-[1.5px] ring-inset ring-primary'
+    : listHint?.id === l.id ? (listHint.before ? 'shadow-[inset_0_2px_0_0_var(--color-primary)]' : 'shadow-[inset_0_-2px_0_0_var(--color-primary)]') : ''
+
   /** The list's name, or a box to rename it in, when asked from the menu. */
   const nameOf = (l: TodoList, fallback: string) =>
     renaming === l.id ? (
@@ -274,7 +358,7 @@ export function Sidebar({
     const target = `project:${p.id}`
     const left = todos.filter((t) => t.listId === p.id && t.type === 'Task' && !t.done).length
     return (
-      <a key={p.id} href={`#${target}`} onClick={follow(target)} {...menuProps(p)} aria-current={view === target ? 'page' : undefined} className={rowClass(target, indent ? 'max-md:pl-5 md:pl-4' : '')} {...dropProps(target)}>
+      <a key={p.id} href={`#${target}`} onClick={follow(target)} {...menuProps(p)} aria-current={view === target ? 'page' : undefined} className={rowClass(target, `${indent ? 'max-md:pl-5 md:pl-4' : ''} ${hintClass(p)}`)} {...dropProps(target)} {...listDnd(p, dropProps(target))}>
         <ProgressRing value={progress(p, todos)} size={14} className="text-muted-foreground mx-px" />
         {nameOf(p, 'Untitled project')}
         {p.hideFromToday && <EyeOff aria-label="Hidden from Today" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />}
@@ -319,7 +403,7 @@ export function Sidebar({
             const target = `area:${a.id}`
             return (
               <div key={a.id}>
-                <a href={`#${target}`} onClick={follow(target)} {...menuProps(a)} aria-current={view === target ? 'page' : undefined} className={rowClass(target, 'font-bold mt-3')} {...dropProps(target)}>
+                <a href={`#${target}`} onClick={follow(target)} {...menuProps(a)} aria-current={view === target ? 'page' : undefined} className={rowClass(target, `font-bold mt-3 ${hintClass(a)}`)} {...dropProps(target)} {...listDnd(a, dropProps(target))}>
                   <Square className="w-4 h-4 shrink-0 text-muted-foreground" />
                   {nameOf(a, 'Untitled area')}
                   {a.hideFromToday && <EyeOff aria-label="Hidden from Today" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />}
@@ -433,6 +517,21 @@ export function Sidebar({
                 ))}
               </>
             )}
+            <hr className="mx-1 my-1.5 border-border/70" />
+            {(() => {
+              const sib = siblingsOf(l)
+              const i = sib.findIndex((x) => x.id === l.id)
+              return (
+                <>
+                  <button role="menuitem" disabled={i <= 0} className={`${MENU_ITEM} disabled:opacity-40 disabled:pointer-events-none`} onClick={() => { close(); stepList(l, -1) }}>
+                    <ArrowUp className="h-[18px] w-[18px]" />Move up
+                  </button>
+                  <button role="menuitem" disabled={i < 0 || i >= sib.length - 1} className={`${MENU_ITEM} disabled:opacity-40 disabled:pointer-events-none`} onClick={() => { close(); stepList(l, 1) }}>
+                    <ArrowDown className="h-[18px] w-[18px]" />Move down
+                  </button>
+                </>
+              )
+            })()}
             <hr className="mx-1 my-1.5 border-border/70" />
             <button role="menuitem" className={MENU_ITEM} onClick={() => { close(); patchList(l.id, { hideFromToday: !l.hideFromToday }) }}>
               {l.hideFromToday ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}

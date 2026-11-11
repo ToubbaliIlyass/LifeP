@@ -2,10 +2,11 @@
 
 import { BTN_PRIMARY } from '@/components/ui/buttons'
 import { ListSkeleton } from '@/components/todos/ListSkeleton'
+import { ContextMenu, MENU_ITEM as CONTEXT_ITEM } from '@/components/todos/Sidebar'
 import { startListening } from '@/components/today/TodayAssistant'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
-  Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
+  ArrowDown, ArrowUp, Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
   Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import type { EventStatus } from '@/lib/event-status'
@@ -438,6 +439,21 @@ export function TodoView({
     })
   }
 
+  /** The to-do whose "move" menu is open (right-click, or a long press on a touch screen), and the ones it can move among. */
+  const [rowMenu, setRowMenu] = useState<{ todo: Todo; pool: Todo[]; x: number; y: number } | null>(null)
+  const rowPress = useRef<{ timer: number | null; fired: boolean }>({ timer: null, fired: false })
+
+  /** One step up or down among the to-dos beside it. */
+  function stepRow(t: Todo, pool: Todo[], dir: -1 | 1) {
+    const i = pool.findIndex((x) => x.id === t.id)
+    if (i < 0 || !pool[i + dir]) return
+    const rest = pool.filter((x) => x.id !== t.id)
+    const at = dir === -1 ? i - 1 : i + 1
+    const prev = rest[at - 1]
+    const next = rest[at]
+    patch(t.id, { order: prev && next ? (prev.order + next.order) / 2 : prev ? prev.order + 1 : next ? next.order - 1 : t.order })
+  }
+
   function row(t: Todo, ctx: Ctx, siblings: Todo[], section: string) {
     if (openId === t.id) {
       return (
@@ -457,12 +473,27 @@ export function TodoView({
       )
     }
     const fixed = !!t.prayerKey
+    // Where a day has a clock, the time decides the order; only the untimed ones can be moved.
+    const daySection = section === 'today' || section === 'evening' || section.startsWith('day:')
+    const movable = !fixed && !(daySection && t.time)
+    const pool = daySection ? siblings.filter((x) => !x.time && !x.prayerKey) : siblings.filter((x) => !x.prayerKey)
     const due = t.deadline && !t.done ? deadlineLabel(t.deadline, today) : null
     return (
       <li
         key={t.id}
         data-todo-id={t.id}
         draggable={!fixed}
+        onContextMenu={movable && pool.length > 1 ? (e) => { e.preventDefault(); setRowMenu({ todo: t, pool, x: e.clientX, y: e.clientY }) } : undefined}
+        onTouchStart={movable && pool.length > 1 ? (e) => {
+          const touch = e.touches[0]
+          rowPress.current.fired = false
+          rowPress.current.timer = window.setTimeout(() => { rowPress.current.fired = true; setRowMenu({ todo: t, pool, x: touch.clientX, y: touch.clientY }) }, 550)
+        } : undefined}
+        onTouchMove={() => { if (rowPress.current.timer) window.clearTimeout(rowPress.current.timer) }}
+        onTouchEnd={(e) => {
+          if (rowPress.current.timer) window.clearTimeout(rowPress.current.timer)
+          if (rowPress.current.fired) e.preventDefault()
+        }}
         onDragStart={(e) => {
           setDragIds(picked.has(t.id) && picked.size > 1 ? [...picked] : [t.id])
           e.dataTransfer.setData('text/plain', String(t.id))
@@ -478,6 +509,7 @@ export function TodoView({
         }}
         onDrop={(e) => { e.preventDefault(); dropOnRow(t, siblings, section) }}
         onClick={(e) => {
+          if (rowPress.current.fired) { rowPress.current.fired = false; return }
           if (e.metaKey || e.ctrlKey || e.shiftKey) { if (!fixed) pick(t, e); return }
           setPicked(new Set())
           if (fixed) setSel(t.id)
@@ -1508,6 +1540,21 @@ export function TodoView({
           </>
         )}
       </div>
+      {rowMenu && (() => {
+        const { todo, pool } = rowMenu
+        const i = pool.findIndex((x) => x.id === todo.id)
+        const close = () => setRowMenu(null)
+        return (
+          <ContextMenu at={rowMenu} onClose={close}>
+            <button role="menuitem" disabled={i <= 0} className={`${CONTEXT_ITEM} disabled:pointer-events-none disabled:opacity-40`} onClick={() => { close(); stepRow(todo, pool, -1) }}>
+              <ArrowUp className="h-[18px] w-[18px]" />Move up
+            </button>
+            <button role="menuitem" disabled={i < 0 || i >= pool.length - 1} className={`${CONTEXT_ITEM} disabled:pointer-events-none disabled:opacity-40`} onClick={() => { close(); stepRow(todo, pool, 1) }}>
+              <ArrowDown className="h-[18px] w-[18px]" />Move down
+            </button>
+          </ContextMenu>
+        )
+      })()}
       {/*
         Inside the scroller and in the same column as the rows, not laid over
         the page: an overlay is centred on the whole pane, the list on the

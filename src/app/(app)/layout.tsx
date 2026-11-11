@@ -82,7 +82,7 @@ const themeScript = `
   } catch(e){}
   try {
     var w = parseInt(localStorage.getItem('acture-sb') || '', 10);
-    if (w >= 220 && w <= 480) document.documentElement.style.setProperty('--sb', w + 'px');
+    if (w >= 260 && w <= 480) document.documentElement.style.setProperty('--sb', w + 'px');
   } catch(e){}
 })()
 `
