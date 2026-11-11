@@ -25,7 +25,7 @@ export function TuckAbout() {
 
   return (
     <div className="flex flex-col items-center gap-5 rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.12] to-primary/[0.04] p-5 max-sm:gap-4 max-sm:p-4">
-      <Tuck state={state} size={320} alt={`Tuck as a ${LEVEL_NAME[level].toLowerCase()}`} className="max-w-full" />
+      <Tuck state={state} size={320} alt={`Tuck as a ${LEVEL_NAME[level].toLowerCase()}`} className="max-w-full max-sm:[zoom:0.68]" />
       <div className="w-full min-w-0 max-w-[34rem]">
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-[length:calc(22px*var(--ts))] font-bold leading-none tracking-tight">{LEVEL_NAME[level]}</p>

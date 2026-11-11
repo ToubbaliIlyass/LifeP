@@ -61,13 +61,13 @@ export function WhatsNext({ date }: { date: string }) {
       aria-label="What to do now"
       className="mb-4 w-full overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.15] to-primary/[0.05] shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
     >
-      <div className="flex items-center gap-3 px-4 py-3 max-md:gap-2 max-md:px-3">
+      <div className="flex items-center gap-3 px-4 py-3 max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-2.5 max-md:px-3">
         <span className="relative flex h-2.5 w-2.5 shrink-0 self-start mt-2" aria-hidden title={`${order.length} left today`}>
           <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
         </span>
         {/* The whole title wraps; what is known about it sits under it. */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 max-md:min-w-[calc(100%-1.5rem)]">
           <p className="text-[length:calc(16px*var(--ts))] font-semibold leading-snug tracking-tight [overflow-wrap:anywhere]">
             <span className="mr-2 text-[length:calc(12px*var(--ts))] font-semibold uppercase tracking-wider text-primary-ink max-md:text-[length:calc(11px*var(--ts))]">Now</span>
             {t.title || 'Untitled'}
@@ -81,22 +81,24 @@ export function WhatsNext({ date }: { date: string }) {
             <li className="text-muted-foreground tabular-nums">{order.length} left</li>
           </ul>
         </div>
+        <div className="flex shrink-0 items-center gap-2 max-md:w-full">
         {order.length > 1 && (
           <button
             onClick={() => setSkip((n) => n + 1)}
             aria-label="Suggest another"
             title="Something else"
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full px-2.5 text-muted-foreground transition hover:bg-foreground/[0.07] hover:text-foreground active:scale-95 max-md:w-11 max-md:px-0"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full px-2.5 text-muted-foreground transition hover:bg-foreground/[0.07] hover:text-foreground active:scale-95 max-md:h-11 max-md:w-11 max-md:px-0"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
         )}
         <button
           onClick={() => { toggle(t); setSkip(0) }}
-          className={`${BTN_PRIMARY} shrink-0`}
+          className={`${BTN_PRIMARY} shrink-0 max-md:flex-1`}
         >
           <Check className="h-4 w-4" strokeWidth={3} /> Done
         </button>
+        </div>
       </div>
       {/* How far through today's to-dos. */}
       <div role="progressbar" aria-label="Today's progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={finished} className="h-1 bg-primary/15">
