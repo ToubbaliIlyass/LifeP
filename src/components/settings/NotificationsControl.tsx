@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Bell, BellOff, Send } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
-import { disablePush, enablePush, pushState, type PushState } from '@/lib/push'
+import { disablePush, enablePush, isBrave, pushState, type PushState } from '@/lib/push'
 
 const BUTTON = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border/80 px-2.5 py-1 max-md:min-h-11 text-[length:calc(13px*var(--ts))] font-medium hover:bg-foreground/[0.05] disabled:opacity-60'
 
@@ -29,10 +29,21 @@ export function NotificationsControl() {
 
   const turnOn = async () => {
     setBusy(true)
-    const ok = await enablePush().catch(() => false)
+    setTested(null)
+    const result = await enablePush().catch(() => 'not-ready' as const)
+    const brave = result === 'push-service' && (await isBrave())
     setBusy(false)
     refresh()
-    if (!ok) setTested(Notification.permission === 'denied' ? null : 'Couldn’t turn them on here. Try again, or check this browser’s notification settings.')
+    if (result === 'ok' || result === 'denied') return // denied: the state line already says it is blocked
+    setTested(
+      brave
+        ? 'Brave switches push off by default. Open brave://settings/privacy, turn on “Use Google services for push messaging”, restart Brave, then press Turn on again.'
+        : result === 'push-service'
+          ? 'This browser couldn’t reach its push service. Check your connection and any blockers, then try again.'
+          : result === 'server'
+            ? 'Acture couldn’t save this device just now. Try again in a moment.'
+            : 'This browser can’t set up reminders here. They still show while Acture is open.',
+    )
   }
   const turnOff = async () => { setBusy(true); await disablePush(); setBusy(false); refresh() }
   const test = async () => {
