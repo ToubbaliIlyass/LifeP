@@ -67,19 +67,20 @@ function Section({ title, hint, icon: Icon, children }: { title: string; hint?: 
 /** An on/off setting as a full-width button, like the others: pressed and ticked when it is on. */
 function Toggle({ label, note, icon: Icon, on, onChange }: { label: string; note?: string; icon: LucideIcon; on: boolean; onChange: (on: boolean) => void }) {
   return (
+    <>
     <button
       type="button"
       aria-pressed={on}
       onClick={() => onChange(!on)}
-      className={`${BUTTON} w-full justify-center py-2 ${on ? 'bg-foreground/[0.09] border-foreground/30' : 'text-muted-foreground'}`}
+      className={`${BUTTON} w-full justify-center py-2 max-sm:justify-between max-sm:px-4 max-sm:py-3 ${on ? 'bg-foreground/[0.09] border-foreground/30' : 'text-muted-foreground'}`}
     >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
+      <span className="inline-flex items-center gap-2"><Icon className="w-3.5 h-3.5" />{label}</span>
       <span className={`ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[length:calc(11.5px*var(--ts))] font-semibold ${on ? 'bg-primary/[0.18] text-primary-ink' : 'bg-foreground/[0.08]'}`}>
         {on && <Check className="h-3 w-3" strokeWidth={3} />}{on ? 'On' : 'Off'}
       </span>
-      {note && <span className="ml-2 text-[length:calc(12px*var(--ts))] font-normal text-muted-foreground">{note}</span>}
     </button>
+    {note && <p className="mt-2 px-1 text-[length:calc(12.5px*var(--ts))] text-muted-foreground">{note}</p>}
+    </>
   )
 }
 

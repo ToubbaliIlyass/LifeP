@@ -477,7 +477,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
         />
       )}
       {ringing.length > 0 && (
-        <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))]" role="status" aria-live="polite">
+        <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] max-md:inset-x-3 max-md:right-3 max-md:top-[calc(env(safe-area-inset-top)+8px)] max-md:w-auto" role="status" aria-live="polite">
           {ringing.map((r) => {
             const todo = r.kind === 'todo' ? data?.todos.find((t) => t.id === r.id) : undefined
             const away = () => setRinging((list) => list.filter((x) => x.key !== r.key))
@@ -490,19 +490,19 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
                     <p className="text-[length:calc(14px*var(--ts))] font-medium truncate">{r.title}</p>
                     <p className="text-[length:calc(12.5px*var(--ts))] text-muted-foreground tabular-nums">{r.body}</p>
                   </div>
-                  <button onClick={away} aria-label="Put away" className="shrink-0 grid place-items-center w-6 h-6 -mr-1 rounded-md text-muted-foreground hover:text-foreground">
-                    <X className="w-3.5 h-3.5" />
+                  <button onClick={away} aria-label="Put away" className="shrink-0 grid place-items-center w-6 h-6 -mr-1 rounded-md text-muted-foreground hover:text-foreground max-md:h-11 max-md:w-11 max-md:-mt-2 max-md:-mr-2">
+                    <X className="w-3.5 h-3.5 max-md:h-5 max-md:w-5" />
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[52px]">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[52px] max-md:gap-2 max-md:pl-0">
                   {todo && !todo.done && (
-                    <button onClick={() => { toggle(todo); away() }} className={`${BTN_PRIMARY} `}>Done</button>
+                    <button onClick={() => { toggle(todo); away() }} className={`${BTN_PRIMARY} max-md:flex-1`}>Done</button>
                   )}
                   {todo && skipPreview(todo, data?.date ?? todayStr()).ok && (
-                    <button onClick={() => { skip(todo); away() }} className={`${BTN_GHOST} `}>Skip today</button>
+                    <button onClick={() => { skip(todo); away() }} className={`${BTN_GHOST} max-md:flex-1`}>Skip today</button>
                   )}
                   {SNOOZES.map((s) => (
-                    <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[length:calc(12.5px*var(--ts))] font-medium hover:bg-foreground/[0.05]">
+                    <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[length:calc(12.5px*var(--ts))] font-medium hover:bg-foreground/[0.05] max-md:min-h-10 max-md:flex-1 max-md:rounded-lg max-md:px-3 max-md:text-[length:calc(14px*var(--ts))]">
                       {s.minutes === null ? s.label : `Snooze ${s.label}`}
                     </button>
                   ))}

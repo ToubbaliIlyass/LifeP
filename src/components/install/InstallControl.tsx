@@ -24,7 +24,7 @@ export function InstallControl() {
 
   return (
     <div className="flex items-center gap-4 max-sm:flex-col max-sm:items-start max-sm:gap-3" data-install-control>
-      <Tuck state="greeting" size={120} decorative className="shrink-0 max-sm:-ml-2" />
+      <Tuck state="greeting" size={120} decorative className="shrink-0 max-sm:self-center max-sm:[zoom:0.8]" />
       <div className="w-full min-w-0 flex-1">
         <p className="text-[length:calc(15px*var(--ts))] font-semibold">Keep Acture one tap away</p>
         <p className="mt-1 text-[length:calc(13px*var(--ts))] text-muted-foreground">{how ?? 'Opens in its own window, like any app.'}</p>
