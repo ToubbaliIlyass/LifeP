@@ -64,7 +64,7 @@ export function TellTuckScreen({ phase, tuck, line, words, said, busy, transcrib
   const typingNow = typing || (!!error && phase === 'listening')
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="Tell Tuck" className="fixed inset-0 z-[70] flex flex-col bg-background/95 text-foreground backdrop-blur-md animate-in fade-in duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Tell Tuck" className="acture-sheet fixed inset-0 z-[70] flex flex-col text-foreground">
       <div className="flex shrink-0 justify-end px-4 pt-4">
         <button onClick={phase === 'listening' ? onCancel : onClose} aria-label="Close (Esc)" title="Close (Esc)" className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.08] text-muted-foreground hover:bg-foreground/[0.12] hover:text-foreground"><X className="h-5 w-5" /></button>
       </div>
@@ -93,9 +93,9 @@ export function TellTuckScreen({ phase, tuck, line, words, said, busy, transcrib
               {said && <p className="max-w-[40ch] text-[length:calc(15px*var(--ts))] italic text-muted-foreground">“{said}”</p>}
               <p aria-live="polite" className="text-[clamp(18px,3.2dvh,26px)] font-semibold leading-snug tracking-tight">{line}</p>
               <div className="flex items-center gap-1.5" aria-hidden>
-                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+                <span className="h-2 w-2 motion-safe:animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
+                <span className="h-2 w-2 motion-safe:animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
+                <span className="h-2 w-2 motion-safe:animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
               </div>
               {/* Cards that have already arrived stay in view while the rest is worked out. */}
               {children}

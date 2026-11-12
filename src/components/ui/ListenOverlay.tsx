@@ -15,7 +15,7 @@ import type { TuckState } from '@/lib/tuck/states'
  * dark. Drawn into the body, because the island it is opened from is
  * transformed and a fixed child of that would be fixed to the island.
  */
-export function ListenOverlay({ state, line, words, onDone, onCancel, busy = false }: {
+export function ListenOverlay({ state, line, words, onDone, onCancel, busy = false, leaving = false }: {
   state: TuckState
   /** What Tuck says above the words, when nothing has been said yet. */
   line: string
@@ -25,10 +25,12 @@ export function ListenOverlay({ state, line, words, onDone, onCancel, busy = fal
   onCancel: () => void
   /** Turning the recording into text: nothing to press until it is back. */
   busy?: boolean
+  /** Drawn while it is on its way out (see Presence). */
+  leaving?: boolean
 }) {
   if (typeof document === 'undefined') return null
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="Listening" className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-[clamp(10px,2.5dvh,24px)] bg-background/95 px-6 text-center text-foreground backdrop-blur-md animate-in fade-in duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Listening" data-state={leaving ? 'closed' : 'open'} className="acture-sheet fixed inset-0 z-[70] flex flex-col items-center justify-center gap-[clamp(10px,2.5dvh,24px)] px-6 text-center text-foreground">
       <Tuck state={state} size={400} decorative className="!w-auto !h-[clamp(120px,36dvh,420px)] max-w-[88vw] aspect-[320/300]" />
 
       {!busy && (
@@ -44,7 +46,7 @@ export function ListenOverlay({ state, line, words, onDone, onCancel, busy = fal
       </p>
 
       <div className="flex items-center gap-3">
-        <button onClick={onDone} disabled={busy} className="flex h-14 items-center gap-2.5 rounded-full bg-primary px-8 text-[length:calc(17px*var(--ts))] font-bold text-primary-foreground shadow-lg transition hover:scale-105 active:scale-95 disabled:opacity-50">
+        <button onClick={onDone} disabled={busy} className="flex h-14 items-center gap-2.5 rounded-full bg-primary px-8 text-[length:calc(17px*var(--ts))] font-bold text-primary-foreground shadow-lg transition motion-safe:hover:scale-105 active:scale-95 disabled:opacity-50">
           <Square className="h-4 w-4" fill="currentColor" /> Done
         </button>
         <button onClick={onCancel} disabled={busy} className="flex h-14 items-center gap-2 rounded-full px-5 text-[length:calc(15px*var(--ts))] font-medium text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-50">

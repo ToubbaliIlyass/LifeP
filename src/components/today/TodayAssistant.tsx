@@ -8,6 +8,7 @@ import { ToolActivity, isToolPart, type ToolPart } from '@/components/chat/ToolA
 import { AttachButton, AttachmentStrip, FilePreview, useAttachments } from '@/components/chat/attachments'
 import { Tuck, TuckAvatar } from '@/components/ui/Tuck'
 import { ListenOverlay } from '@/components/ui/ListenOverlay'
+import { Presence } from '@/components/ui/Presence'
 import { TellTuckScreen } from './TellTuckScreen'
 import { ProposalCard } from '@/components/proposals/ProposalCard'
 import { isSmallAddition } from '@/lib/proposal-undo'
@@ -307,8 +308,9 @@ export function TodayAssistant({ onNavigate, dock = false }: {
         className={dock ? '' : 'rounded-2xl border border-border/70 bg-card shadow-[0_2px_12px_oklch(0_0_0/0.04)]'}
       >
         {/* Listening takes the whole screen (ListenOverlay); the island underneath stays as it was. */}
-        {listeningView && !immersive && (
-          <ListenOverlay
+        <Presence show={listeningView && !immersive}>
+          {(sheet) => (
+          <ListenOverlay leaving={sheet === 'closed'}
             state={speech.transcribing ? 'thinking' : arming && !live ? 'permission-mic' : 'listening'}
             line={prompt || (arming && !live ? TUCK_LINES['permission-mic'] : speech.mode === 'record' ? 'Recording. Tap Done when you have said it all.' : 'Say everything that needs to happen.')}
             words={speech.transcript}
@@ -316,7 +318,8 @@ export function TodayAssistant({ onNavigate, dock = false }: {
             onDone={() => speech.stop()}
             onCancel={cancel}
           />
-        )}
+          )}
+        </Presence>
         {keyboard || dock ? (
           // ── Typing: when speaking is not an option, and always in the
           //    island, where the mic is one of its buttons ─────────
