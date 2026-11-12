@@ -1,5 +1,6 @@
 'use client'
 
+import { toastDismiss, toastNote } from '@/lib/toast'
 import { useCallback, useEffect, useState } from 'react'
 import { Bell, BellOff, Send } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
@@ -20,10 +21,15 @@ const SAYS: Record<PushState, string> = {
  * Settings → Notifications: whether reminders reach this device with the app
  * closed, a switch for it, and a test that sends a real one end to end.
  */
+/** The result of a test, said in the island. */
+function setTested(t: string | null) {
+  if (!t) toastDismiss('acture-push-test')
+  else toastNote('Reminders', t, 'acture-push-test', t.startsWith('Sent') ? 'success' : 'warning')
+}
+
 export function NotificationsControl() {
   const [state, setState] = useState<PushState | null>(null)
   const [busy, setBusy] = useState(false)
-  const [tested, setTested] = useState<string | null>(null)
   const refresh = useCallback(() => { void pushState().then(setState) }, [])
   useEffect(refresh, [refresh])
 
@@ -78,7 +84,6 @@ export function NotificationsControl() {
             )}
           </div>
         )}
-        {tested && <p className="mt-2 text-[length:calc(12.5px*var(--ts))] text-muted-foreground" role="status">{tested}</p>}
       </div>
     </div>
   )

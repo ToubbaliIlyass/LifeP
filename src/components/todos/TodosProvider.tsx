@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { EventStatus } from '@/lib/event-status'
 import type { DayEvent, Todo, TodoList, TodosPayload } from '@/lib/todos'
 import { useUndo } from '@/components/undo/UndoProvider'
-import { ToastCard } from '@/components/ui/ToastCard'
+import { toastDismiss, toastNote, toastReminder, toastUndo, type Tone } from '@/lib/toast'
 import { useDataChanged } from '@/lib/dataSignal'
 import { useLiveSync } from '@/lib/useLiveSync'
 import { todayStr } from '@/lib/date'
@@ -13,12 +13,9 @@ import { dayFacts } from '@/lib/tuck/mood'
 import { relDate, skipPreview } from '@/lib/todo-views'
 import { safeGet, safeSet } from '@/lib/storage'
 import { parseEntry } from '@/lib/quick-entry'
-import { X } from 'lucide-react'
-import { Tuck } from '@/components/ui/Tuck'
 import { SAVE_FAILED, SAY, TICKED } from '@/lib/tuck/events'
 import { dueReminders, remindersIn, SNOOZES, snoozeUntil, type Reminder } from '@/lib/reminders'
 import { momentNow, pushIsOn, systemNotification } from '@/lib/push'
-import { BTN_PRIMARY, BTN_GHOST } from '@/components/ui/buttons'
 
 /** The to-do being typed, before it has a row of its own. */
 export const DRAFT_ID = -999
@@ -70,6 +67,8 @@ interface TodosContextValue {
    */
   saving: boolean
   down: boolean
+  /** How many finished things are in the Logbook's archive (loaded on demand, not in `todos`). */
+  archived: number
 }
 
 const TodosContext = createContext<TodosContextValue | null>(null)
@@ -107,15 +106,12 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
   const { record } = useUndo()
   const [saving, setSaving] = useState(false)
   const [down, setDown] = useState(false)
-  /** The small card after a skip: what happened, and the way back. */
-  const [note, setNoteRaw] = useState<{ id: number; text: string; undo: (() => void) | null } | null>(null)
-  const noteCount = useRef(0)
-  const setNote = useCallback((n: { text: string; undo: (() => void) | null } | null) => setNoteRaw(n && { ...n, id: ++noteCount.current }), [])
-  useEffect(() => {
-    if (!note) return
-    const id = setTimeout(() => setNote(null), 6000)
-    return () => clearTimeout(id)
-  }, [note, setNote])
+  /** The island after a skip or a tick: what happened, and the way back. */
+  const setNote = useCallback((n: { title: string; detail: string; undo: (() => void) | null; tone?: Tone } | null) => {
+    if (!n) { toastDismiss('acture-todo'); return }
+    if (n.undo) toastUndo(n.title, n.detail, n.undo, 'acture-todo', n.tone)
+    else toastNote(n.title, n.detail, 'acture-todo', n.tone ?? 'info')
+  }, [])
 
   const queue = useRef(new Map<number, { changes: Record<string, unknown>; timer: ReturnType<typeof setTimeout> }>())
   const inflight = useRef(0)
@@ -141,7 +137,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
    * One missed while the app was closed still shows when it next opens, for
    * the rest of that day.
    */
-  const [ringing, setRinging] = useState<Reminder[]>([])
+  /** Rings one reminder in the island; set once the actions it offers exist, below. */
+  const remindRef = useRef<(r: Reminder) => void>(() => {})
   const todosRef = useRef<Todo[]>([])
   useEffect(() => { todosRef.current = data?.todos ?? [] }, [data])
   const eventsRef = useRef<DayEvent[]>([])
@@ -158,7 +155,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
         .filter((r) => r.at.slice(0, 10) === now.slice(0, 10))
       for (const r of due) {
         safeSet('local', `acture-reminded:${r.key}`, '1')
-        setRinging((list) => [...list.filter((x) => !(x.kind === r.kind && x.id === r.id)), r])
+        remindRef.current(r)
         if (!pushIsOn()) systemNotification(r)
       }
     }
@@ -264,21 +261,33 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
       // The zone goes along: when it was ticked is learned from (src/lib/availability.ts).
       fetch(`/api/todos/${todo.id}`, json('PATCH', { done: on, tz: clockZone() }))
 
-    // Tuck has a word for a to-do ticked off, and needs the lists as they were before it.
-    if (done && !todo.prayerKey) window.dispatchEvent(new CustomEvent(TICKED, { detail: { id: todo.id } }))
+    // Completing a repeating to-do creates its next occurrence, so undo has
+    // to remove that as well as untick this one. It may be pressed before the
+    // server has answered, so it waits for the answer.
+    let spawnedId: number | undefined
+    let answered!: () => void
+    const settled = new Promise<void>((r) => { answered = r })
+    let undone = false
+    const undo = async () => {
+      if (undone) return
+      undone = true
+      await settled
+      set(!done)
+      await run(async () => {
+        await send(!done)
+        if (spawnedId) await fetch(`/api/nodes/${spawnedId}`, { method: 'DELETE' })
+      }, true)
+    }
+
+    // Tuck has a word for a to-do ticked off, and needs the lists as they were before it. The word carries the way back.
+    if (done && !todo.prayerKey) window.dispatchEvent(new CustomEvent(TICKED, { detail: { id: todo.id, undo } }))
     set(done)
     run(async () => {
       const res = await send(done)
-      // Completing a repeating to-do creates its next occurrence, so undo has
-      // to remove that as well as untick this one.
       const { spawned } = ((await res.json().catch(() => ({}))) ?? {}) as { spawned?: { id: number } | null }
-      record(`${done ? 'Completed' : 'Unticked'} “${todo.title || 'New to-do'}”`, async () => {
-        set(!done)
-        await run(async () => {
-          await send(!done)
-          if (spawned?.id) await fetch(`/api/nodes/${spawned.id}`, { method: 'DELETE' })
-        }, true)
-      })
+      spawnedId = spawned?.id
+      answered()
+      record(`${done ? 'Completed' : 'Unticked'} “${todo.title || 'New to-do'}”`, undo)
     }, true)
   }, [run, record])
 
@@ -309,7 +318,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
       }
       const word = status === 'attended' ? 'Marked as attended' : status === 'cancelled' ? 'Marked as cancelled' : 'Marked as not attended'
       record(`${word}: “${name}”`, undo)
-      setNote({ text: `${word}: “${name}”.`, undo })
+      setNote({ title: word, detail: `“${name}”`, undo, tone: status === 'attended' ? 'success' : 'info' })
     }, true)
   }, [data, run, record, setNote])
 
@@ -318,7 +327,7 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     const plan = skipPreview(todo, today)
     const name = todo.title.trim() || 'New to-do'
     if (!plan.ok) {
-      if (plan.reason === 'last') setNote({ text: `“${name}” is on its last time round, so there is nothing to skip to.`, undo: null })
+      if (plan.reason === 'last') setNote({ title: 'Nothing to skip to', detail: `“${name}” is on its last time round.`, undo: null, tone: 'warning' })
       return
     }
     const { from, to } = plan
@@ -339,19 +348,25 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
         await run(() => fetch(`/api/todos/${todo.id}/skip`, json('POST', { undo: true, date: from })), true)
       }
       record(`Skipped “${name}”`, undo)
-      setNote({ text: `Skipped “${name}”. Next: ${relDate(to, today)}.`, undo })
+      setNote({ title: 'Skipped', detail: `“${name}”. Next: ${relDate(to, today)}.`, undo, tone: 'info' })
     }, true)
   }, [data?.date, run, record, setNote])
 
   /** Deletes a node, keeping what is needed to put it back. */
-  const destroy = useCallback((id: number, label: string) => {
+  /** Deletes a node. With `offer`, the island says so and holds the way back: for what is not worth a confirm dialog because it can be undone. */
+  const destroy = useCallback((id: number, label: string, offer?: { title: string; detail: string }) => {
     run(async () => {
       const res = await fetch(`/api/nodes/${id}`, { method: 'DELETE' })
       const { deleted } = ((await res.json().catch(() => ({}))) ?? {}) as { deleted?: Record<string, unknown> }
       if (!deleted) return
-      record(label, async () => {
+      let restored = false
+      const undo = async () => {
+        if (restored) return
+        restored = true
         await run(() => fetch('/api/nodes/restore', json('POST', { ...deleted, previousId: id })), true)
-      })
+      }
+      record(label, undo)
+      if (offer) toastUndo(offer.title, offer.detail, undo, 'acture-delete', 'warning', 'looking')
     }, true)
   }, [run, record])
 
@@ -442,7 +457,8 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
       lists: d.lists.filter((l) => l.id !== list.id).map((l) => (l.areaId === list.id ? { ...l, areaId: null } : l)),
       todos: d.todos.map((t) => (t.listId === list.id ? { ...t, listId: null } : t)),
     } : d))
-    destroy(list.id, `Deleted “${list.title || (list.kind === 'area' ? 'Untitled area' : 'Untitled project')}”. Its to-dos were kept.`)
+    const name = list.title || (list.kind === 'area' ? 'Untitled area' : 'Untitled project')
+    destroy(list.id, `Deleted “${name}”. Its to-dos were kept.`, { title: list.kind === 'area' ? 'Area deleted' : 'Project deleted', detail: `“${name}”. Its to-dos were kept.` })
   }, [destroy])
 
   /** Puts a reminder off: it comes back at the moment chosen, from now. */
@@ -452,6 +468,19 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     void fetch(`/api/events/${r.id}`, json('PATCH', { snoozedUntil: until })).then(() => loadRef.current())
   }, [patch])
 
+  // A reminder rings in the island: what it is, and the ways to answer it.
+  useEffect(() => {
+    remindRef.current = (r: Reminder) => {
+      const todo = r.kind === 'todo' ? todosRef.current.find((t) => t.id === r.id) : undefined
+      const today = data?.date ?? todayStr()
+      const actions: { label: string; primary?: boolean; run: () => void }[] = []
+      if (todo && !todo.done) actions.push({ label: 'Done', primary: true, run: () => toggle(todo) })
+      if (todo && skipPreview(todo, today).ok) actions.push({ label: 'Skip today', run: () => skip(todo) })
+      for (const sn of SNOOZES) actions.push({ label: sn.minutes === null ? sn.label : `Snooze ${sn.label}`, run: () => snooze(r, sn.minutes) })
+      toastReminder(`reminder-${r.key}`, r.title, r.body, actions)
+    }
+  }, [data?.date, toggle, skip, snooze])
+
   const value = useMemo<TodosContextValue>(() => ({
     ready: data !== null,
     date: data?.date ?? todayStr(),
@@ -460,58 +489,13 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     events: data?.events ?? [],
     patch, toggle, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, reload: load,
-    saving, down,
+    saving, down, archived: data?.archived ?? 0,
   }), [data, draft, saving, down, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, load])
 
   return (
     <TodosContext.Provider value={value}>
       {children}
-      {note && (
-        <ToastCard
-          tuck={note.undo ? 'confirmed' : 'looking'}
-          text={note.text}
-          action={note.undo ? { label: 'Undo', onClick: note.undo } : undefined}
-          onDismiss={() => setNote(null)}
-          timerKey={note.id}
-        />
-      )}
-      {ringing.length > 0 && (
-        <div className="fixed z-[65] top-4 right-4 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] max-md:inset-x-3 max-md:right-3 max-md:top-[calc(env(safe-area-inset-top)+8px)] max-md:w-auto" role="status" aria-live="polite">
-          {ringing.map((r) => {
-            const todo = r.kind === 'todo' ? data?.todos.find((t) => t.id === r.id) : undefined
-            const away = () => setRinging((list) => list.filter((x) => x.key !== r.key))
-            return (
-              <div key={r.key} className="rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
-                <div className="flex items-start gap-3">
-                  {/* Tuck rings the bell: a reminder is a nudge, never an alarm. */}
-                  <Tuck state="nudge" size={60} decorative className="-ml-2 -mt-2" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[length:calc(14px*var(--ts))] font-medium truncate">{r.title}</p>
-                    <p className="text-[length:calc(12.5px*var(--ts))] text-muted-foreground tabular-nums">{r.body}</p>
-                  </div>
-                  <button onClick={away} aria-label="Put away" className="shrink-0 grid place-items-center w-6 h-6 -mr-1 rounded-md text-muted-foreground hover:text-foreground max-md:h-11 max-md:w-11 max-md:-mt-2 max-md:-mr-2">
-                    <X className="w-3.5 h-3.5 max-md:h-5 max-md:w-5" />
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-[52px] max-md:gap-2 max-md:pl-0">
-                  {todo && !todo.done && (
-                    <button onClick={() => { toggle(todo); away() }} className={`${BTN_PRIMARY} max-md:flex-1`}>Done</button>
-                  )}
-                  {todo && skipPreview(todo, data?.date ?? todayStr()).ok && (
-                    <button onClick={() => { skip(todo); away() }} className={`${BTN_GHOST} max-md:flex-1`}>Skip today</button>
-                  )}
-                  {SNOOZES.map((s) => (
-                    <button key={s.label} onClick={() => { snooze(r, s.minutes); away() }} className="rounded-md border border-border/80 px-2 py-1 text-[length:calc(12.5px*var(--ts))] font-medium hover:bg-foreground/[0.05] max-md:min-h-10 max-md:flex-1 max-md:rounded-lg max-md:px-3 max-md:text-[length:calc(14px*var(--ts))]">
-                      {s.minutes === null ? s.label : `Snooze ${s.label}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </TodosContext.Provider>
   )
 }

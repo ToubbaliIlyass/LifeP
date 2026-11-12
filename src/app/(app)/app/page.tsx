@@ -16,6 +16,7 @@ import { QuickFind } from '@/components/todos/QuickFind'
 import { TodayCards } from '@/components/todos/TodayCards'
 import { TuckStatus } from '@/components/tuck/TuckStatus'
 import { IdentityPage } from '@/components/world/IdentityPage'
+import { toastError, toastNote } from '@/lib/toast'
 import { UndoOfferToast } from '@/components/undo/UndoOfferToast'
 import { todayStr } from '@/lib/date'
 import { notifyDataChanged } from '@/lib/dataSignal'
@@ -219,13 +220,13 @@ export default function Home() {
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; importedNodes?: number; importedEdges?: number }
       if (res.ok && data.ok) {
         notifyDataChanged()
-        alert(`Imported ${data.importedNodes} nodes and ${data.importedEdges} edges.`)
+        toastNote('Imported', `${data.importedNodes} nodes and ${data.importedEdges} edges.`, 'acture-import', 'success')
       } else {
         // Said, not swallowed: a file that is refused must not look like a button that did nothing.
-        alert(`Import failed: ${data.error ?? `the server said ${res.status}`}.`)
+        toastError('Import failed', `${data.error ?? `The server said ${res.status}`}.`, 'acture-import')
       }
     } catch {
-      alert('Import failed: that is not a valid Acture export file.')
+      toastError('Import failed', 'That is not a valid Acture export file.', 'acture-import')
     }
     input.value = ''
   }

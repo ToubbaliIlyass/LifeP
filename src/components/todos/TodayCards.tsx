@@ -7,8 +7,9 @@ import { WeekReflection } from '@/components/todos/WeekReflection'
 import { WhatsNext } from '@/components/todos/WhatsNext'
 import { useTodos } from '@/components/todos/TodosProvider'
 import { HelpCard } from '@/components/tuck/HelpCard'
-import { TipCard } from '@/components/todos/TipCard'
-import { EMPTY_TIP_STATE, chooseTip, type Tip, type TipState } from '@/lib/tips'
+import { startListening } from '@/components/today/TodayAssistant'
+import { toastTip } from '@/lib/toast'
+import { EMPTY_TIP_STATE, chooseTip, type TipState } from '@/lib/tips'
 import { safeGet, safeSet } from '@/lib/storage'
 import { awayKey, pickTodayCard } from '@/lib/today-card'
 import { dayFacts } from '@/lib/tuck/mood'
@@ -40,8 +41,7 @@ export function TodayCards({ date }: { date: string }) {
     ? pickTodayCard({ now, todos, lists, events, date, away })
     : null
 
-  // One visit to Today is counted once, when the data is in. A tip may take the Now card's place, rarely (src/lib/tips.ts).
-  const [tip, setTip] = useState<Tip | null>(null)
+  // One visit to Today is counted once, when the data is in. A tip may show, rarely, as a toast (src/lib/tips.ts).
   const counted = useRef(false)
   useEffect(() => {
     if (!mounted || !ready || counted.current) return
@@ -52,7 +52,11 @@ export function TodayCards({ date }: { date: string }) {
     const installed = window.matchMedia('(display-mode: standalone)').matches
     const next = chooseTip(prev, { todos, lists, events: events.length, touch, installed }, Math.random, !card)
     safeSet('local', 'acture-tips', JSON.stringify(next.state))
-    setTip(next.tip)
+    const tip = next.tip
+    if (tip) {
+      const a = tip.action
+      toastTip(tip, a && { label: a.label, run: () => { if (a.kind === 'listen') startListening(); else window.location.hash = a.to } })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit, with what the data was when it arrived
   }, [mounted, ready])
 
@@ -65,8 +69,7 @@ export function TodayCards({ date }: { date: string }) {
         <HelpCard mood={card.mood} level={dayFacts({ now, todos, lists, events }).level} onAway={() => putAway(awayKey.help(date, card.mood.key))} />
       )}
       {/* One slot: Tuck has something to say, or here is what to do now. Never both stacked. */}
-      {!card && tip && <TipCard tip={tip} onAway={() => setTip(null)} />}
-      {!card && !tip && <WhatsNext date={date} />}
+      {!card && <WhatsNext date={date} />}
     </>
   )
 }

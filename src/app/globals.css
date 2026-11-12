@@ -733,6 +733,94 @@
   .acture-toast { animation: none; }
 }
 
+/* The island: every toast (src/lib/toast.tsx, built on Sileo). It wears the
+   palette: the pill is the card colour, the words the foreground, so it
+   belongs on every theme, light or dark, custom ones included. What kind of
+   word it is shows in Tuck's pose and one colour. Selectors are doubled up so
+   they win over the library's own stylesheet, injected at runtime. */
+.acture-island {
+  --island-bg: color-mix(in oklab, var(--card) 94%, var(--foreground));
+  --island-ink: var(--foreground);
+  --island-soft: color-mix(in oklab, var(--foreground) 66%, transparent);
+  --island-chip: color-mix(in oklab, var(--foreground) 9%, transparent);
+  --island-chip-hover: color-mix(in oklab, var(--foreground) 15%, transparent);
+  --island-on-tone: #fff;
+  --island-edge: color-mix(in oklab, var(--island-ink) 55%, transparent);
+  --island-shadow: color-mix(in oklab, var(--island-ink) 20%, transparent);
+  /* Deep enough to read on a light card. Warning and error are both red: a
+     reminder and a failure are the two things not to scroll past. */
+  --sileo-state-success: oklch(0.56 0.17 150);
+  --sileo-state-info: oklch(0.55 0.15 245);
+  --sileo-state-action: oklch(0.54 0.2 295);
+  --sileo-state-warning: oklch(0.57 0.22 28);
+  --sileo-state-error: oklch(0.54 0.23 25);
+  --sileo-state-loading: oklch(0.5 0.01 250);
+  --sileo-spring-easing: cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+.dark .acture-island {
+  --island-bg: color-mix(in oklab, var(--card) 100%, white 4%);
+  --island-on-tone: #0d0d0e;
+  /* Dark pages get a plain shadow and a faint edge, never a light halo. */
+  --island-edge: rgb(255 255 255 / 0.1);
+  --island-shadow: rgb(0 0 0 / 0.4);
+  --sileo-state-success: oklch(0.8 0.18 150);
+  --sileo-state-info: oklch(0.78 0.12 235);
+  --sileo-state-action: oklch(0.76 0.15 295);
+  --sileo-state-warning: oklch(0.72 0.2 28);
+  --sileo-state-error: oklch(0.68 0.23 22);
+  --sileo-state-loading: oklch(0.75 0.01 250);
+}
+.acture-island [data-sileo-viewport] { color: var(--island-ink); z-index: 70; }
+/* The pill and its body are SVG shapes: colour them from the palette, not the fill attribute. */
+.acture-island [data-sileo-viewport] [data-sileo-svg] rect { fill: var(--island-bg); }
+.acture-island [data-sileo-viewport] [data-sileo-title] { text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: -0.005em; }
+/* Sileo sizes the pill as its text + padding + 10px, all of it on the right: take that 10px off the right padding so the word sits in the middle. */
+.acture-island [data-sileo-viewport] [data-sileo-header] { padding-inline: 1.125rem calc(1.125rem - 10px); padding-block: 2px; transform: none; pointer-events: auto; }
+.acture-island [data-sileo-viewport] [data-sileo-header-inner] { gap: 0.25rem; }
+/* No header icon when there is a body (Tuck is in the body then); the badge is only for the small Tuck of a bare line. */
+.acture-island [data-sileo-viewport] [data-sileo-badge] { width: 30px; height: 30px; padding: 0; background: none; margin-left: -0.5rem; }
+.acture-island [data-sileo-viewport] [data-sileo-badge]:has([data-no-icon]) { display: none; }
+.acture-island-tuck { margin-top: 3px; flex-shrink: 0; }
+/* Tuck on top, big enough to be Tuck, with the words centred under him. A
+   one-liner gets a smaller Tuck so the bubble fits its words. */
+.acture-body { display: flex; flex-direction: column; align-items: center; gap: 0.125rem; text-align: center; }
+.acture-body .acture-island-tuck { margin: -0.5rem 0 -0.125rem; }
+.acture-body[data-compact] .acture-island-tuck { margin: -0.375rem 0 -0.125rem; }
+.acture-body-text { min-width: 0; }
+.acture-island [data-sileo-viewport] [data-sileo-description] { color: var(--island-soft); font-size: 0.9375rem; line-height: 1.4; padding: 0.875rem 1.25rem 1.125rem; }
+.acture-island [data-sileo-viewport] [data-sileo-button] {
+  height: 2.75rem; padding: 0 1.1rem; margin-top: 0.75rem; width: 100%; font-size: 0.9375rem; font-weight: 600;
+  color: var(--island-on-tone); background-color: var(--_c);
+}
+.acture-island [data-sileo-viewport] [data-sileo-button]:hover { background-color: color-mix(in oklch, var(--_c) 88%, var(--island-ink)); }
+.acture-island [data-sileo-viewport] [data-sileo-button].acture-undo-btn { background-color: var(--sileo-state-error); }
+.acture-island [data-sileo-viewport] [data-sileo-button].acture-undo-btn:hover { background-color: color-mix(in oklch, var(--sileo-state-error) 88%, var(--island-ink)); }
+/* A hairline of the ink and a soft shadow, so a pale pill still lifts off a pale page. */
+.acture-island [data-sileo-viewport] [data-sileo-svg] { filter: drop-shadow(0 0 0.6px var(--island-edge)) drop-shadow(0 10px 22px var(--island-shadow)); }
+/* "+1 a runner": which identity a tick counted for. */
+.acture-chip { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: 0.5rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--island-chip); font-size: 0.8125rem; font-weight: 600; color: var(--island-ink); vertical-align: 1px; }
+.acture-chip i { width: 0.5rem; height: 0.5rem; border-radius: 9999px; }
+/* A reminder's answers: small, thumb-sized tap targets under the line. */
+.acture-toast-actions { display: flex; flex-direction: column; gap: 0.75rem; }
+.acture-toast-body { font-variant-numeric: tabular-nums; }
+.acture-toast-actions > div:last-child { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.acture-toast-actions [role="button"] {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 1rem; border-radius: 9999px;
+  font-size: 0.9375rem; font-weight: 600; cursor: pointer; background: var(--island-chip); color: var(--island-ink); flex: 1 1 auto;
+}
+.acture-toast-actions [role="button"]:hover { background: var(--island-chip-hover); }
+.acture-toast-actions [role="button"][data-primary="true"] { background: var(--sileo-state-warning); color: var(--island-on-tone); }
+.acture-toast-actions [role="button"]:focus-visible { outline: 2px solid var(--island-ink); outline-offset: 2px; }
+/* Only the visible shape reacts to the pointer, not the 350px box around it. */
+.acture-island [data-sileo-viewport] [data-sileo-toast] { pointer-events: none; }
+.acture-island [data-sileo-viewport] [data-sileo-content][data-visible="true"] { pointer-events: auto; }
+@media (min-width: 768px) {
+  /* Centred on the content, not the window. */
+  .acture-island [data-sileo-viewport][data-position$="center"] { left: calc(50% + var(--sb, 0px) / 2); }
+  .acture-island [data-sileo-viewport] [data-sileo-button], .acture-toast-actions [role="button"] { height: 2rem; min-height: 2rem; font-size: 0.8125rem; }
+  .acture-island [data-sileo-viewport] [data-sileo-description] { font-size: 0.875rem; }
+}
+
 /* The landing page's story (src/components/landing/StoryLanding.tsx): the
    mic's pulse while listening, and Quick Find's caret. */
 @keyframes acture-ping {

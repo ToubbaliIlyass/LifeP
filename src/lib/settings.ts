@@ -95,6 +95,8 @@ export interface Settings {
   graphSweep: { enabled: boolean; intervalDays: number; lastRun: SweepSummary | null }
   /** How long something can go untouched before it is offered back for review. */
   resurfaceDays: number
+  /** The last day the Logbook's archive was swept (src/lib/archive.ts), so it runs once a day, not on every load. */
+  archiveSweepDay: string | null
   /**
    * Prayer times on the Now timeline, computed from the same location the
    * weather uses. Off by default: this is a personal practice, not a feature
@@ -151,6 +153,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoLink: 'auto',
   graphSweep: { enabled: true, intervalDays: 7, lastRun: null },
   resurfaceDays: 21,
+  archiveSweepDay: null,
   prayer: { enabled: false, method: 'morocco', madhab: 'standard' },
   timeZone: null,
   timeZoneOverride: null,

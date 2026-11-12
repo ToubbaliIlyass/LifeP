@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { toastError } from '@/lib/toast'
+import { useEffect, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
 import { SAY } from '@/lib/tuck/events'
@@ -46,6 +47,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   /** 0 is Tuck’s welcome; 1 is the one question, answered by talking. */
   const [step, setStep] = useState(0)
   const [failed, setFailed] = useState(false)
+  useEffect(() => { if (failed) toastError('Couldn’t save that', 'I couldn’t save that. Try again.', 'acture-onboarding') }, [failed])
 
   /*
    * Skipping is a decision, and it has to be recorded as one — otherwise the
@@ -121,7 +123,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   /** The way on, right under the answer: a real button once something was said, a quiet one before. */
   const action = (
     <>
-      {failed && <p role="alert" className="mb-2 text-[length:calc(14px*var(--ts))] text-destructive">I couldn’t save that. Try again.</p>}
       {answers[at] > 0 ? (
         <button onClick={finish} disabled={!!busy} className={`${BTN_PRIMARY} !h-12 w-full`}>
           {busy === 'saving' ? 'Saving…' : 'Looks good, start'}

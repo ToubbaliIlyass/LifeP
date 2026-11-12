@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { inter } from '../fonts'
+import { ActureToaster } from '@/components/ui/ActureToaster'
 import { RegisterServiceWorker } from '@/components/install/RegisterServiceWorker'
 import '../globals.css'
 
@@ -112,6 +113,7 @@ export default function AppLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <RegisterServiceWorker />
+        <ActureToaster />
       </body>
     </html>
   )

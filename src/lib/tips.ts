@@ -1,8 +1,8 @@
 import type { Todo, TodoList } from '@/lib/todos'
 
 /**
- * The tip bank: short, useful things about the app, shown now and then in the
- * Today banner slot (src/components/todos/TipCard.tsx).
+ * The tip bank: short, useful things about the app, shown now and then as a
+ * toast, from Today (src/components/todos/TodayCards.tsx, src/lib/toast.tsx).
  *
  * KEEP THIS CURRENT. Whenever a feature ships or changes, add a tip for it here
  * (or fix the one that describes it). One idea per tip, a title of a few words
@@ -76,6 +76,7 @@ export const TIPS: Tip[] = [
   { id: 'tuck-grows', title: 'Tuck grows with you', body: 'Every finished to-do helps Tuck grow from seed to sprout to bloom. Nothing is ever taken away.' },
   { id: 'prayers', title: 'Prayer times, if you want them', body: 'Turn them on in Settings and the five prayers show on Today at their times.', action: { label: 'Open Settings', kind: 'go', to: 'settings' } },
   { id: 'install', title: 'Keep Acture one tap away', body: 'Install it like an app: the address bar in Chrome, or Share and Add to Home Screen on an iPhone.', when: (c) => !c.installed },
+  { id: 'logbook-archive', title: 'The Logbook tidies itself', body: 'Anything finished over a month ago moves to the Archive at the foot of the Logbook. Open it by month, and put anything back.' },
   { id: 'export', title: 'Your data is yours', body: 'Settings, Data: export everything as one file, or import it back.', action: { label: 'Open Settings', kind: 'go', to: 'settings' } },
 ]
 

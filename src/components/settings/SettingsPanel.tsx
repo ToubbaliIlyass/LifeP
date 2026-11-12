@@ -1,12 +1,14 @@
 'use client'
 
 import { NotificationsControl } from './NotificationsControl'
+import { SoundControl } from './SoundControl'
+import { toastDismiss, toastError, toastNote, toastStanding } from '@/lib/toast'
 import { AiBalance } from '@/components/todos/AiBalance'
 import { InstallControl } from '@/components/install/InstallControl'
 import { useInstall } from '@/components/install/InstallApp'
 import { TuckAbout } from '@/components/tuck/TuckAbout'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronLeft, Clock, Coins, Database, User, Bell, Heart, Zap, Smile, Palette as PaletteIcon, Globe, Download, LogOut, MapPin, Maximize2, Minimize2, Monitor, Moon, Palette, PanelLeftClose, RotateCcw, X, SlidersHorizontal, Sun, Trash2, Upload } from 'lucide-react'
+import { Check, ChevronLeft, Clock, Coins, Database, User, Bell, Heart, Zap, Smile, Palette as PaletteIcon, Globe, Download, LogOut, MapPin, Maximize2, Minimize2, Monitor, Moon, Palette, PanelLeftClose, RotateCcw, X, SlidersHorizontal, Sun, Trash2, Upload, Volume2 } from 'lucide-react'
 import { THEMES, CUSTOM_PREFIX, customHex, isCustomTheme, applyTheme, applyMode, storedMode, storedTheme } from '@/lib/themes'
 import type { LucideIcon } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
@@ -44,6 +46,14 @@ const FIELD = 'bg-foreground/[0.05] rounded-md px-2 py-1 max-md:min-h-11 max-md:
 const BUTTON = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border/80 px-2.5 py-1 max-md:min-h-11 max-md:px-4 max-md:text-[length:calc(15px*var(--ts))] text-[length:calc(13px*var(--ts))] font-medium hover:bg-foreground/[0.05] disabled:opacity-60'
 const LABEL = 'block mb-1 text-[length:calc(12px*var(--ts))] font-medium text-muted-foreground'
 const HINT = 'text-[length:calc(12.5px*var(--ts))] text-muted-foreground max-w-[60ch]'
+
+/** What an export, a reset or a setup change is doing, said in the island instead of under the buttons. */
+function setDataNote(n: { kind: 'busy' | 'ok' | 'error'; text: string } | null) {
+  if (!n) toastDismiss('acture-data')
+  else if (n.kind === 'busy') toastStanding('acture-data', 'syncing', n.text)
+  else if (n.kind === 'ok') toastNote('Done', n.text, 'acture-data', 'success')
+  else toastError('Something went wrong', n.text, 'acture-data')
+}
 
 function Section({ title, hint, icon: Icon, children }: { title: string; hint?: string; icon?: LucideIcon; children: React.ReactNode }) {
   return (
@@ -115,7 +125,6 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
   const [confirmText, setConfirmText] = useState('')
   const [resetting, setResetting] = useState(false)
   /** What the Data buttons are doing or did, shown beside them: a press must never look like nothing happened. */
-  const [dataNote, setDataNote] = useState<{ kind: 'busy' | 'ok' | 'error'; text: string } | null>(null)
   const install = useInstall()
   /** Opened in a browser tab, not yet installed: worth saying how. */
   const installable = !!install && !install.installed
@@ -456,6 +465,10 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
           <NotificationsControl />
         </Section>
 
+        <Section title="Sounds" icon={Volume2}>
+          <SoundControl />
+        </Section>
+
         {installable && (
           <Section title="Install" icon={Download}>
             <InstallControl />
@@ -556,9 +569,6 @@ export function SettingsPanel({ onSettingsChanged, onImport, onOpenMenu, stretch
             </button>
           </div>
 
-          {dataNote && (
-            <p role="status" className={`mt-3 text-[length:calc(13px*var(--ts))] ${dataNote.kind === 'error' ? 'text-destructive' : dataNote.kind === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{dataNote.text}</p>
-          )}
 
           {/* Start over, behind three guards: the button only opens this, a
               backup file downloads first, and nothing is deleted until the

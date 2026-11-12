@@ -1,12 +1,13 @@
 'use client'
 
+import { LogbookArchive } from '@/components/todos/LogbookArchive'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
 import { ListSkeleton } from '@/components/todos/ListSkeleton'
 import { ContextMenu, MENU_ITEM as CONTEXT_ITEM } from '@/components/todos/Sidebar'
 import { startListening } from '@/components/today/TodayAssistant'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
-  ArrowDown, ArrowUp, Archive, Bell, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
+  ArrowDown, ArrowUp, Archive, Bell, History, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
   Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import type { EventStatus } from '@/lib/event-status'
@@ -119,7 +120,7 @@ export function TodoView({
 }) {
   const {
     ready, down, todos, lists, events, date: today, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft,
-    patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload,
+    patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload, archived,
   } = useTodos()
 
   // A draft started from a list that cannot hold one (the Logbook, a search)
@@ -960,13 +961,13 @@ export function TodoView({
           </div>
         )
       }
-      const archived = older.reduce((n, [, group]) => n + group.length, 0)
+      const archivedDays = older.reduce((n, [, group]) => n + group.length, 0)
       return (
         <>
           {standardHead('logbook')}
-          {items.length === 0 && empty('Nothing completed yet.', 'Finished to-dos and projects are kept here.')}
+          {items.length === 0 && archived === 0 && empty('Nothing completed yet.', 'Finished to-dos and projects are kept here.')}
           {recent.map(dayBlock)}
-          {archived > 0 && (
+          {archivedDays > 0 && (
             <>
               <button
                 type="button"
@@ -974,13 +975,15 @@ export function TodoView({
                 aria-expanded={archiveOpen}
                 className="mt-6 flex items-center gap-1.5 text-[length:calc(13px*var(--ts))] font-medium text-muted-foreground hover:text-foreground"
               >
-                <Archive className="w-[15px] h-[15px]" />
-                Archive · {archived} from before {relDate(cutoff, today)}
+                <History className="w-[15px] h-[15px]" />
+                Older · {archivedDays} from before {relDate(cutoff, today)}
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
               </button>
               {archiveOpen && older.map(dayBlock)}
             </>
           )}
+          {/* What was finished over a month ago is not loaded with the app: counted here, opened on demand. */}
+          <LogbookArchive count={archived} />
         </>
       )
     }
@@ -1280,7 +1283,7 @@ export function TodoView({
           <button className={MENU} onClick={() => set({ done: !list.done })}>
             <Check className="w-[18px] h-[18px]" />{list.done ? 'Reopen' : list.kind === 'project' ? 'Complete project' : 'Complete area'}
           </button>
-          <button className={`${MENU} text-red-500`} onClick={() => { close(); if (!window.confirm(`Delete “${list.title || 'Untitled'}”?`)) return; removeList(list); onNavigate('anytime') }}>
+          <button className={`${MENU} text-red-500`} onClick={() => { close(); removeList(list); onNavigate('anytime') }}>
             <Trash2 className="w-[18px] h-[18px]" />Delete {list.kind}
           </button>
         </Pop>
