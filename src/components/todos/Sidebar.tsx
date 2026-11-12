@@ -540,7 +540,7 @@ export function Sidebar({
             <button role="menuitem" className={MENU_ITEM} onClick={() => { close(); patchList(l.id, { done: true }); if (view === target) onSelect('anytime') }}>
               <Check className="h-[18px] w-[18px]" />{l.kind === 'project' ? 'Complete project' : 'Complete area'}
             </button>
-            <button role="menuitem" className={`${MENU_ITEM} text-red-500`} onClick={() => { close(); if (!window.confirm(`Delete “${l.title || 'Untitled'}”?`)) return; removeList(l); if (view === target) onSelect('anytime') }}>
+            <button role="menuitem" className={`${MENU_ITEM} text-red-500`} onClick={() => { close(); removeList(l); if (view === target) onSelect('anytime') }}>
               <Trash2 className="h-[18px] w-[18px]" />Delete {l.kind}
             </button>
           </ContextMenu>

@@ -139,6 +139,8 @@ export interface TodosPayload {
   todos: Todo[]
   lists: TodoList[]
   events: DayEvent[]
+  /** How many finished things are in the Logbook's archive: left out of the lists above, loaded on demand (src/lib/archive.ts). */
+  archived?: number
 }
 
 /** Finished to-dos kept for the Logbook; older ones stay in the database. */
@@ -196,7 +198,7 @@ function daysFor(frequency: unknown, daysOfWeek: unknown): number[] | null {
 const tagsOf = (v: unknown) => (Array.isArray(v) ? v.filter((t): t is string => typeof t === 'string' && !!t.trim()) : [])
 
 /** The list a node sits in: a project if it is linked to one, else an area. */
-function containerOf(nodeId: number, edges: Edge[], kindById: Map<number, 'area' | 'project'>): number | null {
+export function containerOf(nodeId: number, edges: Edge[], kindById: Map<number, 'area' | 'project'>): number | null {
   let area: number | null = null
   for (const e of edges) {
     if (e.type === 'scheduled-for') continue

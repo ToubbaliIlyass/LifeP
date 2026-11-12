@@ -1,5 +1,6 @@
 'use client'
 
+import { toastError } from '@/lib/toast'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Check } from 'lucide-react'
 import type { Proposal } from '@/lib/db/schema'
@@ -81,6 +82,7 @@ export function ProposalCard({ proposal, onResolved, variant = 'row', autoApply 
   const [busy, setBusy] = useState(false)
   /** Why the last press did not work, in words: shown, not swallowed. */
   const [problem, setProblem] = useState<{ text: string; stale?: boolean } | null>(null)
+  useEffect(() => { if (problem) toastError('That didn’t work', problem.text, 'acture-proposal-problem') }, [problem])
   const { record } = useUndo()
   const ops = proposal.operations as BatchOperation[]
   const [summary, ...why] = proposal.summary.split('\n\n')
@@ -214,7 +216,6 @@ export function ProposalCard({ proposal, onResolved, variant = 'row', autoApply 
         </ul>
       )}
 
-      {problem && <p role="alert" className="mt-2 text-[length:calc(13px*var(--ts))] text-red-500">{problem.text}</p>}
       <div className={`flex gap-2 ${big ? 'mt-4' : 'mt-2.5'}`}>
         {!problem?.stale && (
           <button onClick={() => resolve('approve')} disabled={busy || (moves.size > 0 && kept === 0)} className={BTN_PRIMARY}>{addLabel}</button>

@@ -1,7 +1,9 @@
 import { getCurrentUser, unauthorized } from '@/lib/auth/getCurrentUser'
 import { createEdge, createNode, getEdges, getNodeById, getNodes } from '@/lib/graph/queries'
 import { clockIn, zoneFor } from '@/lib/clock'
-import { readSettings } from '@/lib/settings'
+import { readSettings, writeSettings } from '@/lib/settings'
+import { archivedOf, isArchived, planArchive } from '@/lib/archive'
+import { markArchived } from '@/lib/archive-server'
 import { prayerTimesFor } from '@/lib/prayers'
 import { ensurePrayerTasks } from '@/lib/prayers-server'
 import { DEFAULT_TASK_MINUTES } from '@/lib/schedule'
@@ -47,9 +49,28 @@ export async function GET(request: Request) {
   // The five are to-dos with a time worked out for the day; the to-dos
   // themselves are made the first time they are wanted.
   const prayers = prayerTimesFor(settings, date, zone)
-  const nodes = prayers.length ? await ensurePrayerTasks(user.id, read[0]) : read[0]
+  let nodes = prayers.length ? await ensurePrayerTasks(user.id, read[0]) : read[0]
 
-  return Response.json(buildTodos({ date, nodes, edges, prayers }))
+  // Once a day, what was finished over a month ago goes to the Archive (src/lib/archive.ts).
+  // A failed sweep must never cost anyone their lists, so it is only logged.
+  if (settings.archiveSweepDay !== date) {
+    try {
+      const ids = planArchive({ nodes, edges, today: date })
+      if (ids.length) {
+        const at = new Date().toISOString()
+        await markArchived(user.id, ids, at)
+        const gone = new Set(ids)
+        nodes = nodes.map((n) => (gone.has(n.id) ? { ...n, properties: { ...(n.properties as Record<string, unknown>), archivedAt: at } } : n))
+      }
+      await writeSettings(user.id, { archiveSweepDay: date })
+    } catch (e) {
+      console.error('[archive] sweep failed', e)
+    }
+  }
+
+  // The archive is left out of the lists and only counted: it is loaded when it is opened.
+  const live = nodes.filter((n) => !isArchived(n))
+  return Response.json({ ...buildTodos({ date, nodes: live, edges, prayers }), archived: archivedOf(nodes).length })
 }
 
 /**

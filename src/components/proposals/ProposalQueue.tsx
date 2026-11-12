@@ -1,5 +1,6 @@
 'use client'
 
+import { toastTuck } from '@/lib/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Inbox, Repeat } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
@@ -32,6 +33,8 @@ export function ProposalQueue({ onCountChange, onOpenMenu }: {
   }
   useEffect(() => () => { if (noteTimer.current) clearTimeout(noteTimer.current) }, [])
   // Waiting for a yes: the idea held up. Nothing waiting: the quiet.
+  // Tuck's word on a yes or a no, in the island.
+  useEffect(() => { if (note) toastTuck(TUCK_LINES[note], { pose: note, id: 'acture-proposal-note' }) }, [note])
   const pose: TuckState = note ?? (proposals && proposals.length === 0 ? 'empty-inbox' : 'proposing')
 
   const load = useCallback(() => {
@@ -62,7 +65,6 @@ export function ProposalQueue({ onCountChange, onOpenMenu }: {
               <Inbox className="w-[22px] h-[22px] text-primary" />To review
             </h1>
             <p className="text-[length:calc(14px*var(--ts))] text-foreground/75">Bigger things the assistant wants to add. Nothing here happens until you say yes.</p>
-            {note && <p role="status" className="mt-1.5 text-[length:calc(13.5px*var(--ts))] font-medium">{TUCK_LINES[note]}</p>}
           </div>
         </div>
         {proposals && proposals.length === 0 && (

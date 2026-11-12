@@ -3,7 +3,7 @@
  * critical path of saving, so a listener that is not mounted costs nothing.
  */
 
-/** A to-do was just ticked off. `detail: { id }`, sent before the screen has redrawn. */
+/** A to-do was just ticked off. `detail: { id, undo }`, sent before the screen has redrawn; `undo` puts it back, and removes the next occurrence a repeating one made. */
 export const TICKED = 'acture:ticked'
 /** A write did not reach the server. */
 export const SAVE_FAILED = 'acture:save-failed'

@@ -2,21 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTodos } from '@/components/todos/TodosProvider'
-import { Tuck } from '@/components/ui/Tuck'
+import { toastDismiss, toastStanding, toastTuck } from '@/lib/toast'
 import { loadArt } from '@/lib/tuck/art'
 import { wallNow } from '@/lib/wallclock'
 import { dayFacts, momentFor, type Mood } from '@/lib/tuck/mood'
 import { PROPOSAL_NEW, SAVE_FAILED, SAY, TICKED } from '@/lib/tuck/events'
 import { progress } from '@/lib/todo-views'
 import { useOnline } from '@/lib/tuck/useOnline'
-import type { TuckState } from '@/lib/tuck/states'
 
-/** How long a word of thanks stays up. */
-const TOAST_MS = 3600
 /** A save quicker than this is not worth a mention. */
 const SLOW_SAVE_MS = 900
 
-interface Toast { id: number; mood: Pick<Mood, 'state' | 'line'>; action?: { label: string; run: () => void }; /** "+1 a runner": which identity the tick counted for. */ chip?: { text: string; color: string } }
+type Said = Pick<Mood, 'state' | 'line'>
 
 /** Counts worth a word: a first, then round numbers. Gains only, never a loss. */
 
@@ -32,9 +29,7 @@ interface Toast { id: number; mood: Pick<Mood, 'state' | 'line'>; action?: { lab
 export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const { todos, lists, events, saving } = useTodos()
   const online = useOnline()
-  const [toasts, setToasts] = useState<Toast[]>([])
   const [slow, setSlow] = useState(false)
-  const seq = useRef(0)
 
   // The two poses that are needed exactly when the network is not: fetched now, while it is there.
   useEffect(() => {
@@ -45,16 +40,14 @@ export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void
   const latest = useRef({ todos, lists, events })
   useEffect(() => { latest.current = { todos, lists, events } })
 
-  const say = useCallback((mood: Toast['mood'], action?: Toast['action'], chip?: Toast['chip']) => {
-    const id = ++seq.current
-    // One at a time: the newest replaces what was up, so a run of ticks is not a queue.
-    setToasts([{ id, mood, action, chip }])
-    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), TOAST_MS)
+  // One at a time: the newest replaces what was up (same id), so a run of ticks is not a queue.
+  const say = useCallback((mood: Said, action?: { label: string; run: () => void; undo?: boolean }) => {
+    toastTuck(mood.line, { pose: mood.state, action })
   }, [])
 
   useEffect(() => {
     const onTick = (e: Event) => {
-      const { id } = (e as CustomEvent<{ id: number }>).detail
+      const { id, undo } = (e as CustomEvent<{ id: number; undo?: () => void }>).detail
       const { todos: before, lists: ls, events: ev } = latest.current
       const done = before.find((t) => t.id === id)
       if (!done) return
@@ -66,11 +59,11 @@ export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void
       const list = done.listId ? ls.find((l) => l.id === done.listId && !l.done) : undefined
       const finished = list && progress(list, before) < 1 && progress(list, after) === 1 ? list : null
       const m = momentFor(done, was, is, finished)
-      if (m) say(m)
+      if (m) say(m, undo && { label: 'Undo', run: undo, undo: true })
     }
     const onFail = () => say({ state: 'error', line: 'Oops, that didn’t work. Let’s try again.' })
     const onProposal = () => say({ state: 'curious', line: 'Ooh, something new showed up.' }, onNavigate ? { label: 'Take a look', run: () => onNavigate('proposals') } : undefined)
-    const onSay = (e: Event) => say((e as CustomEvent<Toast['mood']>).detail)
+    const onSay = (e: Event) => say((e as CustomEvent<Said>).detail)
     window.addEventListener(SAY, onSay)
     window.addEventListener(TICKED, onTick)
     window.addEventListener(SAVE_FAILED, onFail)
@@ -90,38 +83,13 @@ export function TuckStatus({ onNavigate }: { onNavigate?: (view: string) => void
     return () => clearTimeout(on)
   }, [saving])
 
-  const standing: { state: TuckState; line: string } | null = !online
-    ? { state: 'offline', line: 'Offline, but cosy. I’ll keep everything safe.' }
-    : slow ? { state: 'syncing', line: 'Saving, one moment.' } : null
+  // "Offline" and "saving" stay only as long as they are true.
+  useEffect(() => {
+    if (!online) { toastStanding('acture-offline', 'offline', 'Offline, but cosy. I’ll keep everything safe.'); return () => toastDismiss('acture-offline') }
+  }, [online])
+  useEffect(() => {
+    if (online && slow) { toastStanding('acture-saving', 'syncing', 'Saving, one moment.'); return () => toastDismiss('acture-saving') }
+  }, [online, slow])
 
-  if (!standing && toasts.length === 0) return null
-  const shown = standing ?? toasts[0].mood
-  const action = standing ? undefined : toasts[0].action
-  const chip = standing ? undefined : toasts[0].chip
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      data-tuck-status={shown.state}
-      className="pointer-events-none fixed z-[45] top-[calc(env(safe-area-inset-top)+52px)] md:top-2 inset-x-0 md:left-[var(--sb)] flex justify-center px-3"
-    >
-      <div className="pointer-events-auto flex max-w-[360px] items-center gap-1.5 rounded-2xl border border-border/70 bg-card pl-1 pr-3.5 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.14)]">
-        <Tuck state={shown.state} size={52} decorative />
-        <div className="min-w-0 py-1">
-          <p className="text-[length:calc(13.5px*var(--ts))] leading-snug">{shown.line}</p>
-          {chip && (
-            <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-foreground/[0.07] px-2 py-0.5 text-[length:calc(12px*var(--ts))] font-semibold">
-              <span className="h-2 w-2 rounded-full" style={{ background: chip.color }} />{chip.text}
-            </span>
-          )}
-          {action && (
-            <button onClick={action.run} className="mt-0.5 text-[length:calc(12.5px*var(--ts))] font-semibold underline underline-offset-2 text-foreground/85 hover:text-foreground">
-              {action.label}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  return null
 }

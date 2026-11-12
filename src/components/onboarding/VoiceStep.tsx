@@ -1,5 +1,6 @@
 'use client'
 
+import { toastError } from '@/lib/toast'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowUp, Check, Mic, Square, X } from 'lucide-react'
 import { Tuck } from '@/components/ui/Tuck'
@@ -36,6 +37,8 @@ export function VoiceStep<T>({ step, ask, example, items, onItems, row, action, 
   const speech = useSpeechInput((t) => { heard.current = t })
   const [reading, setReading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const shownError = error ?? speech.error
+  useEffect(() => { if (shownError) toastError('I couldn’t get that', shownError, 'acture-voice') }, [shownError])
   const [draft, setDraft] = useState('')
   /** What was just understood, held for a yes before it joins the list: what was said, and the list it would make. */
   const [pending, setPending] = useState<{ said: string; next: T[] } | null>(null)
@@ -185,7 +188,6 @@ export function VoiceStep<T>({ step, ask, example, items, onItems, row, action, 
         </form>
       )}
 
-      {(error || speech.error) && <p role="alert" className="mt-2 shrink-0 text-[length:calc(13px*var(--ts))] text-destructive">{error ?? speech.error}</p>}
 
       {/* Before it counts: what was said, and what came of it. */}
       {pending && (
