@@ -1,7 +1,7 @@
 'use client'
 
 import './tuck.css'
-import { useEffect, useId, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import { useEffect, useId, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { ID_PREFIX, loadArt, peekArt } from '@/lib/tuck/art'
 import { LOADING_FRAMES, TUCK_ALT, type TuckLevel, type TuckState } from '@/lib/tuck/states'
 
@@ -82,14 +82,18 @@ export function Tuck({ state, size = 96, alt, decorative = false, animate = true
     return () => { live = false }
   }, [wantsInline, art, state, useDark, level])
 
+  // The same object while the art is the same, so a parent that re-renders (a ticking clock, say) leaves
+  // the drawing alone. A fresh object every render makes React rebuild it, and every animation starts over.
+  const html = useMemo(() => (art ? { __html: art.replaceAll(ID_PREFIX, `${uid}-`) } : null), [art, uid])
+
   const box: CSSProperties = { width: size, height: Math.round(size * RATIO), ...style }
   const a11y = decorative ? { 'aria-hidden': true as const } : { role: 'img' as const, 'aria-label': alt ?? TUCK_ALT[state] }
   const cls = `tuck ${animate ? '' : 'tuck-still'} ${className}`
 
-  if (art) {
+  if (html) {
     return (
       <span {...a11y} className={cls} data-state={state} data-sleepy={SLEEPY.includes(state) || undefined} style={box}
-        dangerouslySetInnerHTML={{ __html: art.replaceAll(ID_PREFIX, `${uid}-`) }} />
+        dangerouslySetInnerHTML={html} />
     )
   }
 
