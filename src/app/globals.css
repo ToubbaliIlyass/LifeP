@@ -340,6 +340,8 @@
 .acture-flip-clock { --tuck-h: 1.4em; }
 .acture-stage { position: relative; margin-top: var(--tuck-h); }
 .acture-pace { position: absolute; left: 0; right: 0; bottom: 100%; height: var(--tuck-h); display: flex; justify-content: center; pointer-events: none; }
+/* Tuck a little above the cards rather than right on them, where there is room. */
+@media (min-height: 700px) { .acture-pace { transform: translateY(-2.5dvh); } }
 
 /* ─── Themes ──────────────────────────────────────────── */
 /*

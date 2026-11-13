@@ -94,7 +94,7 @@ export function FocusScreen({ todo, leaving, onPause, onResume, onFinish, onClos
       {/* The task, up top, where you read what you are doing. */}
       <h2 className={`relative mx-auto mt-1 max-w-3xl shrink-0 line-clamp-2 px-6 text-center text-[length:calc(25px*var(--ts))] lg:text-[length:calc(28px*var(--ts))] font-semibold leading-tight tracking-tight transition-opacity duration-1000 [overflow-wrap:anywhere] ${calm ? 'opacity-70' : ''}`}>{todo.title.trim() || 'New to-do'}</h2>
 
-      <div className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-[clamp(8px,2dvh,24px)] px-6 text-center [@media(min-height:700px)]:-translate-y-[3.5dvh]">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-[clamp(8px,2dvh,24px)] px-6 text-center">
         <FlipClock ms={total} dim={!running} mascot={<Tuck state={running ? 'focus' : 'break-time'} size={500} decorative className="!h-full !w-auto" />} />
         <p className="mt-1 min-h-6 text-[length:calc(15px*var(--ts))] lg:text-[length:calc(19px*var(--ts))] text-muted-foreground">
           {running
