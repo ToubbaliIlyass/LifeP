@@ -89,6 +89,8 @@ export function TodoEditor({
   /** On a phone only the first three buttons show; the rest are one tap away. */
   const [more, setMore] = useState(false)
   const hide = (on: boolean) => (!more && !on ? 'max-md:hidden' : '')
+  /** On a wide screen an empty pill is just its icon (the name is its tooltip), so the whole row fits on one line. */
+  const short = (on: boolean) => (on ? '' : 'md:hidden')
 
   const isDraft = todo.id < -900
   /** A phone's empty new draft shows only the title and the buttons: room for the keyboard. Notes, checklist and tags appear once there are words. */
@@ -180,7 +182,7 @@ export function TodoEditor({
     whenOn = true
   }
   const pill = (on: boolean, extra = '') =>
-    `${PILL} ${on ? `border-primary/40 bg-primary/[0.12] text-foreground ${extra}` : 'border-transparent bg-foreground/[0.05] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.085]'}`
+    `${PILL} ${on ? `border-primary/40 bg-primary/[0.12] text-foreground ${extra}` : 'md:flex-none md:px-1.5 border-transparent bg-foreground/[0.05] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.085]'}`
 
   return (
     <li
@@ -356,63 +358,63 @@ export function TodoEditor({
           />
         )}
 
-        <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-border/60">
+        <div className="flex flex-wrap items-center gap-1.5 md:gap-1 mt-3 pt-2.5 border-t border-border/60">
           {isTask || isEvent ? (
             <>
               <button type="button" className={pill(whenOn)} onClick={(e) => onPop('when', e.currentTarget)}>{when}</button>
               {/* The time on its day: the slot it is planned in, and when it reminds you. */}
               {!todo.someday && (
-                <button type="button" className={pill(!!todo.time)} onClick={(e) => onPop('time', e.currentTarget)}>
+                <button type="button" title="Time" className={pill(!!todo.time)} onClick={(e) => onPop('time', e.currentTarget)}>
                   <Clock className="w-[15px] h-[15px]" />
-                  <span className="truncate tabular-nums">
+                  <span className={`truncate tabular-nums ${short(!!todo.time)}`}>
                     {todo.time ? `${todo.time}${todo.minutes ? ` · ${todo.minutes < 60 ? `${todo.minutes}m` : `${todo.minutes / 60}h`}` : ''}` : 'Time'}
                   </span>
                 </button>
               )}
               {isTask && (
-                <button type="button" className={pill(!!todo.deadline, 'text-red-500')} onClick={(e) => onPop('deadline', e.currentTarget)}>
+                <button type="button" title="Deadline" className={pill(!!todo.deadline, 'text-red-500')} onClick={(e) => onPop('deadline', e.currentTarget)}>
                   <Flag className="w-[15px] h-[15px]" />
-                  <span className="truncate">{todo.deadline ? `Due ${relDate(todo.deadline, today)}` : 'Deadline'}</span>
+                  <span className={`truncate ${short(!!todo.deadline)}`}>{todo.deadline ? `Due ${relDate(todo.deadline, today)}` : 'Deadline'}</span>
                 </button>
               )}
             </>
           ) : null}
           {isTask && !isDraft && (
             // When it reminds you: at its time, before it, or any moment.
-            <button type="button" className={`${pill(!!reminderLabel(todo, today), 'text-amber-600 dark:text-amber-400')} ${hide(!!reminderLabel(todo, today))}`} onClick={(e) => onPop('remind', e.currentTarget)}>
+            <button type="button" className={`${pill(!!reminderLabel(todo, today), 'text-amber-600 dark:text-amber-400')} ${hide(!!reminderLabel(todo, today))}`} title="Remind" onClick={(e) => onPop('remind', e.currentTarget)}>
               <Bell className="w-[15px] h-[15px]" />
-              <span className="truncate tabular-nums">{reminderLabel(todo, today) ?? 'Remind'}</span>
+              <span className={`truncate tabular-nums ${short(!!reminderLabel(todo, today))}`}>{reminderLabel(todo, today) ?? 'Remind'}</span>
             </button>
           )}
           {isTask && (
             // Priority: marked, or not. "!!" in a new to-do's line sets it too.
-            <button type="button" className={`${pill(todo.priority === 'high', 'text-red-500')} ${hide(todo.priority === 'high')}`} aria-pressed={todo.priority === 'high'} onClick={() => onPatch({ priority: todo.priority === 'high' ? null : 'high' })}>
+            <button type="button" className={`${pill(todo.priority === 'high', 'text-red-500')} ${hide(todo.priority === 'high')}`} aria-pressed={todo.priority === 'high'} title="Priority" onClick={() => onPatch({ priority: todo.priority === 'high' ? null : 'high' })}>
               <span className="font-bold leading-none">!!</span>
-              <span className="truncate">{todo.priority === 'high' ? 'High' : 'Priority'}</span>
+              <span className={`truncate ${short(todo.priority === 'high')}`}>{todo.priority === 'high' ? 'High' : 'Priority'}</span>
             </button>
           )}
           {isTask && !isDraft && !todo.done && (
             // Start the timer and open the focus screen. Always one tap away, on a phone too: it is what the phone is propped up for.
-            <button type="button" className={pill(isRunning(todo.sessions ?? []), 'text-primary-ink')} onClick={() => { if (!isRunning(todo.sessions ?? [])) focus.start(todo); focus.open(todo.id) }}>
+            <button type="button" title="Focus on this" className={pill(isRunning(todo.sessions ?? []), 'text-primary-ink')} onClick={() => { if (!isRunning(todo.sessions ?? [])) focus.start(todo); focus.open(todo.id) }}>
               <Timer className="w-[15px] h-[15px]" />
-              <span className="truncate tabular-nums">{isRunning(todo.sessions ?? []) ? 'Focusing' : todo.sessions?.length ? `Focus · ${spentText(focusedMs(todo.sessions, 0))}` : 'Focus'}</span>
+              <span className={`truncate tabular-nums ${short(isRunning(todo.sessions ?? []) || focusedMs(todo.sessions ?? [], 0) >= 60000)}`}>{isRunning(todo.sessions ?? []) ? 'Focusing' : focusedMs(todo.sessions ?? [], 0) >= 60000 ? spentText(focusedMs(todo.sessions ?? [], 0)) : 'Focus'}</span>
             </button>
           )}
           {/* Any to-do can come round again. */}
-          <button type="button" className={`${pill(!!todo.repeats)} ${hide(!!todo.repeats)}`} onClick={(e) => onPop('repeat', e.currentTarget)}>
+          <button type="button" className={`${pill(!!todo.repeats)} ${hide(!!todo.repeats)}`} title="Repeat" onClick={(e) => onPop('repeat', e.currentTarget)}>
             <Repeat className={`w-[15px] h-[15px] ${todo.repeats ? 'text-emerald-600 dark:text-emerald-400' : ''}`} />
-            <span className="truncate">{todo.repeats ? repeatLabel(todo.repeats) : 'Repeat'}</span>
+            <span className={`truncate ${short(!!todo.repeats)}`}>{todo.repeats ? repeatLabel(todo.repeats) : 'Repeat'}</span>
           </button>
           {!isEvent && (
-            <button type="button" className={`${pill(false)} ${hide(false)}`} onClick={(e) => onPop('move', e.currentTarget)}>
+            <button type="button" className={`${pill(false)} ${hide(false)}`} title="Move to a list" onClick={(e) => onPop('move', e.currentTarget)}>
               <ArrowRight className="w-[15px] h-[15px]" />
-              <span className="truncate">{list ? list.title || 'Untitled' : isTask ? 'Inbox' : 'No list'}</span>
+              <span className={`truncate ${short(!!list)}`}>{list ? list.title || 'Untitled' : isTask ? 'Inbox' : 'No list'}</span>
             </button>
           )}
           {onSkip && !isDraft && (
-            <button type="button" className={`${pill(false)} ${hide(false)}`} onClick={() => { onSkip(); onClose() }}>
+            <button type="button" className={`${pill(false)} ${hide(false)}`} title={skipLabel(todo, today)} onClick={() => { onSkip(); onClose() }}>
               <SkipForward className="w-[15px] h-[15px]" />
-              <span className="truncate">{skipLabel(todo, today)}</span>
+              <span className={`truncate ${short(false)}`}>{skipLabel(todo, today)}</span>
             </button>
           )}
           {!more && (
@@ -427,7 +429,7 @@ export function TodoEditor({
                 type="button"
                 onClick={() => { deleting.current = true; onDelete() }}
                 aria-label="Delete to-do"
-                className="grid shrink-0 place-items-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045] max-md:w-11 max-md:h-11"
+                className="grid shrink-0 place-items-center w-7 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.045] max-md:w-11 max-md:h-11"
               >
                 <Trash2 className="w-[17px] h-[17px]" />
               </button>
