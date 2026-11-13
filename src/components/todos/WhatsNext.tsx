@@ -63,7 +63,7 @@ export function WhatsNext({ date }: { date: string }) {
   return (
     <section
       aria-label="What to do now"
-      className="mb-4 w-full overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.15] to-primary/[0.05] shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
+      className="mb-4 -mx-2 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.15] to-primary/[0.05] shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
     >
       <div className="flex items-center gap-3 px-4 py-3 max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-2.5 max-md:px-3">
         <span className="relative flex h-2.5 w-2.5 shrink-0 self-start mt-2" aria-hidden title={`${order.length} left today`}>

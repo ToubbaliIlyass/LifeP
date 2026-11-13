@@ -659,7 +659,7 @@ export function TodoView({
    * it off the day. Not going is never marked as a failure: no red, no count.
    */
   const eventRows = (items: DayEvent[], settle = false) => items.length > 0 && (
-    <ul className="my-2 rounded-md bg-foreground/[0.05] px-2.5 py-1.5 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] leading-[19px] max-md:leading-6 max-md:px-3 max-md:py-2">
+    <ul className="my-2 -mx-2 rounded-md bg-foreground/[0.05] px-2 py-1.5 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] leading-[19px] max-md:leading-6 max-md:py-2">
       {items.map((e) => {
         const key = `${e.id}:${e.date}`
         return (
