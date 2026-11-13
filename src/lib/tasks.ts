@@ -60,6 +60,8 @@ export async function setTaskStatus(userId: number, taskId: number, status: stri
         completedAt: undefined,
         // Skips belong to the occurrence they were made on (src/lib/skip.ts).
         skipped: undefined,
+        // Focus time belongs to the time round it was spent on (src/lib/focus.ts).
+        focus: undefined,
         // Each occurrence starts with its checklist unticked.
         ...(Array.isArray(props.checklist)
           ? { checklist: (props.checklist as Record<string, unknown>[]).map((c) => ({ ...c, done: false })) }

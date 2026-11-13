@@ -1,7 +1,10 @@
 'use client'
 
+import { FocusLog } from '@/components/focus/FocusLog'
+import { useFocus } from '@/components/focus/useFocus'
+import { focusedMs, isRunning, spentText } from '@/lib/focus'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, Archive, Bell, CalendarDays, Check, Clock, Ellipsis, Flag, ListChecks, MapPin, Moon, Plus, Repeat, SkipForward, Star, Trash2, X } from 'lucide-react'
+import { ArrowRight, Archive, Bell, CalendarDays, Check, Clock, Ellipsis, Flag, ListChecks, MapPin, Moon, Plus, Repeat, SkipForward, Star, Timer, Trash2, X } from 'lucide-react'
 import type { ChecklistItem, Todo, TodoList } from '@/lib/todos'
 import { relDate, repeatLabel, skipLabel } from '@/lib/todo-views'
 import { parseEntry, saysMore } from '@/lib/quick-entry'
@@ -60,6 +63,7 @@ export function TodoEditor({
   onPop: (kind: PopKind, anchor: HTMLElement) => void
 }) {
   const root = useRef<HTMLLIElement>(null)
+  const focus = useFocus()
   /** A selector to focus once the next render has put it on the page. */
   const focusNext = useRef<string | null>(autoFocus ? '[data-title]' : null)
   useEffect(() => {
@@ -387,6 +391,13 @@ export function TodoEditor({
               <span className="truncate">{todo.priority === 'high' ? 'High' : 'Priority'}</span>
             </button>
           )}
+          {isTask && !isDraft && !todo.done && (
+            // Start the timer and open the focus screen. Always one tap away, on a phone too: it is what the phone is propped up for.
+            <button type="button" className={pill(isRunning(todo.sessions ?? []), 'text-primary-ink')} onClick={() => { if (!isRunning(todo.sessions ?? [])) focus.start(todo); focus.open(todo.id) }}>
+              <Timer className="w-[15px] h-[15px]" />
+              <span className="truncate tabular-nums">{isRunning(todo.sessions ?? []) ? 'Focusing' : todo.sessions?.length ? `Focus · ${spentText(focusedMs(todo.sessions, 0))}` : 'Focus'}</span>
+            </button>
+          )}
           {/* Any to-do can come round again. */}
           <button type="button" className={`${pill(!!todo.repeats)} ${hide(!!todo.repeats)}`} onClick={(e) => onPop('repeat', e.currentTarget)}>
             <Repeat className={`w-[15px] h-[15px] ${todo.repeats ? 'text-emerald-600 dark:text-emerald-400' : ''}`} />
@@ -423,6 +434,7 @@ export function TodoEditor({
             </>
           )}
         </div>
+        {isTask && !isDraft && (todo.sessions?.length ?? 0) > 0 && <FocusLog sessions={todo.sessions ?? []} />}
         {isDraft && (
           // A new item is either something to do or something to show up to; it is only kept once confirmed
           // (this button, Enter, or clicking away).

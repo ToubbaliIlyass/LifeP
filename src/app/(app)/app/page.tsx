@@ -18,6 +18,7 @@ import { TuckStatus } from '@/components/tuck/TuckStatus'
 import { IdentityPage } from '@/components/world/IdentityPage'
 import { toastError, toastNote } from '@/lib/toast'
 import { UndoOfferToast } from '@/components/undo/UndoOfferToast'
+import { FocusHost } from '@/components/focus/FocusHost'
 import { todayStr } from '@/lib/date'
 import { notifyDataChanged } from '@/lib/dataSignal'
 import { safeGet, safeSet } from '@/lib/storage'
@@ -318,6 +319,7 @@ export default function Home() {
       {/* Tuck's word on what is happening behind the screen: ticks, new proposals, saving, offline. */}
       <TuckStatus onNavigate={select} />
       <UndoOfferToast />
+      <FocusHost />
 
       {finding !== null && <QuickFind initial={finding} onClose={() => setFinding(null)} onNavigate={select} />}
 

@@ -8,6 +8,7 @@ import { blockStartFor, forgetDone, recordDone, seriesOf } from '@/lib/availabil
 import { clockFor } from '@/lib/clock-server'
 import { setTaskStatus } from '@/lib/tasks'
 import { moveTaskTime, setTaskTime } from '@/lib/task-time'
+import { pauseFocus, sessionsOf } from '@/lib/focus'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 /** A date, null to clear it, or undefined when the field was not sent or is not one. */
@@ -61,7 +62,7 @@ async function relink(userId: number, nodeId: number, targetId: number | null, k
  * this writes them back). Only the fields sent are touched.
  *
  * Body, all optional: { title, notes, when, evening, someday, deadline,
- *   repeats, repeatDays, reminder, time, minutes, tags, checklist, order, listId, headingId,
+ *   repeats, repeatDays, reminder, time, minutes, tags, checklist, sessions, order, listId, headingId,
  *   headings, areaId, done }
  */
 export async function PATCH(
@@ -133,6 +134,10 @@ export async function PATCH(
     const deadline = day(body.deadline)
     if (deadline !== undefined) put(props, 'deadline', deadline)
     if (Array.isArray(body.checklist)) put(props, 'checklist', body.checklist.length ? body.checklist : null)
+    // Focus time: the stretches as the screen has them, cleaned (src/lib/focus.ts).
+    if (Array.isArray(body.sessions)) { const kept = sessionsOf(body.sessions); put(props, 'focus', kept.length ? kept : null) }
+    // Finishing a to-do ends its running stretch, whoever finishes it (the screen, or the assistant).
+    if (body.done === true && Array.isArray(props.focus)) put(props, 'focus', pauseFocus(sessionsOf(props.focus), new Date().toISOString()))
     // A heading belongs to one project, so leaving the project leaves it too.
     if ('headingId' in body) put(props, 'headingId', typeof body.headingId === 'string' ? body.headingId : null)
     else if ('listId' in body) delete props.headingId
