@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Pause, Timer } from 'lucide-react'
+import { Pause } from 'lucide-react'
+import { AnalogClock } from './AnalogClock'
 import { clockText, focusedMs } from '@/lib/focus'
 import { useFocus } from './useFocus'
 
@@ -18,7 +19,7 @@ export function FocusStrip() {
   return (
     <div className="mb-3 flex items-center gap-1 rounded-full bg-primary/10 pl-1 pr-1.5 max-md:mt-1">
       <button type="button" onClick={() => open(running.id)} aria-label={`Open focus: ${running.title}`} className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 text-left transition active:scale-[0.98]">
-        <Timer className="h-4 w-4 shrink-0 text-primary-ink" />
+        <AnalogClock ms={focusedMs(running.sessions ?? [], now)} size={26} className="shrink-0 text-primary-ink" />
         <span className="min-w-0 flex-1 truncate text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-semibold">{running.title.trim() || 'New to-do'}</span>
         <span className="shrink-0 tabular-nums text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-bold">{clockText(focusedMs(running.sessions ?? [], now))}</span>
       </button>
