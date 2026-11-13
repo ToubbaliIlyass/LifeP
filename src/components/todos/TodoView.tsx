@@ -2,7 +2,6 @@
 
 import { LogbookArchive } from '@/components/todos/LogbookArchive'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
-import { FocusStrip } from '@/components/focus/FocusStrip'
 import { useFocus } from '@/components/focus/useFocus'
 import { isRunning } from '@/lib/focus'
 import { ListSkeleton } from '@/components/todos/ListSkeleton'
@@ -1591,7 +1590,6 @@ export function TodoView({
     <div ref={scroller} className="h-full overflow-y-auto flex flex-col">
       <div data-enter={entering ? '' : undefined} className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 max-md:pb-36 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] `}>
         {phoneBar}
-        <FocusStrip />
         {!ready && down ? (
           // The server is not answering: say so, kindly, with a way to try again.
           <div className="mt-20 flex flex-col items-center text-center" role="status">

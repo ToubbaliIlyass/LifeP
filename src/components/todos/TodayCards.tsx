@@ -73,7 +73,7 @@ export function TodayCards({ date }: { date: string }) {
       )}
       {/* One slot: Tuck has something to say, or here is what to do now. Never both stacked. */}
       {/* While one is being timed, the timer is what you are doing now: it takes the place of the suggestion. */}
-      {!card && (running ? <div data-focus-now className="mb-3"><FocusBanner todo={running} /></div> : <WhatsNext date={date} />)}
+      {!card && (running ? <FocusBanner todo={running} /> : <WhatsNext date={date} />)}
     </>
   )
 }
