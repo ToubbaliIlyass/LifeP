@@ -240,8 +240,8 @@
   .acture-sheet { background: var(--background); backdrop-filter: none; }
 }
 
-/* The timer's own banner is in the list: no second one at the top. */
-body:has([data-focus-row]) [data-focus-strip] { display: none; }
+/* The timer's banner has taken the place of Today's "Now" card: no second one at the top. */
+body:has([data-focus-now]) [data-focus-strip] { display: none; }
 
 /* Stagger: related things arrive one after another, the most important first,
    in one direction (up), 40ms apart, 280ms each, the whole of it under 700ms.
