@@ -357,6 +357,12 @@ export function TodoView({
 
   // ── Rows ─────────────────────────────────────────────────────────────
 
+  /** A run of small marks beside a title: kept together, never split across lines, sitting on the text's line. */
+  function marks(items: React.ReactNode[], gap: string) {
+    if (!items.length) return null
+    return <span className={`inline-flex items-center gap-x-1.5 align-middle ${gap}`}>{items}</span>
+  }
+
   /** What comes before a title: when it is, as a chip or a mark. */
   function lead(t: Todo, ctx: Ctx) {
     const m: React.ReactNode[] = []
@@ -404,15 +410,31 @@ export function TodoView({
     return m
   }
 
-  /** The project or area a to-do belongs to, under its title — only where the list does not already say. */
-  function place(t: Todo, ctx: Ctx) {
-    if (ctx === 'project') return null
-    const l = lists.find((x) => x.id === t.listId)
-    if (!l || (l.kind === 'area' && ctx === 'area')) return null
+  /**
+   * The line under a title: the project or area it belongs to (only where the
+   * list does not already say), and when it is due. Both sit here, with the
+   * task, rather than pinned to the far edge where they float away from it.
+   */
+  function place(t: Todo, ctx: Ctx, due: { text: string; tone: 'over' | 'soon' | 'calm' } | null) {
+    const l = ctx === 'project' ? undefined : lists.find((x) => x.id === t.listId)
+    const where = l && !(l.kind === 'area' && ctx === 'area') ? l : undefined
+    if (!where && !due) return null
+    const dueTone = due?.tone === 'over'
+      ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-semibold'
+      : due?.tone === 'soon' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'bg-foreground/[0.06] text-muted-foreground'
     return (
-      <div className="flex items-center gap-1 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground">
-        {l.kind === 'project' && <ProgressRing value={progress(l, todos)} size={11} />}
-        <span className="truncate">{l.title || (l.kind === 'project' ? 'Untitled project' : 'Untitled area')}</span>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground">
+        {where && (
+          <span className="flex min-w-0 items-center gap-1">
+            {where.kind === 'project' && <ProgressRing value={progress(where, todos)} size={11} />}
+            <span className="truncate">{where.title || (where.kind === 'project' ? 'Untitled project' : 'Untitled area')}</span>
+          </span>
+        )}
+        {due && (
+          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 ${dueTone}`}>
+            <Flag className="w-3 h-3" />{due.text}
+          </span>
+        )}
       </div>
     )
   }
@@ -536,20 +558,16 @@ export function TodoView({
         )}
         <TodoCheck done={t.done} label={t.done ? `Mark “${t.title}” as not done` : `Complete “${t.title}”`} onClick={() => complete(t)} />
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-x-1.5">
-            {lead(t, ctx)}
-            <span className={`min-w-0 [overflow-wrap:anywhere] ${t.done ? 'text-muted-foreground line-through' : ''}`}>
+          {/* Text, not a flex row: a long title wraps like a sentence with the marks in front of it, instead of dropping to a line of its own. */}
+          <div className="[overflow-wrap:anywhere]">
+            {marks(lead(t, ctx), 'mr-1.5')}
+            <span className={t.done ? 'text-muted-foreground line-through' : ''}>
               {t.title.trim() || <span className="text-muted-foreground/50">New to-do</span>}
             </span>
-            {trail(t)}
+            {marks(trail(t), 'ml-1.5')}
           </div>
-          {place(t, ctx)}
+          {place(t, ctx, due)}
         </div>
-        {due && (
-          <span className={`shrink-0 inline-flex items-center gap-1 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] ${due.tone === 'over' ? 'text-red-600 dark:text-red-400 font-semibold' : due.tone === 'soon' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
-            <Flag className="w-3 h-3" />{due.text}
-          </span>
-        )}
         {/* One time round of a repeating to-do, put off; it carries on after. Always there on a phone, which has no hover. */}
         {canSkip(t) && (
           <button
