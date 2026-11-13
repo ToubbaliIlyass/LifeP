@@ -25,6 +25,13 @@ export function suggestOrder(todos: Todo[], today: string, nowMin: number, lists
   return [...open].sort((a, b) => rank(a) - rank(b))
 }
 
+/** How far through today's to-dos: what was finished today (not the old ones that happen to be dated earlier), out of that and what is still open. */
+export function todayProgress(todos: Todo[], lists: TodoList[], date: string, open: number) {
+  const finished = todos.filter((x) => !x.prayerKey && x.done && x.doneAt && localDateStr(new Date(x.doneAt)) === date && isToday(x, date, lists)).length
+  const total = open + finished
+  return { finished, total, pct: total ? Math.round((finished / total) * 100) : 0 }
+}
+
 /**
  * "What now?": one thing from today, with a button to do it, so opening the app is never a list to
  * decide from. "Another" moves to the next suggestion; finishing it brings the next.
@@ -44,10 +51,7 @@ export function WhatsNext({ date }: { date: string }) {
   if (order.length === 0) return null
   const t = order[skip % order.length]
 
-  // Today's own: what is still open, and what was finished today (not the old ones that happen to be dated earlier).
-  const finished = todos.filter((x) => !x.prayerKey && x.done && x.doneAt && localDateStr(new Date(x.doneAt)) === date && isToday(x, date, lists)).length
-  const total = order.length + finished
-  const pct = Math.round((finished / total) * 100)
+  const { finished, total, pct } = todayProgress(todos, lists, date, order.length)
   const list = t.listId !== null ? lists.find((l) => l.id === t.listId) : undefined
 
   const chips: { key: string; icon: React.ReactNode; text: string; tone?: string }[] = []
@@ -59,7 +63,7 @@ export function WhatsNext({ date }: { date: string }) {
   return (
     <section
       aria-label="What to do now"
-      className="mb-4 w-full overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.15] to-primary/[0.05] shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
+      className="mb-4 -mx-2 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.15] to-primary/[0.05] shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
     >
       <div className="flex items-center gap-3 px-4 py-3 max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-2.5 max-md:px-3">
         <span className="relative flex h-2.5 w-2.5 shrink-0 self-start mt-2" aria-hidden title={`${order.length} left today`}>

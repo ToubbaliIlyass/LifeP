@@ -1,3 +1,4 @@
+import { sessionsOf, type FocusSession } from '@/lib/focus'
 import type { Node, Edge } from '@/lib/db/schema'
 import { addDays, eventOccursOn } from '@/lib/date'
 import { blockOccursOn, firmnessOf } from '@/lib/sessions'
@@ -73,6 +74,8 @@ export interface Todo {
   snoozedUntil?: string | null
   /** Marked as mattering more — or less — than the rest. */
   priority: 'high' | 'low' | null
+  /** Focus time: the stretches spent on it, as moments (src/lib/focus.ts). The last may still be running. */
+  sessions?: FocusSession[]
   /** Set on the five prayers only: which one. They repeat daily, at a time worked out each day. */
   prayerKey?: string
   /** On a draft only: becomes an Event (something you show up to) when saved, not a to-do. */
@@ -341,6 +344,7 @@ export function buildTodos({
         repeatDays: daysFor(recurrence?.frequency, (recurrence as { daysOfWeek?: unknown } | undefined)?.daysOfWeek),
         ...reminderFields(p),
         priority: p.priority === 'high' || p.priority === 'low' ? p.priority : null,
+        sessions: sessionsOf(p.focus),
       })
     }
   }

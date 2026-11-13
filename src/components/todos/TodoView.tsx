@@ -2,6 +2,8 @@
 
 import { LogbookArchive } from '@/components/todos/LogbookArchive'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
+import { useFocus } from '@/components/focus/useFocus'
+import { isRunning } from '@/lib/focus'
 import { ListSkeleton } from '@/components/todos/ListSkeleton'
 import { ContextMenu, MENU_ITEM as CONTEXT_ITEM } from '@/components/todos/Sidebar'
 import { startListening } from '@/components/today/TodayAssistant'
@@ -135,6 +137,7 @@ export function TodoView({
     ready, down, todos, lists, events, date: today, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft,
     patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload, archived,
   } = useTodos()
+  const focus = useFocus()
 
   // A draft started from a list that cannot hold one (the Logbook, a search)
   // arrives here already begun: open it, as it was about to be.
@@ -357,6 +360,12 @@ export function TodoView({
 
   // ── Rows ─────────────────────────────────────────────────────────────
 
+  /** A run of small marks beside a title: kept together, never split across lines, sitting on the text's line. */
+  function marks(items: React.ReactNode[], gap: string) {
+    if (!items.length) return null
+    return <span className={`inline-flex items-center gap-x-1.5 align-middle ${gap}`}>{items}</span>
+  }
+
   /** What comes before a title: when it is, as a chip or a mark. */
   function lead(t: Todo, ctx: Ctx) {
     const m: React.ReactNode[] = []
@@ -404,15 +413,35 @@ export function TodoView({
     return m
   }
 
-  /** The project or area a to-do belongs to, under its title — only where the list does not already say. */
+  /** When it is due, as a chip on the title's own line. */
+  function dueChip(due: { text: string; tone: 'over' | 'soon' | 'calm' } | null) {
+    if (!due) return []
+    const tone = due.tone === 'over'
+      ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-semibold'
+      : due.tone === 'soon' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'bg-foreground/[0.06] text-muted-foreground'
+    return [
+      <span key="due" className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 ${tone}`}>
+        <Flag className="w-3 h-3" />{due.text}
+      </span>,
+    ]
+  }
+
+  /**
+   * The line under a title: the project or area it belongs to (only where the
+   * list does not already say). When it is due sits on the title's own line.
+   */
   function place(t: Todo, ctx: Ctx) {
-    if (ctx === 'project') return null
-    const l = lists.find((x) => x.id === t.listId)
-    if (!l || (l.kind === 'area' && ctx === 'area')) return null
+    const l = ctx === 'project' ? undefined : lists.find((x) => x.id === t.listId)
+    const where = l && !(l.kind === 'area' && ctx === 'area') ? l : undefined
+    if (!where) return null
     return (
-      <div className="flex items-center gap-1 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground">
-        {l.kind === 'project' && <ProgressRing value={progress(l, todos)} size={11} />}
-        <span className="truncate">{l.title || (l.kind === 'project' ? 'Untitled project' : 'Untitled area')}</span>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground">
+        {where && (
+          <span className="flex min-w-0 items-center gap-1">
+            {where.kind === 'project' && <ProgressRing value={progress(where, todos)} size={11} />}
+            <span className="truncate">{where.title || (where.kind === 'project' ? 'Untitled project' : 'Untitled area')}</span>
+          </span>
+        )}
       </div>
     )
   }
@@ -492,6 +521,9 @@ export function TodoView({
     const movable = !fixed && !(daySection && t.time)
     const pool = daySection ? siblings.filter((x) => !x.time && !x.prayerKey) : siblings.filter((x) => !x.prayerKey)
     const due = t.deadline && !t.done ? deadlineLabel(t.deadline, today) : null
+    const live = t.type === 'Task' && !t.done && !fixed && ctx !== 'logbook'
+    const canFocus = live
+    const timing = live && isRunning(t.sessions ?? [])
     return (
       <li
         key={t.id}
@@ -536,31 +568,40 @@ export function TodoView({
         )}
         <TodoCheck done={t.done} label={t.done ? `Mark “${t.title}” as not done` : `Complete “${t.title}”`} onClick={() => complete(t)} />
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-x-1.5">
-            {lead(t, ctx)}
-            <span className={`min-w-0 [overflow-wrap:anywhere] ${t.done ? 'text-muted-foreground line-through' : ''}`}>
+          {/* Text, not a flex row: a long title wraps like a sentence with the marks in front of it, instead of dropping to a line of its own. */}
+          <div className="[overflow-wrap:anywhere]">
+            {marks(lead(t, ctx), 'mr-1.5')}
+            <span className={t.done ? 'text-muted-foreground line-through' : ''}>
               {t.title.trim() || <span className="text-muted-foreground/50">New to-do</span>}
             </span>
-            {trail(t)}
+            {marks([...trail(t), ...dueChip(due)], 'ml-1.5')}
           </div>
           {place(t, ctx)}
         </div>
-        {due && (
-          <span className={`shrink-0 inline-flex items-center gap-1 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] ${due.tone === 'over' ? 'text-red-600 dark:text-red-400 font-semibold' : due.tone === 'soon' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
-            <Flag className="w-3 h-3" />{due.text}
-          </span>
-        )}
-        {/* One time round of a repeating to-do, put off; it carries on after. Always there on a phone, which has no hover. */}
-        {canSkip(t) && (
-          <button
-            type="button"
-            title={skipLabel(t, today)}
-            aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`}
-            onClick={(e) => { e.stopPropagation(); skip(t) }}
-            className={`${ICON_BTN} -my-0.5 -mr-1 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 max-md:opacity-100 [@media(hover:none)]:opacity-100`}
+        {/* Quick buttons, so the common things need no opening of the to-do. With a mouse they float in on hover (or while it is being timed);
+            on a phone, which has no hover, the focus one is always there. */}
+        {(canFocus || canSkip(t)) && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`flex shrink-0 items-center self-center max-md:-my-2.5 -mr-1 md:h-[22px] md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
           >
-            <SkipForward className="w-[15px] h-[15px]" />
-          </button>
+            {canSkip(t) && (
+              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} md:!h-[22px] hover:!bg-transparent`}>
+                <SkipForward className="w-[15px] h-[15px]" />
+              </button>
+            )}
+            {canFocus && (
+              <button
+                type="button"
+                title={timing ? 'Pause focus' : t.sessions?.length ? 'Resume focus' : 'Focus on this'}
+                aria-label={`${timing ? 'Pause focus' : 'Focus on'}: ${t.title.trim() || 'to-do'}`}
+                onClick={() => { if (timing) focus.pause(t); else focus.start(t) }}
+                className={`h-[22px] max-md:h-11 shrink-0 px-2 transition-opacity active:opacity-40 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium outline-none ${timing ? 'text-primary-ink' : 'text-muted-foreground hover:text-primary-ink'}`}
+              >
+                {timing ? 'Pause' : 'Focus'}
+              </button>
+            )}
+          </div>
         )}
       </li>
     )
@@ -618,7 +659,7 @@ export function TodoView({
    * it off the day. Not going is never marked as a failure: no red, no count.
    */
   const eventRows = (items: DayEvent[], settle = false) => items.length > 0 && (
-    <ul className="my-2 rounded-md bg-foreground/[0.05] px-2.5 py-1.5 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] leading-[19px] max-md:leading-6 max-md:px-3 max-md:py-2">
+    <ul className="my-2 -mx-2 rounded-md bg-foreground/[0.05] px-2 py-1.5 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] leading-[19px] max-md:leading-6 max-md:py-2">
       {items.map((e) => {
         const key = `${e.id}:${e.date}`
         return (
