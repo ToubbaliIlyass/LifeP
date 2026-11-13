@@ -271,6 +271,69 @@
   [data-enter] li, .acture-body > *, .acture-toast-actions > div:last-child { animation-delay: 0ms !important; }
 }
 
+/* The flip clock on the focus screen (FlipClock.tsx). The cards are the theme's own
+   light: the page colour with a wash of the accent, pale digits are never needed; the
+   ink is the foreground. --n is how many cards (2, or 3 with hours); the type size is
+   worked out so the row fills the width, within the height there is.
+   A card is only given 3D layers while it is turning: a transform on still text makes the
+   browser draw it to a bitmap, which is what made the digits look soft. */
+.acture-flip-clock {
+  --card-bg: color-mix(in oklab, var(--primary) 15%, var(--background));
+  --card-ink: var(--foreground);
+  --card-line: color-mix(in oklab, var(--foreground) 24%, var(--background));
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  font-size: min(calc((100vw - 3rem) / (var(--n) * 1.7 - 0.1)), 21dvh, 300px);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+.dark .acture-flip-clock { --card-bg: color-mix(in oklab, var(--foreground) 12%, var(--background)); --card-line: color-mix(in oklab, var(--foreground) 30%, var(--background)); }
+.acture-flip-row { display: flex; gap: 0.1em; align-items: flex-start; }
+.acture-flip-cell { display: flex; flex-direction: column; align-items: center; }
+.acture-flip {
+  position: relative;
+  isolation: isolate;
+  width: 1.6em;
+  height: 1.3em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1.3em;
+  color: var(--card-ink);
+}
+.acture-flip::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 0.14em; box-shadow: 0 0.03em 0.1em rgb(0 0 0 / 0.14), 0 0 0 1px color-mix(in oklab, var(--foreground) 9%, transparent); }
+.acture-flip[data-flipping] { perspective: 6em; }
+.acture-flip-half {
+  position: absolute;
+  left: 0; right: 0;
+  height: 50%;
+  overflow: hidden;
+  background: var(--card-bg);
+  text-align: center;
+}
+.acture-flip-half > span { position: absolute; left: 0; right: 0; height: 200%; }
+.acture-flip-top { top: 0; border-radius: 0.14em 0.14em 0 0; }
+.acture-flip-top > span { top: 0; }
+.acture-flip-bottom { bottom: 0; border-radius: 0 0 0.14em 0.14em; background-image: linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 7%, transparent), transparent 55%); }
+.acture-flip-bottom > span { top: -100%; }
+/* While folding, the still bottom shows the old number; reduced motion shows the new one at once. */
+.acture-flip-bottom > span[data-new] { display: none; }
+.acture-flip-hinge { position: absolute; left: 0; right: 0; top: calc(50% - 0.006em); height: 0.012em; background: var(--card-line); z-index: 3; }
+.acture-flip-caption { margin-top: 0.12em; font-size: clamp(11px, 0.085em, 22px); font-weight: 700; letter-spacing: 0.2em; text-indent: 0.2em; text-transform: uppercase; line-height: 1; color: var(--muted-foreground); }
+.acture-flip-leaf { z-index: 2; backface-visibility: hidden; will-change: transform; }
+.acture-flip-leaf-top { transform-origin: bottom; animation: acture-flip-fold 0.2s ease-in both; }
+.acture-flip-leaf-bottom { transform-origin: top; animation: acture-flip-drop 0.2s ease-out 0.2s both; }
+.acture-flip-leaf-bottom > span[data-old] { display: none; }
+.acture-flip-leaf-bottom > span[data-new] { display: block; }
+@keyframes acture-flip-fold { from { transform: rotateX(0); } to { transform: rotateX(-90deg); } }
+@keyframes acture-flip-drop { from { transform: rotateX(90deg); } to { transform: rotateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .acture-flip-leaf { display: none; }
+  .acture-flip-bottom > span[data-old] { display: none; }
+  .acture-flip-bottom > span[data-new] { display: block; }
+}
+
 /* ─── Themes ──────────────────────────────────────────── */
 /*
   Themes sit *on top of* light/dark rather than replacing it: `.dark` still
