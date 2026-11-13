@@ -91,17 +91,14 @@ export function FocusScreen({ todo, leaving, onPause, onResume, onFinish, onClos
       {/* While it counts, a warm light behind the clock; paused, it goes out. */}
       <div aria-hidden className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${running ? 'opacity-100' : 'opacity-0'}`} style={{ background: 'radial-gradient(70% 52% at 50% 52%, color-mix(in oklab, var(--primary) 16%, transparent), transparent 72%), radial-gradient(120% 90% at 50% 50%, transparent 55%, color-mix(in oklab, var(--foreground) 7%, transparent))' }} />
 
-      <div className="relative grid w-full shrink-0 grid-cols-[2.75rem_1fr_2.75rem] items-center px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <span />
+      <div className="relative w-full shrink-0 px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <p className="text-center text-[length:calc(13px*var(--ts))] lg:text-[length:calc(16px*var(--ts))] font-bold uppercase tracking-[0.22em] text-muted-foreground">Focusing on</p>
-        <button onClick={onClose} tabIndex={calm ? -1 : 0} aria-label="Close (Esc). The timer keeps running" title="Close (Esc). The timer keeps running" className={`grid h-11 w-11 place-items-center rounded-full bg-foreground/[0.08] text-muted-foreground transition duration-700 hover:bg-foreground/[0.12] hover:text-foreground active:scale-95 ${calm ? 'pointer-events-none opacity-0' : ''}`}><X className="h-5 w-5" /></button>
       </div>
       {/* The task, up top, where you read what you are doing. */}
       <h2 className={`relative mx-auto mt-1 max-w-3xl shrink-0 line-clamp-2 px-6 text-center text-[length:calc(25px*var(--ts))] lg:text-[length:calc(28px*var(--ts))] font-semibold leading-tight tracking-tight transition-opacity duration-1000 [overflow-wrap:anywhere] ${calm ? 'opacity-70' : ''}`}>{todo.title.trim() || 'New to-do'}</h2>
 
       <div className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-[clamp(8px,2dvh,24px)] px-6 text-center">
-        <Tuck state={running ? 'focus' : 'break-time'} size={500} decorative className="!w-auto !h-[clamp(130px,min(31dvh,72vw),400px)] max-w-[88vw] min-h-[72px] shrink aspect-[320/300] lg:!h-[clamp(80px,min(24dvh,calc(100dvh-560px)),340px)]" />
-        <FlipClock ms={total} dim={!running} />
+        <FlipClock ms={total} dim={!running} walking={running} walker={<Tuck state={running ? 'focus' : 'break-time'} size={500} decorative className="!h-full !w-full" />} />
         <p className="mt-1 min-h-6 text-[length:calc(15px*var(--ts))] lg:text-[length:calc(19px*var(--ts))] text-muted-foreground">
           {running
             ? began && `Started ${at(began)}`
@@ -110,6 +107,7 @@ export function FocusScreen({ todo, leaving, onPause, onResume, onFinish, onClos
       </div>
 
       <div className={`relative flex w-full max-w-xl shrink-0 gap-3 px-6 lg:max-w-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-opacity duration-700 ${calm ? 'pointer-events-none opacity-0' : ''}`}>
+        <button onClick={onClose} tabIndex={calm ? -1 : 0} aria-label="Close (Esc). The timer keeps running" title="Close (Esc). The timer keeps running" className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-foreground/[0.08] text-muted-foreground transition hover:bg-foreground/[0.12] hover:text-foreground active:scale-95"><X className="h-5 w-5" /></button>
         <button onClick={running ? onPause : onResume} tabIndex={calm ? -1 : 0} className="flex h-14 flex-1 items-center justify-center gap-2.5 rounded-full bg-foreground/[0.08] text-[length:calc(16px*var(--ts))] font-bold transition hover:bg-foreground/[0.12] active:scale-[0.97]">
           {running ? <><Pause className="h-5 w-5" fill="currentColor" /> Pause</> : <><Play className="h-5 w-5" fill="currentColor" /> Resume</>}
         </button>
