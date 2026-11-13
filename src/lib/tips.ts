@@ -78,7 +78,7 @@ export const TIPS: Tip[] = [
   { id: 'install', title: 'Keep Acture one tap away', body: 'Install it like an app: the address bar in Chrome, or Share and Add to Home Screen on an iPhone.', when: (c) => !c.installed },
   { id: 'logbook-archive', title: 'The Logbook tidies itself', body: 'Anything finished over a month ago moves to the Archive at the foot of the Logbook. Open it by month, and put anything back.' },
   { id: 'swipe-menu', title: 'Swipe the menu away', body: 'With your lists open, swipe left to close them. A quick flick throws them away; a slow short drag lets them settle back.', on: 'phone' },
-  { id: 'focus-timer', title: 'Time yourself on a to-do', body: 'Open a to-do and tap Focus. Prop your phone up and it shows the task and how long you have been at it.' },
+  { id: 'focus-timer', title: 'Time yourself on a to-do', body: 'Tap Focus on a to-do and it turns into a timer right where it sits. Tap the timer for the big screen: prop your phone up and it shows the task and how long you have been at it.' },
   { id: 'quick-buttons', title: 'Buttons on every to-do', body: 'Hover a to-do for quick buttons: focus on it, send it to today, or skip it once. On a phone, Focus is always there.' },
   { id: 'export', title: 'Your data is yours', body: 'Settings, Data: export everything as one file, or import it back.', action: { label: 'Open Settings', kind: 'go', to: 'settings' } },
 ]

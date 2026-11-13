@@ -393,7 +393,7 @@ export function TodoEditor({
           )}
           {isTask && !isDraft && !todo.done && (
             // Start the timer and open the focus screen. Always one tap away, on a phone too: it is what the phone is propped up for.
-            <button type="button" className={pill(isRunning(todo.sessions ?? []), 'text-primary-ink')} onClick={() => { if (!isRunning(todo.sessions ?? [])) focus.start(todo); focus.open(todo.id) }}>
+            <button type="button" className={pill(isRunning(todo.sessions ?? []), 'text-primary-ink')} onClick={() => { if (isRunning(todo.sessions ?? [])) focus.open(todo.id); else { focus.start(todo); onClose() } }}>
               <Timer className="w-[15px] h-[15px]" />
               <span className="truncate tabular-nums">{isRunning(todo.sessions ?? []) ? 'Focusing' : todo.sessions?.length ? `Focus · ${spentText(focusedMs(todo.sessions, 0))}` : 'Focus'}</span>
             </button>

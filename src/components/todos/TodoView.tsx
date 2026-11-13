@@ -2,7 +2,7 @@
 
 import { LogbookArchive } from '@/components/todos/LogbookArchive'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
-import { FocusStrip } from '@/components/focus/FocusStrip'
+import { FocusBanner, FocusStrip } from '@/components/focus/FocusStrip'
 import { useFocus } from '@/components/focus/useFocus'
 import { isRunning } from '@/lib/focus'
 import { ListSkeleton } from '@/components/todos/ListSkeleton'
@@ -527,6 +527,10 @@ export function TodoView({
     const timing = live && isRunning(t.sessions ?? [])
     // Not already on today's list: one tap puts it there.
     const canToday = live && !isToday(t, today, lists)
+    // Being timed, the to-do's place in the list is the focus banner.
+    if (timing) {
+      return <li key={t.id} data-todo-id={t.id} data-focus-row className="list-none py-0.5"><FocusBanner todo={t} /></li>
+    }
     return (
       <li
         key={t.id}
@@ -586,7 +590,7 @@ export function TodoView({
         {(canFocus || canSkip(t) || canToday) && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`flex shrink-0 items-center max-md:-my-2.5 -mr-1 md:h-[22px] md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
+            className={`flex shrink-0 items-center self-center max-md:-my-2.5 -mr-1 md:h-[22px] md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100`}
           >
             {canToday && (
               <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} md:!h-[22px] hover:!bg-transparent max-md:hidden`}>
@@ -601,12 +605,12 @@ export function TodoView({
             {canFocus && (
               <button
                 type="button"
-                title={timing ? 'Pause focus' : t.sessions?.length ? 'Resume focus' : 'Focus on this'}
-                aria-label={`${timing ? 'Pause focus' : 'Focus on'}: ${t.title.trim() || 'to-do'}`}
-                onClick={() => { if (timing) focus.pause(t); else { focus.start(t); focus.open(t.id) } }}
-                className={`h-[22px] max-md:h-11 shrink-0 px-2 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium outline-none ${timing ? 'text-primary-ink' : 'text-muted-foreground hover:text-primary-ink'}`}
+                title={t.sessions?.length ? 'Resume focus' : 'Focus on this'}
+                aria-label={`Focus on: ${t.title.trim() || 'to-do'}`}
+                onClick={() => focus.start(t)}
+                className={`h-[22px] max-md:h-11 shrink-0 px-2 transition-opacity active:opacity-40 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium outline-none text-muted-foreground hover:text-primary-ink`}
               >
-                {timing ? 'Pause' : 'Focus'}
+                Focus
               </button>
             )}
           </div>

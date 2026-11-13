@@ -87,7 +87,7 @@ export function FocusScreen({ todo, leaving, onPause, onResume, onFinish, onClos
   const began = firstStart(sessions)
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="Focus" data-state={leaving ? 'closed' : 'open'} onPointerDown={wake} onPointerMove={wake} onKeyDown={wake} onClickCapture={(e) => { if (Date.now() < swallowUntil.current) { e.stopPropagation(); e.preventDefault() } }} className="acture-sheet !bg-background !backdrop-filter-none fixed inset-0 z-[70] flex flex-col items-center overflow-hidden text-foreground">
+    <div role="dialog" aria-modal="true" aria-label="Focus" data-state={leaving ? 'closed' : 'open'} onPointerDown={wake} onPointerMove={wake} onKeyDown={wake} onClickCapture={(e) => { if (Date.now() < swallowUntil.current) { e.stopPropagation(); e.preventDefault() } }} className="acture-sheet [animation-duration:0.2s] !bg-background !backdrop-filter-none fixed inset-0 z-[70] flex flex-col items-center overflow-hidden text-foreground">
       {/* While it counts, a warm light behind the clock; paused, it goes out. */}
       <div aria-hidden className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${running ? 'opacity-100' : 'opacity-0'}`} style={{ background: 'radial-gradient(70% 52% at 50% 52%, color-mix(in oklab, var(--primary) 16%, transparent), transparent 72%), radial-gradient(120% 90% at 50% 50%, transparent 55%, color-mix(in oklab, var(--foreground) 7%, transparent))' }} />
 
