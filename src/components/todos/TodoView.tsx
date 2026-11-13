@@ -11,7 +11,7 @@ import { startListening } from '@/components/today/TodayAssistant'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   ArrowDown, ArrowUp, Archive, Bell, History, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
-  Pause, Play, Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
+  Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import type { EventStatus } from '@/lib/event-status'
 import { parseWhen } from '@/lib/jump-start'
@@ -582,15 +582,15 @@ export function TodoView({
         {(canFocus || canSkip(t) || canToday) && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`flex shrink-0 items-center -my-0.5 -mr-1 md:absolute md:inset-y-0 md:right-0 md:m-0 md:rounded-r-md md:pl-6 md:pr-1 md:bg-[linear-gradient(to_right,transparent,color-mix(in_oklab,var(--foreground)_4%,var(--background))_1.5rem)] md:transition-opacity md:duration-150 md:focus-within:pointer-events-auto md:focus-within:opacity-100 md:group-hover/row:pointer-events-auto md:group-hover/row:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:pointer-events-none md:opacity-0'}`}
+            className={`flex shrink-0 items-center -my-0.5 -mr-1 md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
           >
             {canToday && (
-              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} md:!h-7 md:!w-7 max-md:hidden`}>
+              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} max-md:hidden`}>
                 <Star className="w-[15px] h-[15px]" />
               </button>
             )}
             {canSkip(t) && (
-              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} md:!h-7 md:!w-7`}>
+              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN}`}>
                 <SkipForward className="w-[15px] h-[15px]" />
               </button>
             )}
@@ -600,9 +600,9 @@ export function TodoView({
                 title={timing ? 'Pause focus' : t.sessions?.length ? 'Resume focus' : 'Focus on this'}
                 aria-label={`${timing ? 'Pause focus' : 'Focus on'}: ${t.title.trim() || 'to-do'}`}
                 onClick={() => { if (timing) focus.pause(t); else { focus.start(t); focus.open(t.id) } }}
-                className={`${ICON_BTN} md:!h-7 md:!w-7 max-md:!h-9 max-md:!w-9 max-md:rounded-full ${timing ? '' : 'max-md:bg-foreground/[0.06]'} ${timing ? 'bg-primary/15 text-primary-ink hover:bg-primary/20' : 'hover:text-primary-ink'}`}
+                className={`h-9 max-md:h-11 shrink-0 px-2 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium outline-none ${timing ? 'text-primary-ink' : 'text-muted-foreground hover:text-primary-ink'}`}
               >
-                {timing ? <Pause className="w-[15px] h-[15px]" fill="currentColor" /> : <Play className="w-[15px] h-[15px]" fill="currentColor" />}
+                {timing ? 'Pause' : 'Focus'}
               </button>
             )}
           </div>
