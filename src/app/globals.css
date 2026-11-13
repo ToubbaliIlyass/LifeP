@@ -241,6 +241,37 @@
   .acture-sheet { background: var(--background); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
+/* Stagger: related things arrive one after another, the most important first,
+   in one direction (up), 40ms apart, 280ms each, the whole of it under 700ms.
+   `data-enter` is on a list for the first 700ms after it opens or finishes
+   loading (useEntering), so rows ticked or added later do not replay it. */
+@keyframes acture-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+[data-enter] [data-enter-lead],
+[data-enter] li:nth-child(-n+8) {
+  animation: acture-rise 0.28s var(--ease-out) both;
+}
+[data-enter] li:nth-child(1) { animation-delay: 40ms; }
+[data-enter] li:nth-child(2) { animation-delay: 80ms; }
+[data-enter] li:nth-child(3) { animation-delay: 120ms; }
+[data-enter] li:nth-child(4) { animation-delay: 160ms; }
+[data-enter] li:nth-child(5) { animation-delay: 200ms; }
+[data-enter] li:nth-child(6) { animation-delay: 240ms; }
+[data-enter] li:nth-child(7) { animation-delay: 280ms; }
+[data-enter] li:nth-child(8) { animation-delay: 320ms; }
+/* The toast body: Tuck, then the words, then the buttons, after the pill has begun to open. */
+.acture-body > * { animation: acture-rise 0.26s var(--ease-out) both; }
+.acture-body > :nth-child(1) { animation-delay: 140ms; }
+.acture-body > :nth-child(2) { animation-delay: 185ms; }
+.acture-toast-actions > div:last-child { animation: acture-rise 0.26s var(--ease-out) 230ms both; }
+/* Reduced motion: a quick fade, everything at once. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes acture-rise { from { opacity: 0; } to { opacity: 1; } }
+  [data-enter] li, .acture-body > *, .acture-toast-actions > div:last-child { animation-delay: 0ms !important; }
+}
+
 /* ─── Themes ──────────────────────────────────────────── */
 /*
   Themes sit *on top of* light/dark rather than replacing it: `.dark` still

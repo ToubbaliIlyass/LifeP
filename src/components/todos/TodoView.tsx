@@ -103,6 +103,19 @@ function DateRow({ Icon, label, value, onPick }: { Icon: React.ComponentType<{ c
  * for and how they group them (src/lib/todo-views.ts); a row, the editor it
  * opens into, the keyboard and dragging are the same everywhere.
  */
+/** True for the first `ms` after `key` changes, so a list can stagger in when it opens, and only then. */
+function useEntering(key: string, ms = 700) {
+  const [seen, setSeen] = useState(key)
+  const [on, setOn] = useState(true)
+  if (seen !== key) { setSeen(key); setOn(true) }
+  useEffect(() => {
+    if (!on) return
+    const t = setTimeout(() => setOn(false), ms)
+    return () => clearTimeout(t)
+  }, [on, key, ms])
+  return on
+}
+
 export function TodoView({
   view, stretched = false, onNavigate, onOpenMenu, onQuickFind, dock, banner,
 }: {
@@ -741,7 +754,7 @@ export function TodoView({
         {sub ? <div className="mb-2 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] text-foreground/75">{sub}</div> : null}
       </div>
       <div className="h-2" />
-      {banner}
+      {banner && <div data-enter-lead>{banner}</div>}
     </>
   )
   const standardHead = (id: StandardView, actions?: React.ReactNode, sub?: React.ReactNode) => {
@@ -1522,10 +1535,12 @@ export function TodoView({
   /** The one column the rows and the assistant's bar both sit in. */
   const column = `w-full mx-auto ${stretched ? 'max-w-none' : 'max-w-[740px]'} px-12 max-md:px-[18px]`
   const known = (STANDARD_VIEWS as readonly string[]).includes(view) || listId !== null || tagView !== null
+  // The first moments of a list: its rows arrive in turn (globals.css, `data-enter`).
+  const entering = useEntering(`${view}:${ready}`)
 
   return (
     <div ref={scroller} className="h-full overflow-y-auto flex flex-col">
-      <div className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 max-md:pb-36 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] `}>
+      <div data-enter={entering ? '' : undefined} className={`${column} flex-1 pt-10 max-md:pt-2 pb-16 max-md:pb-36 text-[length:calc(14px*var(--ts))] max-md:text-[length:calc(16px*var(--ts))] `}>
         {phoneBar}
         {!ready && down ? (
           // The server is not answering: say so, kindly, with a way to try again.

@@ -77,6 +77,7 @@ export const TIPS: Tip[] = [
   { id: 'prayers', title: 'Prayer times, if you want them', body: 'Turn them on in Settings and the five prayers show on Today at their times.', action: { label: 'Open Settings', kind: 'go', to: 'settings' } },
   { id: 'install', title: 'Keep Acture one tap away', body: 'Install it like an app: the address bar in Chrome, or Share and Add to Home Screen on an iPhone.', when: (c) => !c.installed },
   { id: 'logbook-archive', title: 'The Logbook tidies itself', body: 'Anything finished over a month ago moves to the Archive at the foot of the Logbook. Open it by month, and put anything back.' },
+  { id: 'swipe-menu', title: 'Swipe the menu away', body: 'With your lists open, swipe left to close them. A quick flick throws them away; a slow short drag lets them settle back.', on: 'phone' },
   { id: 'export', title: 'Your data is yours', body: 'Settings, Data: export everything as one file, or import it back.', action: { label: 'Open Settings', kind: 'go', to: 'settings' } },
 ]
 
