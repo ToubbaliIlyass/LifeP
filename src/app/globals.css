@@ -335,68 +335,11 @@
   .acture-flip-bottom > span[data-new] { display: block; }
 }
 
-/* Tuck paces along the top of the clock while it counts (FlipClock.tsx): walks to the
-   right end, stops, turns, walks back, stops, over a 12s round. Nested so each part moves on
-   its own: the mover carries it along the row (a % of its own width is the distance it can
-   travel, since it is as wide as the row less Tuck), the hop is its step, the face is which
-   way it looks. Paused, or with reduced motion, it stands still in the middle. */
-.acture-flip-clock { --tuck-h: 1.4em; --tuck-w: calc(var(--tuck-h) * 1.0667); }
+/* Tuck stands on top of the clock (FlipClock.tsx), in a lane as tall as there is room for:
+   the clock's type size already leaves that height free under the title (see .acture-flip-clock). */
+.acture-flip-clock { --tuck-h: 1.4em; }
 .acture-stage { position: relative; margin-top: var(--tuck-h); }
-.acture-pace { position: absolute; left: 0; right: 0; bottom: 100%; height: var(--tuck-h); pointer-events: none; }
-.acture-pace-mover { position: absolute; left: 0; bottom: 0; width: calc(100% - var(--tuck-w)); height: 100%; transform: translateX(50%); }
-.acture-pace-hop { position: absolute; left: 0; bottom: 0; width: var(--tuck-w); height: 100%; }
-.acture-pace-face { width: 100%; height: 100%; }
-.acture-pace[data-walking] .acture-pace-mover { animation: acture-pace 12s linear infinite; }
-.acture-pace[data-walking] .acture-pace-hop { animation: acture-hop 12s linear infinite; }
-.acture-pace[data-walking] .acture-pace-face { animation: acture-face 12s linear infinite; }
-@keyframes acture-pace {
-  0% { transform: translateX(0); animation-timing-function: ease-in-out; }
-  35% { transform: translateX(100%); }
-  50% { transform: translateX(100%); animation-timing-function: ease-in-out; }
-  85% { transform: translateX(0); }
-  100% { transform: translateX(0); }
-}
-@keyframes acture-face {
-  0%, 41.9% { transform: scaleX(1); }
-  42%, 91.9% { transform: scaleX(-1); }
-  92%, 100% { transform: scaleX(1); }
-}
-@keyframes acture-hop {
-  0.0% { transform: translateY(0%); }
-  2.5% { transform: translateY(-5%); }
-  5.0% { transform: translateY(0%); }
-  7.5% { transform: translateY(-5%); }
-  10.0% { transform: translateY(0%); }
-  12.5% { transform: translateY(-5%); }
-  15.0% { transform: translateY(0%); }
-  17.5% { transform: translateY(-5%); }
-  20.0% { transform: translateY(0%); }
-  22.5% { transform: translateY(-5%); }
-  25.0% { transform: translateY(0%); }
-  27.5% { transform: translateY(-5%); }
-  30.0% { transform: translateY(0%); }
-  32.5% { transform: translateY(-5%); }
-  35.0% { transform: translateY(0%); }
-  50.0% { transform: translateY(0%); }
-  52.5% { transform: translateY(-5%); }
-  55.0% { transform: translateY(0%); }
-  57.5% { transform: translateY(-5%); }
-  60.0% { transform: translateY(0%); }
-  62.5% { transform: translateY(-5%); }
-  65.0% { transform: translateY(0%); }
-  67.5% { transform: translateY(-5%); }
-  70.0% { transform: translateY(0%); }
-  72.5% { transform: translateY(-5%); }
-  75.0% { transform: translateY(0%); }
-  77.5% { transform: translateY(-5%); }
-  80.0% { transform: translateY(0%); }
-  82.5% { transform: translateY(-5%); }
-  85.0% { transform: translateY(0%); }
-  100.0% { transform: translateY(0%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .acture-pace[data-walking] .acture-pace-mover, .acture-pace[data-walking] .acture-pace-hop, .acture-pace[data-walking] .acture-pace-face { animation: none; }
-}
+.acture-pace { position: absolute; left: 0; right: 0; bottom: 100%; height: var(--tuck-h); display: flex; justify-content: center; pointer-events: none; }
 
 /* ─── Themes ──────────────────────────────────────────── */
 /*

@@ -37,12 +37,11 @@ function FlipCard({ text, unit }: { text: string; unit: string }) {
 const two = (n: number) => String(n).padStart(2, '0')
 
 /** Elapsed time as flip cards: minutes and seconds, with hours too once there are some. */
-export function FlipClock({ ms, dim = false, walker, walking = false }: {
+export function FlipClock({ ms, dim = false, mascot }: {
   ms: number
   dim?: boolean
-  /** Paces along the top edge of the cards while `walking`; stands in the middle otherwise. */
-  walker?: React.ReactNode
-  walking?: boolean
+  /** Stands on top of the cards. */
+  mascot?: React.ReactNode
 }) {
   const s = Math.floor(Math.max(0, ms) / 1000)
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
@@ -51,11 +50,7 @@ export function FlipClock({ ms, dim = false, walker, walking = false }: {
     <div role="timer" aria-live="off" style={{ '--n': cards } as React.CSSProperties} className={`acture-flip-clock transition-opacity duration-300 ${dim ? 'opacity-50' : ''}`}>
       <span className="sr-only">{clockText(ms)}</span>
       <div className="acture-stage">
-        {walker && (
-          <div aria-hidden className="acture-pace" data-walking={walking || undefined}>
-            <div className="acture-pace-mover"><div className="acture-pace-hop"><div className="acture-pace-face">{walker}</div></div></div>
-          </div>
-        )}
+        {mascot && <div aria-hidden className="acture-pace">{mascot}</div>}
         <div aria-hidden className="acture-flip-row">
           {h > 0 && <FlipCard text={String(h)} unit="hr" />}
           <FlipCard text={two(m)} unit="min" />

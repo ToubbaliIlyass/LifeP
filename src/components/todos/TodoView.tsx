@@ -524,8 +524,6 @@ export function TodoView({
     const live = t.type === 'Task' && !t.done && !fixed && ctx !== 'logbook'
     const canFocus = live
     const timing = live && isRunning(t.sessions ?? [])
-    // Not already on today's list: one tap puts it there.
-    const canToday = live && !isToday(t, today, lists)
     return (
       <li
         key={t.id}
@@ -582,16 +580,11 @@ export function TodoView({
         </div>
         {/* Quick buttons, so the common things need no opening of the to-do. With a mouse they float in on hover (or while it is being timed);
             on a phone, which has no hover, the focus one is always there. */}
-        {(canFocus || canSkip(t) || canToday) && (
+        {(canFocus || canSkip(t)) && (
           <div
             onClick={(e) => e.stopPropagation()}
             className={`flex shrink-0 items-center self-center max-md:-my-2.5 -mr-1 md:h-[22px] md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
           >
-            {canToday && (
-              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} md:!h-[22px] hover:!bg-transparent max-md:hidden`}>
-                <Star className="w-[15px] h-[15px]" />
-              </button>
-            )}
             {canSkip(t) && (
               <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} md:!h-[22px] hover:!bg-transparent`}>
                 <SkipForward className="w-[15px] h-[15px]" />

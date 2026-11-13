@@ -6,17 +6,20 @@ import { AnalogClock } from './AnalogClock'
 import { clockText, firstStart, focusedMs } from '@/lib/focus'
 import type { Todo } from '@/lib/todos'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
+import { useTodos } from '@/components/todos/TodosProvider'
+import { suggestOrder, todayProgress } from '@/components/todos/WhatsNext'
 import { useFocus } from './useFocus'
 
 /** 9:12, in the device's own style of clock. */
 const at = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
 /**
- * The to-do being timed, in the place and the shape of Today's "Now" card (WhatsNext): what you are on,
- * how long you have been at it, Pause and Done. Tap the card for the focus screen. Along the bottom edge,
- * how far through its time (when it has one set) you are.
+ * Today's "Now" card (WhatsNext) while a to-do is being timed: the same card, showing what you chose rather than
+ * what is suggested: what you are on, how long you have been at it, Pause and Done. Tap it for the focus screen.
+ * Along the bottom edge, the same thing as on the suggestion: how far through today's to-dos you are.
  */
-export function FocusBanner({ todo }: { todo: Todo }) {
+export function FocusBanner({ todo, date }: { todo: Todo; date: string }) {
+  const { todos, lists } = useTodos()
   const { open, pause, finish } = useFocus()
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -25,7 +28,7 @@ export function FocusBanner({ todo }: { todo: Todo }) {
   }, [])
   const ms = focusedMs(todo.sessions ?? [], now)
   const began = firstStart(todo.sessions ?? [])
-  const pct = todo.minutes ? Math.min(100, Math.round((ms / (todo.minutes * 60000)) * 100)) : 0
+  const { finished, total, pct } = todayProgress(todos, lists, date, suggestOrder(todos, date, 0, lists).length)
   return (
     <section
       aria-label="Focusing"
@@ -63,7 +66,7 @@ export function FocusBanner({ todo }: { todo: Todo }) {
           </button>
         </div>
       </div>
-      <div className="h-1 bg-primary/15">
+      <div role="progressbar" aria-label="Today's progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={finished} className="h-1 bg-primary/15">
         <div className="h-full rounded-r-full bg-primary transition-[width] duration-500 ease-[var(--ease-out)] motion-reduce:transition-none" style={{ width: `${pct}%` }} />
       </div>
     </section>

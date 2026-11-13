@@ -12,6 +12,7 @@ import { clockZone, wallNow } from '@/lib/wallclock'
 import { dayFacts } from '@/lib/tuck/mood'
 import { relDate, skipPreview } from '@/lib/todo-views'
 import { safeGet, safeSet } from '@/lib/storage'
+import { isRunning, pauseFocus, startFocus } from '@/lib/focus'
 import { parseEntry } from '@/lib/quick-entry'
 import { SAVE_FAILED, SAY, TICKED } from '@/lib/tuck/events'
 import { dueReminders, remindersIn, SNOOZES, snoozeUntil, type Reminder } from '@/lib/reminders'
@@ -34,6 +35,8 @@ interface TodosContextValue {
   /** Changes a to-do: on screen at once, written a moment later. */
   patch: (id: number, changes: Partial<Todo>) => void
   toggle: (todo: Todo) => void
+  /** Starts or pauses a to-do's focus timer. On screen at once; sent at once, and the server applies it to what it has stored. */
+  focusAction: (todo: Todo, action: 'start' | 'pause') => void
   /** Skips this time round of a repeating to-do; the series carries on. Undoable. */
   skip: (todo: Todo) => void
   /** Settles one day of an event: attended, cancelled or not gone to. Leaves the day's list; undoable. */
@@ -248,6 +251,22 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     setData((d) => (d ? { ...d, todos: d.todos.map((t) => (t.id === id ? { ...t, ...full } : t)) } : d))
     write(id, full)
   }, [write])
+
+  const focusAction = useCallback((todo: Todo, action: 'start' | 'pause') => {
+    if (todo.id === DRAFT_ID) return
+    const at = new Date().toISOString()
+    setData((d) => (d ? {
+      ...d,
+      todos: d.todos.map((t) => {
+        const s = t.sessions ?? []
+        if (t.id === todo.id) return { ...t, sessions: action === 'start' ? startFocus(s, at) : pauseFocus(s, at) }
+        // One at a time: starting one pauses the rest, here as on the server.
+        return action === 'start' && isRunning(s) ? { ...t, sessions: pauseFocus(s, at) } : t
+      }),
+    } : d))
+    // Not held back with the typing: a start must not be lost if the page closes straight after.
+    run(() => fetch(`/api/todos/${todo.id}`, { ...json('PATCH', { focusAction: action }), keepalive: true }), true)
+  }, [run])
 
   const toggle = useCallback((todo: Todo) => {
     if (todo.id === DRAFT_ID) return
@@ -487,10 +506,10 @@ export function TodosProvider({ children }: { children: React.ReactNode }) {
     todos: draft ? [draft, ...(data?.todos ?? [])] : data?.todos ?? [],
     lists: data?.lists ?? [],
     events: data?.events ?? [],
-    patch, toggle, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
+    patch, toggle, focusAction, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, reload: load,
     saving, down, archived: data?.archived ?? 0,
-  }), [data, draft, saving, down, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
+  }), [data, draft, saving, down, patch, toggle, focusAction, skip, resolveEvent, remove, startDraft, endDraft, patchList, createList, removeList,
     dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, requestOpen, takeOpenRequest, load])
 
   return (

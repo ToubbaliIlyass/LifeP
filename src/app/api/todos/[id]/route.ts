@@ -8,7 +8,7 @@ import { blockStartFor, forgetDone, recordDone, seriesOf } from '@/lib/availabil
 import { clockFor } from '@/lib/clock-server'
 import { setTaskStatus } from '@/lib/tasks'
 import { moveTaskTime, setTaskTime } from '@/lib/task-time'
-import { pauseFocus, sessionsOf } from '@/lib/focus'
+import { isRunning, pauseFocus, sessionsOf, startFocus } from '@/lib/focus'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 /** A date, null to clear it, or undefined when the field was not sent or is not one. */
@@ -63,7 +63,7 @@ async function relink(userId: number, nodeId: number, targetId: number | null, k
  *
  * Body, all optional: { title, notes, when, evening, someday, deadline,
  *   repeats, repeatDays, reminder, time, minutes, tags, checklist, sessions, order, listId, headingId,
- *   headings, areaId, done }
+ *   headings, areaId, done, focusAction: 'start' | 'pause' }
  */
 export async function PATCH(
   request: Request,
@@ -136,6 +136,22 @@ export async function PATCH(
     if (Array.isArray(body.checklist)) put(props, 'checklist', body.checklist.length ? body.checklist : null)
     // Focus time: the stretches as the screen has them, cleaned (src/lib/focus.ts).
     if (Array.isArray(body.sessions)) { const kept = sessionsOf(body.sessions); put(props, 'focus', kept.length ? kept : null) }
+    // Start or pause, applied here to what is stored and at the server's own clock: two devices cannot write over
+    // each other's stretches or disagree about the time, and starting one pauses whatever else was running.
+    if (node.type === 'Task' && (body.focusAction === 'start' || body.focusAction === 'pause')) {
+      const at = new Date().toISOString()
+      const cur = sessionsOf(props.focus)
+      const next = body.focusAction === 'start' ? startFocus(cur, at) : pauseFocus(cur, at)
+      put(props, 'focus', next.length ? next : null)
+      if (body.focusAction === 'start') {
+        for (const n of await getNodes(user.id)) {
+          if (n.id === id || n.type !== 'Task') continue
+          const p = n.properties as Record<string, unknown>
+          const other = sessionsOf(p.focus)
+          if (isRunning(other)) await updateNode(user.id, n.id, { ...p, focus: pauseFocus(other, at) })
+        }
+      }
+    }
     // Finishing a to-do ends its running stretch, whoever finishes it (the screen, or the assistant).
     if (body.done === true && Array.isArray(props.focus)) put(props, 'focus', pauseFocus(sessionsOf(props.focus), new Date().toISOString()))
     // A heading belongs to one project, so leaving the project leaves it too.

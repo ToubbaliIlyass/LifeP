@@ -5,7 +5,7 @@ import { CatchUp } from '@/components/todos/CatchUp'
 import { CheckIn } from '@/components/todos/CheckIn'
 import { WeekReflection } from '@/components/todos/WeekReflection'
 import { WhatsNext } from '@/components/todos/WhatsNext'
-import { FocusBanner } from '@/components/focus/FocusStrip'
+import { FocusBanner } from '@/components/focus/FocusBanner'
 import { useFocus } from '@/components/focus/useFocus'
 import { useTodos } from '@/components/todos/TodosProvider'
 import { HelpCard } from '@/components/tuck/HelpCard'
@@ -63,6 +63,9 @@ export function TodayCards({ date }: { date: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit, with what the data was when it arrived
   }, [mounted, ready])
 
+  // One slot. A timer running is what you are doing now, so it comes first; then Tuck, when there is something to say;
+  // otherwise here is what to do now. Never stacked.
+  if (running) return <FocusBanner todo={running} date={date} />
   return (
     <>
       {card?.kind === 'catch-up' && <CatchUp date={date} onAway={() => putAway(awayKey.catchUp(date))} />}
@@ -71,9 +74,7 @@ export function TodayCards({ date }: { date: string }) {
       {card?.kind === 'help' && (
         <HelpCard mood={card.mood} level={dayFacts({ now, todos, lists, events }).level} onAway={() => putAway(awayKey.help(date, card.mood.key))} />
       )}
-      {/* One slot: Tuck has something to say, or here is what to do now. Never both stacked. */}
-      {/* While one is being timed, the timer is what you are doing now: it takes the place of the suggestion. */}
-      {!card && (running ? <FocusBanner todo={running} /> : <WhatsNext date={date} />)}
+      {!card && <WhatsNext date={date} />}
     </>
   )
 }
