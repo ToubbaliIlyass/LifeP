@@ -35,6 +35,7 @@ export function ProgressRing({ value, size = 16, className = '' }: { value: numb
 /** The tick every to-do carries: a small rounded square, sitting on the title's first line. */
 export function TodoCheck({ done, onClick, small = false, label }: { done: boolean; onClick: () => void; small?: boolean; label?: string }) {
   // Ticking pops the box and sends a ring out: the smallest cheer, on the most repeated thing in the app.
+  // It also gives under the finger the instant it touches (active), not after it lets go.
   const [pop, setPop] = useState(false)
   return (
     <button
@@ -42,7 +43,7 @@ export function TodoCheck({ done, onClick, small = false, label }: { done: boole
       onClick={(e) => { e.stopPropagation(); if (!done) { setPop(true); window.setTimeout(() => setPop(false), 600) } onClick() }}
       aria-label={label ?? (done ? 'Mark as not done' : 'Complete')}
       // The box is drawn small and the thumb gets a 44px square around it: the ::before reaches past it, and past the row's edge.
-      className={`relative shrink-0 grid place-items-center rounded-[4px] border-[1.5px] transition-colors before:absolute before:-inset-3 before:content-[''] md:before:-inset-2 ${pop ? 'acture-tick' : ''} ${
+      className={`relative shrink-0 grid place-items-center rounded-[4px] border-[1.5px] transition-[color,background-color,border-color,scale] duration-100 active:scale-[0.82] motion-reduce:active:scale-100 before:absolute before:-inset-3 before:content-[''] md:before:-inset-2 ${pop ? 'acture-tick' : ''} ${
         small ? 'w-[13px] h-[13px]' : 'w-[15px] h-[15px] mt-[3.5px] max-md:w-[22px] max-md:h-[22px] max-md:mt-[1px] max-md:rounded-[6px]'
       } ${done ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/50 text-transparent hover:border-primary hover:text-muted-foreground/50'}`}
     >

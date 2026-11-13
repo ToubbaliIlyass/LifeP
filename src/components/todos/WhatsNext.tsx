@@ -102,7 +102,7 @@ export function WhatsNext({ date }: { date: string }) {
       </div>
       {/* How far through today's to-dos. */}
       <div role="progressbar" aria-label="Today's progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={finished} className="h-1 bg-primary/15">
-        <div className="h-full rounded-r-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-r-full bg-primary transition-[width] duration-500 ease-[var(--ease-out)] motion-reduce:transition-none" style={{ width: `${pct}%` }} />
       </div>
     </section>
   )

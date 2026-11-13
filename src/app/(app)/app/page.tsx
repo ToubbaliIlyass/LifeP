@@ -266,6 +266,7 @@ export default function Home() {
         onSelect={select}
         pendingCount={pendingCount}
         open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
       />
 
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">

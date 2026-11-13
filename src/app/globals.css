@@ -189,6 +189,89 @@
   * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--foreground) 28%, transparent) transparent; }
 }
 
+/* ─── Motion + type tokens ────────────────────────────── */
+/*
+  Two curves, so the app moves one way. --ease-out is for things that appear
+  or fade; --ease-spring is a critically damped spring (no overshoot, response
+  0.34s, settles in 0.4s) sampled into linear(): the same shape Apple uses for
+  moving and re-placing things. Use it with a 400ms duration. Overshoot is kept
+  for rewards and flicks (the tick pop), never for panels.
+*/
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: linear(0, 0.045, 0.146, 0.267, 0.389, 0.501, 0.598, 0.681, 0.749, 0.804, 0.849, 0.883, 0.911, 0.932, 0.948, 0.961, 0.971, 0.978, 0.983, 0.988, 0.991, 0.993, 1);
+}
+
+/* Inter's own tracking curve (-0.0223 + 0.185·e^(-0.1745·px) em): about 0 at
+   12px, -0.011em at the 16px most text is set at, -0.02em for titles, which
+   `tracking-tight` already gives. Body text takes the 16px value; form
+   controls inherit it. */
+@layer base {
+  body { letter-spacing: -0.011em; }
+}
+
+/* A full-screen sheet (Listening, Tell Tuck): it materializes, the blur and
+   the scale arriving together, and leaves the way it came. */
+.acture-sheet {
+  background: color-mix(in oklab, var(--background) 94%, transparent);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  animation: acture-sheet-in 0.32s var(--ease-out) both;
+}
+.acture-sheet[data-state="closed"] { animation: acture-sheet-out 0.18s var(--ease-out) both; pointer-events: none; }
+@keyframes acture-sheet-in {
+  from { opacity: 0; transform: scale(0.985); backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+  to { opacity: 1; transform: scale(1); backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); }
+}
+@keyframes acture-sheet-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.985); }
+}
+/* Reduced motion keeps the fade and drops the movement. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes acture-sheet-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes acture-sheet-out { from { opacity: 1; } to { opacity: 0; } }
+}
+/* Frosted glass becomes plain paper for people who asked for less transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  .acture-sheet { background: var(--background); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+/* More contrast: a firm edge on floating surfaces. */
+@media (prefers-contrast: more) {
+  .acture-sheet { background: var(--background); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* Stagger: related things arrive one after another, the most important first,
+   in one direction (up), 40ms apart, 280ms each, the whole of it under 700ms.
+   `data-enter` is on a list for the first 700ms after it opens or finishes
+   loading (useEntering), so rows ticked or added later do not replay it. */
+@keyframes acture-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+[data-enter] [data-enter-lead],
+[data-enter] li:nth-child(-n+8) {
+  animation: acture-rise 0.28s var(--ease-out) both;
+}
+[data-enter] li:nth-child(1) { animation-delay: 40ms; }
+[data-enter] li:nth-child(2) { animation-delay: 80ms; }
+[data-enter] li:nth-child(3) { animation-delay: 120ms; }
+[data-enter] li:nth-child(4) { animation-delay: 160ms; }
+[data-enter] li:nth-child(5) { animation-delay: 200ms; }
+[data-enter] li:nth-child(6) { animation-delay: 240ms; }
+[data-enter] li:nth-child(7) { animation-delay: 280ms; }
+[data-enter] li:nth-child(8) { animation-delay: 320ms; }
+/* The toast body: Tuck, then the words, then the buttons, after the pill has begun to open. */
+.acture-body > * { animation: acture-rise 0.26s var(--ease-out) both; }
+.acture-body > :nth-child(1) { animation-delay: 140ms; }
+.acture-body > :nth-child(2) { animation-delay: 185ms; }
+.acture-toast-actions > div:last-child { animation: acture-rise 0.26s var(--ease-out) 230ms both; }
+/* Reduced motion: a quick fade, everything at once. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes acture-rise { from { opacity: 0; } to { opacity: 1; } }
+  [data-enter] li, .acture-body > *, .acture-toast-actions > div:last-child { animation-delay: 0ms !important; }
+}
+
 /* ─── Themes ──────────────────────────────────────────── */
 /*
   Themes sit *on top of* light/dark rather than replacing it: `.dark` still
@@ -717,22 +800,6 @@
   .acture-tick, .acture-tick-ring { animation: none; }
 }
 
-/* The undo card: it rises into place, and a thin line runs down the six
-   seconds in which the change can still be reversed. */
-@keyframes acture-toast-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes acture-toast-timer {
-  from { transform: scaleX(1); }
-  to { transform: scaleX(0); }
-}
-.acture-toast { animation: acture-toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.acture-toast-timer { transform-origin: left; animation: acture-toast-timer 6s linear forwards; }
-@media (prefers-reduced-motion: reduce) {
-  .acture-toast { animation: none; }
-}
-
 /* The island: every toast (src/lib/toast.tsx, built on Sileo). It wears the
    palette: the pill is the card colour, the words the foreground, so it
    belongs on every theme, light or dark, custom ones included. What kind of
@@ -828,4 +895,10 @@
 }
 @keyframes acture-blink {
   50% { opacity: 0; }
+}
+
+/* More contrast: the island gets a firm edge. Last, and doubled, so it beats
+   both the light and the `.dark` values above. */
+@media (prefers-contrast: more) {
+  .acture-island.acture-island { --island-edge: color-mix(in oklab, var(--island-ink) 70%, transparent); }
 }

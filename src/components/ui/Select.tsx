@@ -107,7 +107,7 @@ export function Select({ value, options, onChange, ariaLabel, icon, className = 
       >
         {icon}
         <span className="min-w-0 flex-1 truncate">{options[selected]?.label ?? ''}</span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && box && createPortal(
         <ul

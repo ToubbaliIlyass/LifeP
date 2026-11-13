@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Inbox as ProposalsIcon, Keyboard, Layers, Mic, Moon, Pencil, Plus, Search, SlidersHorizontal, Square, Sun, Trash2 } from 'lucide-react'
 import { useMode } from '@/lib/useMode'
+import { useDrawerSwipe } from '@/lib/useDrawerSwipe'
 import { addDays } from '@/lib/date'
 import { byOrder, counts, progress, type StandardView } from '@/lib/todo-views'
 import type { Todo, TodoList } from '@/lib/todos'
@@ -135,7 +136,7 @@ export function ContextMenu({ at, onClose, children }: { at: { x: number; y: num
  * areas and projects. Every list is also somewhere to drop a to-do.
  */
 export function Sidebar({
-  view, onSelect, pendingCount, open, slim, onQuickFind, onCapture, onAttach,
+  view, onSelect, pendingCount, open, onClose, slim, onQuickFind, onCapture, onAttach,
 }: {
   view: string
   onSelect: (view: string) => void
@@ -143,6 +144,8 @@ export function Sidebar({
   pendingCount: number
   /** The drawer, on a phone. */
   open: boolean
+  /** Called when the drawer is swiped shut. */
+  onClose?: () => void
   /** Slim Mode: the sidebar put away on a wide screen. */
   slim: boolean
   onQuickFind: () => void
@@ -152,6 +155,8 @@ export function Sidebar({
   onAttach: (files: FileList) => void
 }) {
   const { todos, lists, date, patch, toggle, dragId, dragIds, setDragIds, plusDragging, setPlusDragging, startDraft, createList, patchList, removeList } = useTodos()
+  const asideRef = useRef<HTMLElement>(null)
+  const swipe = useDrawerSwipe(asideRef, open, onClose)
   const [over, setOver] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   /** Right-clicked: which list, and where the pointer was. */
@@ -377,17 +382,20 @@ export function Sidebar({
   return (
     <>
       <aside
+        ref={asideRef}
+        {...swipe}
         aria-label="Lists"
         className={`
           relative flex flex-col min-h-0 w-[var(--sb)] shrink-0 bg-sidebar border-r border-border/60
           max-md:fixed max-md:inset-0 max-md:z-50 max-md:w-full max-md:border-r-0
           max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]
-          max-md:transition-transform max-md:duration-200 motion-reduce:transition-none
+          max-md:touch-pan-y max-md:transition-transform max-md:duration-[400ms] max-md:ease-[var(--ease-spring)] max-md:will-change-transform motion-reduce:transition-none
           ${open ? '' : 'max-md:-translate-x-[102%]'} ${slim ? 'md:hidden' : ''}
         `}
       >
         <ResizeHandle />
-        <nav className="flex-1 min-h-0 overflow-y-auto px-2.5 pt-3 pb-3">
+        {/* touch-action only counts up to the nearest scroller, so the list needs pan-y itself or the browser takes the sideways swipe (useDrawerSwipe). */}
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2.5 pt-3 pb-3 max-md:touch-pan-y">
           {standard('inbox', c.inbox)}
           <div className="h-3" />
           {standard('today', c.today, c.due)}
