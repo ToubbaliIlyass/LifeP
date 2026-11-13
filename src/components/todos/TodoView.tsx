@@ -585,12 +585,12 @@ export function TodoView({
             className={`flex shrink-0 items-center -my-0.5 -mr-1 md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
           >
             {canToday && (
-              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} max-md:hidden`}>
+              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} hover:!bg-transparent max-md:hidden`}>
                 <Star className="w-[15px] h-[15px]" />
               </button>
             )}
             {canSkip(t) && (
-              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN}`}>
+              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} hover:!bg-transparent`}>
                 <SkipForward className="w-[15px] h-[15px]" />
               </button>
             )}
