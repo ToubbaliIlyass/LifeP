@@ -586,15 +586,15 @@ export function TodoView({
         {(canFocus || canSkip(t) || canToday) && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`flex shrink-0 items-center -my-0.5 -mr-1 md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
+            className={`flex shrink-0 items-center max-md:-my-2.5 -mr-1 md:h-[22px] md:transition-opacity md:duration-150 [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:opacity-0 md:group-hover/row:opacity-100 md:focus-within:opacity-100'}`}
           >
             {canToday && (
-              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} hover:!bg-transparent max-md:hidden`}>
+              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} md:!h-[22px] hover:!bg-transparent max-md:hidden`}>
                 <Star className="w-[15px] h-[15px]" />
               </button>
             )}
             {canSkip(t) && (
-              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} hover:!bg-transparent`}>
+              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} md:!h-[22px] hover:!bg-transparent`}>
                 <SkipForward className="w-[15px] h-[15px]" />
               </button>
             )}
@@ -604,7 +604,7 @@ export function TodoView({
                 title={timing ? 'Pause focus' : t.sessions?.length ? 'Resume focus' : 'Focus on this'}
                 aria-label={`${timing ? 'Pause focus' : 'Focus on'}: ${t.title.trim() || 'to-do'}`}
                 onClick={() => { if (timing) focus.pause(t); else { focus.start(t); focus.open(t.id) } }}
-                className={`h-9 max-md:h-11 shrink-0 px-2 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium outline-none ${timing ? 'text-primary-ink' : 'text-muted-foreground hover:text-primary-ink'}`}
+                className={`h-[22px] max-md:h-11 shrink-0 px-2 text-[length:calc(13px*var(--ts))] max-md:text-[length:calc(15px*var(--ts))] font-medium outline-none ${timing ? 'text-primary-ink' : 'text-muted-foreground hover:text-primary-ink'}`}
               >
                 {timing ? 'Pause' : 'Focus'}
               </button>
