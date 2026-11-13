@@ -414,29 +414,33 @@ export function TodoView({
     return m
   }
 
+  /** When it is due, as a chip on the title's own line. */
+  function dueChip(due: { text: string; tone: 'over' | 'soon' | 'calm' } | null) {
+    if (!due) return []
+    const tone = due.tone === 'over'
+      ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-semibold'
+      : due.tone === 'soon' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'bg-foreground/[0.06] text-muted-foreground'
+    return [
+      <span key="due" className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 ${tone}`}>
+        <Flag className="w-3 h-3" />{due.text}
+      </span>,
+    ]
+  }
+
   /**
    * The line under a title: the project or area it belongs to (only where the
-   * list does not already say), and when it is due. Both sit here, with the
-   * task, rather than pinned to the far edge where they float away from it.
+   * list does not already say). When it is due sits on the title's own line.
    */
-  function place(t: Todo, ctx: Ctx, due: { text: string; tone: 'over' | 'soon' | 'calm' } | null) {
+  function place(t: Todo, ctx: Ctx) {
     const l = ctx === 'project' ? undefined : lists.find((x) => x.id === t.listId)
     const where = l && !(l.kind === 'area' && ctx === 'area') ? l : undefined
-    if (!where && !due) return null
-    const dueTone = due?.tone === 'over'
-      ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-semibold'
-      : due?.tone === 'soon' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'bg-foreground/[0.06] text-muted-foreground'
+    if (!where) return null
     return (
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[length:calc(12px*var(--ts))] max-md:text-[length:calc(13.5px*var(--ts))] leading-4 max-md:leading-5 text-muted-foreground">
         {where && (
           <span className="flex min-w-0 items-center gap-1">
             {where.kind === 'project' && <ProgressRing value={progress(where, todos)} size={11} />}
             <span className="truncate">{where.title || (where.kind === 'project' ? 'Untitled project' : 'Untitled area')}</span>
-          </span>
-        )}
-        {due && (
-          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 ${dueTone}`}>
-            <Flag className="w-3 h-3" />{due.text}
           </span>
         )}
       </div>
@@ -573,9 +577,9 @@ export function TodoView({
             <span className={t.done ? 'text-muted-foreground line-through' : ''}>
               {t.title.trim() || <span className="text-muted-foreground/50">New to-do</span>}
             </span>
-            {marks(trail(t), 'ml-1.5')}
+            {marks([...trail(t), ...dueChip(due)], 'ml-1.5')}
           </div>
-          {place(t, ctx, due)}
+          {place(t, ctx)}
         </div>
         {/* Quick buttons, so the common things need no opening of the to-do. With a mouse they float in on hover (or while it is being timed);
             on a phone, which has no hover, the focus one is always there. */}
