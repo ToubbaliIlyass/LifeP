@@ -3,13 +3,15 @@
 import { LogbookArchive } from '@/components/todos/LogbookArchive'
 import { BTN_PRIMARY } from '@/components/ui/buttons'
 import { FocusStrip } from '@/components/focus/FocusStrip'
+import { useFocus } from '@/components/focus/useFocus'
+import { isRunning } from '@/lib/focus'
 import { ListSkeleton } from '@/components/todos/ListSkeleton'
 import { ContextMenu, MENU_ITEM as CONTEXT_ITEM } from '@/components/todos/Sidebar'
 import { startListening } from '@/components/today/TodayAssistant'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   ArrowDown, ArrowUp, Archive, Bell, History, CalendarDays, CalendarPlus, Check, ChevronDown, Clock, Ellipsis, ChevronLeft, FileText, GripVertical, Eye, EyeOff, Flag, Heading, Inbox, Layers, ListChecks, Loader2, Mic, Moon, Plus,
-  Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
+  Pause, Play, Repeat, SkipForward, Sparkles, Square, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import type { EventStatus } from '@/lib/event-status'
 import { parseWhen } from '@/lib/jump-start'
@@ -136,6 +138,7 @@ export function TodoView({
     ready, down, todos, lists, events, date: today, patch, toggle, skip, resolveEvent, remove, startDraft, endDraft,
     patchList, removeList, dragId, dragIds, setDragId, setDragIds, plusDragging, setPlusDragging, takeOpenRequest, reload, archived,
   } = useTodos()
+  const focus = useFocus()
 
   // A draft started from a list that cannot hold one (the Logbook, a search)
   // arrives here already begun: open it, as it was about to be.
@@ -515,6 +518,11 @@ export function TodoView({
     const movable = !fixed && !(daySection && t.time)
     const pool = daySection ? siblings.filter((x) => !x.time && !x.prayerKey) : siblings.filter((x) => !x.prayerKey)
     const due = t.deadline && !t.done ? deadlineLabel(t.deadline, today) : null
+    const live = t.type === 'Task' && !t.done && !fixed && ctx !== 'logbook'
+    const canFocus = live
+    const timing = live && isRunning(t.sessions ?? [])
+    // Not already on today's list: one tap puts it there.
+    const canToday = live && !isToday(t, today, lists)
     return (
       <li
         key={t.id}
@@ -569,17 +577,35 @@ export function TodoView({
           </div>
           {place(t, ctx, due)}
         </div>
-        {/* One time round of a repeating to-do, put off; it carries on after. Always there on a phone, which has no hover. */}
-        {canSkip(t) && (
-          <button
-            type="button"
-            title={skipLabel(t, today)}
-            aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`}
-            onClick={(e) => { e.stopPropagation(); skip(t) }}
-            className={`${ICON_BTN} -my-0.5 -mr-1 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 max-md:opacity-100 [@media(hover:none)]:opacity-100`}
+        {/* Quick buttons, so the common things need no opening of the to-do. With a mouse they float in on hover (or while it is being timed);
+            on a phone, which has no hover, the focus one is always there. */}
+        {(canFocus || canSkip(t) || canToday) && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`flex shrink-0 items-center -my-0.5 -mr-1 md:absolute md:inset-y-0 md:right-0 md:m-0 md:rounded-r-md md:pl-6 md:pr-1 md:bg-[linear-gradient(to_right,transparent,color-mix(in_oklab,var(--foreground)_4%,var(--background))_1.5rem)] md:transition-opacity md:duration-150 md:focus-within:pointer-events-auto md:focus-within:opacity-100 md:group-hover/row:pointer-events-auto md:group-hover/row:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 ${timing ? '' : 'md:pointer-events-none md:opacity-0'}`}
           >
-            <SkipForward className="w-[15px] h-[15px]" />
-          </button>
+            {canToday && (
+              <button type="button" title="Do it today (T)" aria-label={`Do today: ${t.title.trim() || 'to-do'}`} onClick={() => patch(t.id, { when: today, evening: false })} className={`${ICON_BTN} md:!h-7 md:!w-7 max-md:hidden`}>
+                <Star className="w-[15px] h-[15px]" />
+              </button>
+            )}
+            {canSkip(t) && (
+              <button type="button" title={skipLabel(t, today)} aria-label={`${skipLabel(t, today)}: ${t.title.trim() || 'to-do'}`} onClick={() => skip(t)} className={`${ICON_BTN} md:!h-7 md:!w-7`}>
+                <SkipForward className="w-[15px] h-[15px]" />
+              </button>
+            )}
+            {canFocus && (
+              <button
+                type="button"
+                title={timing ? 'Pause focus' : t.sessions?.length ? 'Resume focus' : 'Focus on this'}
+                aria-label={`${timing ? 'Pause focus' : 'Focus on'}: ${t.title.trim() || 'to-do'}`}
+                onClick={() => { if (timing) focus.pause(t); else { focus.start(t); focus.open(t.id) } }}
+                className={`${ICON_BTN} md:!h-7 md:!w-7 max-md:!h-9 max-md:!w-9 max-md:rounded-full ${timing ? '' : 'max-md:bg-foreground/[0.06]'} ${timing ? 'bg-primary/15 text-primary-ink hover:bg-primary/20' : 'hover:text-primary-ink'}`}
+              >
+                {timing ? <Pause className="w-[15px] h-[15px]" fill="currentColor" /> : <Play className="w-[15px] h-[15px]" fill="currentColor" />}
+              </button>
+            )}
+          </div>
         )}
       </li>
     )
